@@ -65,7 +65,9 @@ endif()
 # directory's scope, where a variable set here is not visible.
 set_property(GLOBAL PROPERTY DC_CORE_COMPAT_DEFS "${DC_CORE_COMPAT_DEFS}")
 
-if (BUILD_TESTING)
+# The gtest suite is written for the Linux runner (t/run_tests.sh); windows.h's min/max and
+# near/far macros break its sources under MSVC, so Windows builds leave it out.
+if (BUILD_TESTING AND NOT MSVC)
     function(define_dungeon_clear_tests)
         set(MOD_PATH "${CMAKE_SOURCE_DIR}/modules/mod-dungeon-clear")
         get_property(DC_CORE_COMPAT_DEFS GLOBAL PROPERTY DC_CORE_COMPAT_DEFS)
