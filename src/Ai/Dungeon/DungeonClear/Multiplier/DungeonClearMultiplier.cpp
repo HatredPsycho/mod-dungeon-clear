@@ -315,7 +315,9 @@ float DungeonClearMultiplier::GetValue(Action* action)
     bool const isProactiveEngage =
         name == "attack anything" ||
         name == "move random" ||
-        name == "pull action" || name == "pull start" || name == "reach pull";
+        name == "pull action" || name == "pull start" || name == "reach pull" ||
+        // Conquest of Azeroth's Playerbots: the tank's own "coa auto pull" takes the nearest pack in reach.
+        name == "coa auto pull";
 
     // FOLLOWER in advanced-pull camp-hold. Followers never set `enabled`, so this
     // sits above the enabled gate below. In pull mode the party holds and
@@ -385,7 +387,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // DC's own follow-tank redirect is a DcMovementAction, not a FollowAction, so
     // this never touches it. When paused/off PartyTank is null and stock follow
     // resumes (a paused run hands positioning back to the player).
-    if (dynamic_cast<FollowAction*>(action) && AI_VALUE(Player*, DcKey::PartyTank))
+    // Conquest of Azeroth's Playerbots add "coa catch up", which teleports a bot to the human
+    // party leader after 6s more than 35yd away out of combat: on a run it would pull the
+    // scouting tank and the camp back to a player who trails behind.
+    if ((dynamic_cast<FollowAction*>(action) || name == "coa catch up") && AI_VALUE(Player*, DcKey::PartyTank))
         return 0.0f;
 
     bool const enabled = DcRun::Of(context).enabled;
