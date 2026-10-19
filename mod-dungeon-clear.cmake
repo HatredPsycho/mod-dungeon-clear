@@ -65,9 +65,7 @@ endif()
 # directory's scope, where a variable set here is not visible.
 set_property(GLOBAL PROPERTY DC_CORE_COMPAT_DEFS "${DC_CORE_COMPAT_DEFS}")
 
-# The gtest suite is written for the Linux runner (t/run_tests.sh); windows.h's min/max and
-# near/far macros break its sources under MSVC, so Windows builds leave it out.
-if (BUILD_TESTING AND NOT MSVC)
+if (BUILD_TESTING)
     function(define_dungeon_clear_tests)
         set(MOD_PATH "${CMAKE_SOURCE_DIR}/modules/mod-dungeon-clear")
         get_property(DC_CORE_COMPAT_DEFS GLOBAL PROPERTY DC_CORE_COMPAT_DEFS)
@@ -190,10 +188,13 @@ if (BUILD_TESTING AND NOT MSVC)
         # same reason (see the C4005 note above).
         if (MSVC)
             target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES=)
+            # windows.h's min/max macros break std::numeric_limits<...>::max() in the suite.
+            target_compile_definitions(dungeon_clear_tests PRIVATE NOMINMAX)
         endif()
 
         # Link the necessary targets
         target_link_libraries(dungeon_clear_tests
+            acore-core-interface
             game
             gtest_main
             gmock_main

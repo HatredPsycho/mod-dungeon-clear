@@ -7,6 +7,7 @@
 // museum verdict (Judge) — plus a sweep over every committed scenario so a
 // malformed file under lab/scenarios fails here, not at `.dc lab batch` time.
 
+#include <algorithm>
 #include <filesystem>
 
 #include "gtest/gtest.h"
@@ -177,6 +178,7 @@ TEST(DcLabScenario, JudgeMuseumVerdicts)
 TEST(DcLabScenario, CommittedScenariosLoad)
 {
     std::string dir = std::string(__FILE__);
+    std::replace(dir.begin(), dir.end(), '\\', '/');
     dir = dir.substr(0, dir.rfind("/t/")) + "/lab/scenarios";
     if (char const* env = std::getenv("DC_LAB_DIR"))
         dir = std::string(env) + "/scenarios";
