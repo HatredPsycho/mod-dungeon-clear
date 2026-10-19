@@ -76,6 +76,7 @@ namespace DcSuppressionTransit
         PackTrailing,  // the trailing living member is outside the pack leash
         Elite,         // a live Taskmaster / Hatcher is inside the hold radius
         Disarm,        // an armed Suppression Device is inside the hold radius
+        Engaged,       // the last legs, with elites still fighting the raid (see Decide)
     };
 
     inline char const* HoldName(Hold h)
@@ -86,6 +87,7 @@ namespace DcSuppressionTransit
             case Hold::PackTrailing: return "pack trailing";
             case Hold::Elite:        return "elite in reach";
             case Hold::Disarm:       return "disarming a suppression device";
+            case Hold::Engaged:      return "finishing the tow before the standoff";
             case Hold::None:
             default:                 return "advancing";
         }
@@ -128,6 +130,13 @@ namespace DcSuppressionTransit
         float  nearestArmedDeviceDist = -1.0f; // <0 = none in scan
         float  disarmHoldRadius = 0.0f;
 
+        // Live non-whelp creatures fighting a living member, wherever they stand,
+        // and how many legs short of the standoff that is a reason to stop
+        // (0 = never). The standoff is at the boss's feet, so walking the last legs
+        // with a tow on the raid pulls him into it.
+        uint32 engagedElites = 0;
+        uint32 engagedHoldLegs = 0;
+
         // --- clocks ---
         uint32 nowMs = 0;
         uint32 armedSinceMs = 0;     // DcRunState::transitArmedMs (the gather budget's clock)
@@ -139,6 +148,7 @@ namespace DcSuppressionTransit
         uint32 packHoldTimeoutMs = 0;
         uint32 eliteHoldTimeoutMs = 0;
         uint32 disarmHoldTimeoutMs = 0;
+        uint32 engagedHoldTimeoutMs = 0;
     };
 
     struct Verdict
@@ -201,6 +211,9 @@ namespace DcSuppressionTransit
     // packet, one tick is one anchor. Twenty-four yards per 120 seconds over the
     // 342yd crossing is the 18-24 minute leg we kept measuring.
     //
+    // ENGAGED does not latch either, for the same reason as the pack hold below:
+    // walking on is what makes it worse. The legs it covers end on Broodlord.
+    //
     // PACKTRAILING deliberately does NOT latch, and that asymmetry is the point.
     // Walking is what makes a straggler hold WORSE, not better, so a latched
     // release would march the leader to the Broodlord standoff on its own —
@@ -221,6 +234,7 @@ namespace DcSuppressionTransit
             case Hold::PackTrailing: return in.packHoldTimeoutMs;
             case Hold::Elite:        return in.eliteHoldTimeoutMs;
             case Hold::Disarm:       return in.disarmHoldTimeoutMs;
+            case Hold::Engaged:      return in.engagedHoldTimeoutMs;
             case Hold::None:
             default:                 return 0;
         }
@@ -298,10 +312,20 @@ namespace DcSuppressionTransit
         // finished.
         v.cursorAdvance = reached;
 
-        // --- the three holds, in precedence order ---------------------------
+        // THE TOW BEFORE THE STANDOFF. Judged on the anchor the leader is about to
+        // walk TO, not the one it is on: a hold never issues a stop packet, so the
+        // only way to stand on the last safe anchor is to refuse the leg that leaves
+        // it on the tick it is reached.
+        uint32 const nextIndex = reached ? in.cursorIndex + 1 : in.cursorIndex;
+        bool const towIntoStandoff = in.engagedHoldLegs > 0 && in.engagedElites > 0 &&
+                                     nextIndex + in.engagedHoldLegs >= in.anchorCount;
+
+        // --- the four holds, in precedence order ----------------------------
         Hold want = Hold::None;
         if (PackLags(in))
             want = Hold::PackTrailing;
+        else if (towIntoStandoff)
+            want = Hold::Engaged;
         else if (in.nearestEliteDist >= 0.0f && in.nearestEliteDist <= in.eliteHoldRadius)
             want = Hold::Elite;
         else if (in.nearestArmedDeviceDist >= 0.0f &&

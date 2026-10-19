@@ -1317,6 +1317,20 @@ float DcTargeting::ActiveRoomSkirt(Player* bot, AiObjectContext* ctx)
 
     return IsRoomClearActive(bot, ctx) ? skirt : 0.0f;
 }
+std::vector<G3D::Vector3> DcTargeting::ActiveRoomPatrolRoute(Player* bot, AiObjectContext* ctx)
+{
+    if (!bot || !ctx)
+        return {};
+
+    // Same cheap-gates-first order as ActiveRoomSkirt.
+    std::optional<DungeonBossInfo> next =
+        ctx->GetValue<std::optional<DungeonBossInfo>>(DcKey::NextDungeonBoss)->Get();
+    if (!next.has_value() || !RoomAggroRegistry::Find(bot->GetMapId(), next->entry))
+        return {};
+    if (!IsRoomClearActive(bot, ctx))
+        return {};
+    return DcEngageGeometry::PatrolRouteOf(GetLiveBoss(bot, ctx, next->entry));
+}
 RoomAggroBoss const* DcTargeting::ActiveRoomCampBox(Player* bot, AiObjectContext* ctx)
 {
     if (!bot || !ctx)

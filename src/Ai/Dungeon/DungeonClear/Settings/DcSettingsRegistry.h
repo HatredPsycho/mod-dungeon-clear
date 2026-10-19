@@ -679,8 +679,41 @@ inline constexpr DcSettingDef kDcSettings[] =
     // HEROIC: actually wait the patrol out. 8s gives up on plenty of real patrol
     // loops, and giving up means committing the heavier maneuver into a pack that
     // was about to be two mobs smaller.
+    //
+    // RAID: 30s. PullPatrolWaitSec is also the SOFT budget of the patrol guard
+    // below, and a raid patrol loop is long: Lucifron's is ~186yd, about 75s at
+    // walk, so 8s (or heroic's 18) gives up long before he turns. Past the soft
+    // budget the guard holds only while the patrol walks AT the pull, up to twice
+    // the budget (DungeonClearMath::PatrolHoldHardFactor), then pulls anyway.
     { "PullPatrolWait",        DcType::Bool,   1,   0,   1,  true  },
-    { "PullPatrolWaitSec",     DcType::Float,  8,   1,  30,  true,  18 },
+    { "PullPatrolWaitSec",     DcType::Float,  8,   1, 120,  true,  18, 30 },
+
+    // Patrol guard (Dynamic mode only). The patrol-wait above is an ESTIMATE
+    // question — it only fires when a lone patroller is what tips a pack over the
+    // Leeroy ceiling. The guard is a PROXIMITY question: never start a pull while
+    // a patrolling creature (a DB waypoint mover, or a member of a formation led by
+    // one) or a boss that moves, out of combat and not part of the pack, stands
+    // within its own aggro reach + PullEnRouteMargin + PullPatrolBuffer of the pack
+    // or of the camp. Molten Core 2026-10-16: a five-hound pack (15 thirds, exactly
+    // the ceiling) read LEEROY and was pulled with Lucifron's patrol 14-32yd away;
+    // he and both Protectors joined five seconds in, the next hound pack nine
+    // seconds later. The estimate counted nothing because he was at the far end of
+    // his loop when the pack was sized.
+    //
+    // The tank holds where it stands (decision 3, "Waiting for patrol") at first
+    // sight of the pack, and again in the advanced pull's Forming dwell right before
+    // the tag; a patrol already walking AWAY and outside its real aggro reach does
+    // not hold. The hold shares PullPatrolWaitSec's budget, one per pull; past it
+    // only a patrol walking AT the pull keeps the hold, and twice the budget is a
+    // hard cap, so a patrol that never leaves cannot stall the run. A boss that
+    // never moves is not waited on (it will be there in 30s too): its room-aggro
+    // row / skirt keeps the fight away from it instead.
+    //
+    // RAID-only by default: a raid fight lasts long enough for any patrol to walk
+    // into it, and a raid boss joining a trash pull is a wipe. Dungeons keep the
+    // estimate-only patrol-wait.
+    { "PullPatrolGuard",       DcType::Bool,   0,   0,   1,  true,  kDcNoHeroic, 1 },
+    { "PullPatrolBuffer",      DcType::Float, 10,   0,  40,  true  },
 
     // Chase leash. Patrol-wait above handles a patroller that CONTENDS a pack we
     // are pulling; this handles the patroller that IS the pack. A pull target is

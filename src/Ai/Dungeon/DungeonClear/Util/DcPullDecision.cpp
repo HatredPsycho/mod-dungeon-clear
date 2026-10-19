@@ -40,7 +40,18 @@ namespace DcPullDecision
                 return PullVerdict::NoOp;        // throttled — hold standing decision
         }
 
-        // 4. Resolve a fresh classification into a verdict, layering the patrol-wait
+        // 4. Patrol guard: a patrolling creature or moving boss is near the pack
+        //    or the camp. Hold wherever the tank stands — not just at commit range:
+        //    the provisional-Leeroy walk-in the contended branch below uses would
+        //    carry the tank (or the Leeroy room-clear) into the pack while the
+        //    patrol is still beside it, which is the pull being avoided. Leeroy or
+        //    Advanced alike: the patrol joins a long fight either way. Once the
+        //    shared wait budget is spent, fall through and commit as classified so
+        //    a patrol that never leaves can't stall the run.
+        if (o.patrolNear && !o.patrolWaitExpired)
+            return PullVerdict::PatrolWaitHold;
+
+        // 5. Resolve a fresh classification into a verdict, layering the patrol-wait
         //    gate on top of the plain Leeroy/Advanced decision. Patrol-wait fires
         //    only when ADVANCED is the verdict AND the feature is on: when the ONLY
         //    reason a pack reads ADVANCED is a lone patroller in chain range
@@ -64,7 +75,7 @@ namespace DcPullDecision
             }
         }
 
-        // 5. Commit the classification.
+        // 6. Commit the classification.
         return o.advanced ? PullVerdict::Advanced : PullVerdict::Leeroy;
     }
 }

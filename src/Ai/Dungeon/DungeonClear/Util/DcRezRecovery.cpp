@@ -768,6 +768,11 @@ namespace DcRezRecovery
         run.noRezzerSinceMs = 0;
         run.noRezzerQuietSinceMs = 0;
         run.progress.stampMs = 0;  // stranded clock re-arms on the next evaluation
+        // A transit the wipe interrupted (BWL's Suppression Rooms) must start over
+        // from its staging point. Left as it was, the latched gather skips the
+        // muster, the stale arm clock reads as already expired, and a hold clock
+        // with the same reason releases its first hold on sight.
+        run.ClearTransit();
 
         if (PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot))
             DcStatusPublisher::SendAddonMessage(

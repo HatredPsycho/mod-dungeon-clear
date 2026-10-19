@@ -355,6 +355,38 @@ public:
     // when neither owns the difficulty.
     static bool TargetInsideBystanderPack(Player* bot, Unit* target);
 
+    // Patrol guard (PullPatrolGuard): what makes starting a pull on `target`
+    // unsafe right now. `creature` is the first threat (nullptr = none); `closing`
+    // is true when any threat is NOT walking away (walking at the pack/camp, or
+    // paused on a waypoint) — past the soft wait budget only a closing threat
+    // keeps the hold (DungeonClearMath::ShouldHoldForPatrol).
+    //
+    // A threat is out of combat, hostile, on the target's floor, not part of the
+    // pack (DungeonClearMath::IsPatrolPackmate: same formation, linked respawn, or
+    // a formation-less neighbour of a formation-less target), moves on its own
+    // (DungeonClearMath::IsPatrolMover: waypoint mover, follower of a waypoint
+    // leader, or a boss that wanders or walks), and stands within its aggro reach
+    // + PullEnRouteMargin + PullPatrolBuffer of the target or of `camp` (nullptr =
+    // no camp yet) WITH line of sight to it — a patrol one wall over cannot see
+    // the fight. One walking away from both and already outside its real reach of
+    // both is not a threat at all. A boss parked on its spot never qualifies; the
+    // room-aggro skirt keeps the fight away from it instead.
+    //
+    // Same exclusions as TargetInsideBystanderPack, deliberately without its
+    // PullEnRouteAvoid / sweep arming: this is armed by PullPatrolGuard alone
+    // (raid-only by default). One grid search around the target.
+    struct PatrolThreat
+    {
+        Creature* creature = nullptr;
+        bool closing = false;
+    };
+    static PatrolThreat PatrolThreatNear(Player* bot, AiObjectContext* ctx, Unit* target,
+                                         Position const* camp);
+
+    // The closed waypoint route `c` walks — its own path, or its formation
+    // leader's — as world points; empty when it does not patrol a DB path.
+    static std::vector<G3D::Vector3> PatrolRouteOf(Creature const* c);
+
     // Is the en-route pack SWEEP in force for this bot? A non-heroic dungeon on
     // the RouteSweepRegistry allow-list — see that header for why the scope is a
     // per-map table rather than a difficulty or a config key, and

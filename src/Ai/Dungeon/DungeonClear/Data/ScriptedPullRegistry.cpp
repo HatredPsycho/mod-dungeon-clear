@@ -492,6 +492,57 @@ namespace
     // between the spawns and the cylinder's authored centre.
     float constexpr MGT_ROT_ZBAND  = 10.0f;
 
+    // --- Blackwing Lair (469) — the two Death Talon packs past Vaelastrasz -------
+    //
+    // Geometry from acore_world.creature + creature_formations, measured against the
+    // certified approach route (BlackwingLairEvents.cpp, anchors 11-14):
+    //
+    //   * EAST pack (formation leader 84519, Captain): 84519/84530/84523/84524/
+    //     84525/84526 — Captain, Flamescale, 2 Seether, 2 Wyrmkin — around
+    //     (-7531.8, -919.5, 428.0), every member within 9.5yd of that point.
+    //   * WEST pack (leader 84520): 84520/84529/84521/84522/84527/84528 around
+    //     (-7581.2, -933.5, 428.2), every member within 12.4yd. The route runs
+    //     straight THROUGH it: anchor 14 is 4.9yd from Flamescale 84529 and anchor
+    //     15 is 6.0yd from Wyrmkin 84527.
+    //   * The two packs are 31.9yd apart at their nearest members (84525 / 84529),
+    //     against a ~23yd elite aggro reach for a level-60 raid.
+    //   * The hall behind them (anchors 5-12) is the NO_STOP band: 25-26yd under the
+    //     upper suppression room's Technicians in 3D (DcNoStopZone).
+    //
+    // Why a plan. Without one the pull system stands down for the whole leg out of
+    // anchor 12 (the NO_STOP capsule reaches 18yd past it), the tank walks on to
+    // anchor 13 and fights the east pack from there — and anchor 13 is 21.9yd from
+    // the west pack. A 40-man raid spread around the tank there body-pulls it. Live
+    // (2026-10-17 13:19): east pack engaged at :40, west pack at :45, 50 deaths; the
+    // next attempt carried the leftover pack into the Suppression Room.
+    //
+    //   EAST ROW — camp and stand (-7535.0, -952.0), 3.7yd off anchor 12 toward the
+    //   pack: 25.3yd from the nearest east member, 37.9yd from the west pack, 26.9yd
+    //   from the floor above. A follower 12yd off it (the camp-fight leash) is still
+    //   26yd from the west pack. A body pull from the camp itself, like the MgT
+    //   patrol row: the tank walks the few yards to the aggro edge and the pack comes
+    //   to the camp.
+    //
+    //   WEST ROW — camp on the east pack's own floor (-7529.0, -921.0), empty by
+    //   then: every point 12yd around it is 29yd+ from the west pack and 29.5yd from
+    //   the floor above. Stand on anchor 13 (certified on-mesh, sight-line down the
+    //   route leg into the pack), 21.9yd from Flamescale 84529, so the tag is a
+    //   ranged opener on the nearest member and a ~31yd drag north-east.
+    //
+    // Both rows arm off anchor 12, so the west row only becomes due once the tank
+    // is back at the east camp with the east cylinder empty. Not yet measured
+    // in-game; the stand and camp spots are the first thing to check on a run.
+    uint32 constexpr BWL_MAP             = 469;
+    uint32 constexpr BWL_BROODLORD       = 12017;
+    uint32 constexpr BWL_DT_FLAMESCALE   = 12463;
+    uint32 constexpr BWL_DT_SEETHER      = 12464;
+    uint32 constexpr BWL_DT_WYRMKIN      = 12465;
+    uint32 constexpr BWL_DT_CAPTAIN      = 12467;
+
+    float constexpr BWL_DT_ARM_X = -7537.02f, BWL_DT_ARM_Y = -955.13f, BWL_DT_ARM_Z = 428.52f;
+    float constexpr BWL_DT_ARM_R = 16.0f;
+    float constexpr BWL_DT_ZBAND = 6.0f;
+
     std::vector<ScriptedPullStage> const& Table()
     {
         static std::vector<ScriptedPullStage> const kStages = []
@@ -648,6 +699,40 @@ namespace
                 s.bodyPull   = r.bodyPull;
                 t.push_back(s);
             }
+
+            std::vector<uint32> const deathTalon = {
+                BWL_DT_FLAMESCALE, BWL_DT_SEETHER, BWL_DT_WYRMKIN, BWL_DT_CAPTAIN};
+
+            ScriptedPullStage dtEast;
+            dtEast.mapId      = BWL_MAP;
+            dtEast.bossEntry  = BWL_BROODLORD;
+            dtEast.order      = 0;
+            dtEast.name       = "Blackwing Lair — Death Talon east pack";
+            dtEast.campX      = -7535.00f; dtEast.campY  = -952.00f; dtEast.campZ  = 428.50f;
+            dtEast.standX     = -7535.00f; dtEast.standY = -952.00f; dtEast.standZ = 428.50f;
+            dtEast.packX      = -7531.80f; dtEast.packY  = -919.50f; dtEast.packZ  = 428.00f;
+            dtEast.packRadius = 12.0f;
+            dtEast.packZBand  = BWL_DT_ZBAND;
+            dtEast.armX       = BWL_DT_ARM_X; dtEast.armY = BWL_DT_ARM_Y; dtEast.armZ = BWL_DT_ARM_Z;
+            dtEast.armRadius  = BWL_DT_ARM_R;
+            dtEast.entries    = deathTalon;
+            dtEast.bodyPull   = true;
+            t.push_back(dtEast);
+
+            ScriptedPullStage dtWest;
+            dtWest.mapId      = BWL_MAP;
+            dtWest.bossEntry  = BWL_BROODLORD;
+            dtWest.order      = 1;
+            dtWest.name       = "Blackwing Lair — Death Talon west pack";
+            dtWest.campX      = -7529.00f; dtWest.campY  = -921.00f; dtWest.campZ  = 428.00f;
+            dtWest.standX     = -7549.37f; dtWest.standY = -944.97f; dtWest.standZ = 428.65f;
+            dtWest.packX      = -7581.20f; dtWest.packY  = -933.50f; dtWest.packZ  = 428.20f;
+            dtWest.packRadius = 15.0f;
+            dtWest.packZBand  = BWL_DT_ZBAND;
+            dtWest.armX       = BWL_DT_ARM_X; dtWest.armY = BWL_DT_ARM_Y; dtWest.armZ = BWL_DT_ARM_Z;
+            dtWest.armRadius  = BWL_DT_ARM_R;
+            dtWest.entries    = deathTalon;
+            t.push_back(dtWest);
 
             std::stable_sort(t.begin(), t.end(),
                              [](ScriptedPullStage const& a, ScriptedPullStage const& b)

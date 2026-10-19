@@ -36,6 +36,7 @@ namespace
         o.atCommitRange = false;
         o.patrolContended = false;
         o.patrolWaitExpired = false;
+        o.patrolNear = false;
         return o;
     }
 }
@@ -187,6 +188,70 @@ TEST(DcPullDecision, AdvancedApproachingNotContendedCommits)
     EXPECT_EQ(DecidePull(o), PullVerdict::Advanced);
 }
 
+// ---- Patrol guard (PullPatrolGuard) ---------------------------------------
+// Molten Core 2026-10-16: a five-hound pack (15 thirds, exactly the ceiling) read
+// LEEROY and was pulled while Lucifron's patrol stood 14-32yd off; he joined five
+// seconds in. The guard holds on proximity alone, whatever the estimate says.
+
+TEST(DcPullDecision, PatrolGuardHoldsALeeroyPack)
+{
+    PullObservation o = Base();
+    o.patrolNear = true;           // the 5-hound pack: advanced == false
+    EXPECT_EQ(DecidePull(o), PullVerdict::PatrolWaitHold);
+}
+
+TEST(DcPullDecision, PatrolGuardHoldsAnAdvancedPack)
+{
+    PullObservation o = Base();
+    o.advanced = true;
+    o.patrolNear = true;
+    EXPECT_EQ(DecidePull(o), PullVerdict::PatrolWaitHold);
+}
+
+TEST(DcPullDecision, PatrolGuardHoldsBeforeCommitRangeInsteadOfWalkingIn)
+{
+    // The contended branch would answer ApproachAsLeeroy here; with the patrol
+    // near, walking in is exactly the pull being avoided, so hold where we stand.
+    PullObservation o = Base();
+    o.advanced = true;
+    o.patrolWaitEnabled = true;
+    o.patrolContended = true;
+    o.atCommitRange = false;
+    o.patrolNear = true;
+    EXPECT_EQ(DecidePull(o), PullVerdict::PatrolWaitHold);
+}
+
+TEST(DcPullDecision, PatrolGuardWaitExpiredCommitsTheClassification)
+{
+    // Budget spent: never deadlock on a patrol that does not leave.
+    PullObservation o = Base();
+    o.patrolNear = true;
+    o.patrolWaitExpired = true;
+    EXPECT_EQ(DecidePull(o), PullVerdict::Leeroy);
+    o.advanced = true;
+    EXPECT_EQ(DecidePull(o), PullVerdict::Advanced);
+}
+
+TEST(DcPullDecision, PatrolGuardNeverOverridesTheEngagementLatch)
+{
+    PullObservation o = Base();
+    o.patrolNear = true;
+    o.inCombat = true;
+    EXPECT_EQ(DecidePull(o), PullVerdict::NoOp);
+    o = Base();
+    o.patrolNear = true;
+    o.sameTarget = true;
+    o.currentlyAdvanced = true;   // committed Advanced stays locked (the Forming
+    EXPECT_EQ(DecidePull(o), PullVerdict::NoOp);  // dwell owns the guard there)
+}
+
+TEST(DcPullDecision, PatrolGuardOffLeavesTheOldLadder)
+{
+    PullObservation o = Base();
+    o.patrolNear = false;
+    EXPECT_EQ(DecidePull(o), PullVerdict::Leeroy);
+}
+
 // ---------------------------------------------------------------------------
 // DcPullContext::SafetyRelease — the camp-safety valve's per-phase policy.
 // The valve wants "let them fight", not "abandon the maneuver": an in-flight
@@ -285,6 +350,48 @@ TEST(DcPullStandDown, ClearDynamicVerdictDropsAPatrolHold)
     // branch would resume mid-throttle against a pack it never re-classified.
     EXPECT_TRUE(pull.decisionTarget.IsEmpty());
     EXPECT_EQ(pull.decisionSince, 0u);
+    EXPECT_EQ(pull.patrolWaitSince, 0u);
+}
+
+// ---------------------------------------------------------------------------
+// DcPullContext::ScopePatrolBudgetTo — the patrol-hold budget belongs to one pack.
+// The Forming dwell's guard spends pull.patrolWaitSince; only the Dynamic governor
+// resets it per pack, and it never runs on pull setting On, so the commit scopes it.
+// ---------------------------------------------------------------------------
+
+TEST(DcPullPatrolBudget, CommitToANewPackStartsAFreshBudget)
+{
+    DcPullContext pull;
+    pull.decisionTarget = ObjectGuid(uint64(0xF130004123456789ull));  // pack A
+    pull.patrolWaitSince = 4000u;                                     // spent on A
+    pull.ScopePatrolBudgetTo(ObjectGuid(uint64(0xF130004100000001ull)));  // commit B
+    EXPECT_EQ(pull.patrolWaitSince, 0u);
+}
+
+TEST(DcPullPatrolBudget, GovernorHoldOnTheSamePackCarriesIntoForming)
+{
+    // One wait per pull: what the governor already spent holding for this pack
+    // is not handed out again at the tag.
+    DcPullContext pull;
+    ObjectGuid const pack(uint64(0xF130004123456789ull));
+    pull.decisionTarget = pack;
+    pull.patrolWaitSince = 4000u;
+    pull.ScopePatrolBudgetTo(pack);
+    EXPECT_EQ(pull.patrolWaitSince, 4000u);
+}
+
+TEST(DcPullPatrolBudget, PullSettingOnNeverCarriesABudgetOver)
+{
+    // No governor on pull setting On: decisionTarget stays empty, so every commit
+    // starts clean — including a re-pull of the same pack after a fizzle.
+    DcPullContext pull;
+    ObjectGuid const pack(uint64(0xF130004123456789ull));
+    pull.patrolWaitSince = 4000u;   // spent on the previous pull's Forming dwell
+    pull.ScopePatrolBudgetTo(pack);
+    EXPECT_EQ(pull.patrolWaitSince, 0u);
+    pull.patrolWaitSince = 9000u;
+    pull.pullTarget = pack;
+    pull.ScopePatrolBudgetTo(pack);
     EXPECT_EQ(pull.patrolWaitSince, 0u);
 }
 

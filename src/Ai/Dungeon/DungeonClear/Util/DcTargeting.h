@@ -297,6 +297,15 @@ public:
     // "combat too close, pulls the boss" failure). Leader/room-scoped; cheap.
     static float ActiveRoomSkirt(Player* bot, AiObjectContext* ctx);
 
+    // The closed waypoint route of the room-aggro boss currently being pre-cleared,
+    // when that boss PATROLS (DcEngageGeometry::PatrolRouteOf); empty otherwise.
+    // The skirt above is measured from where the boss stands NOW, which for a
+    // patroller says nothing about where it will be twenty seconds into the camp
+    // fight: Lucifron's loop is ~186yd, and a camp 40yd from him at one end of it
+    // can sit on the leg he walks next. The camp placer and the room-clear lane
+    // keep their skirt clearance from this whole route as well. Leader/room-scoped.
+    static std::vector<G3D::Vector3> ActiveRoomPatrolRoute(Player* bot, AiObjectContext* ctx);
+
     // The row of the room-aggro boss currently being pre-cleared when it carries
     // a camp box (RoomAggroBoss::hasCampBox), else nullptr. The advanced-pull camp
     // search rejects every candidate outside that box, so the skirt-widened drag

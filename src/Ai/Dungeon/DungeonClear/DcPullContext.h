@@ -463,6 +463,19 @@ struct DcPullContext
 
     void Reset() { *this = DcPullContext{}; }
 
+    // Scope the patrol-hold budget (patrolWaitSince) to the pack an advanced pull
+    // is committing to. Only the Dynamic governor resets it per pack, and the
+    // governor does not run at all on pull setting On (or once an Advanced verdict
+    // is locked), so without this a budget spent on one pack carried into the
+    // Forming dwell of the next and that pull's tag was never held. A budget the
+    // governor spent holding for THIS pack (decisionTarget) is kept — one wait per
+    // pull, not one per phase.
+    void ScopePatrolBudgetTo(ObjectGuid pack)
+    {
+        if (pack != decisionTarget)
+            patrolWaitSince = 0;
+    }
+
     // Tear down the standing Dynamic verdict and every latch that feeds it.
     //
     // The governor (DcPullPlanner::UpdateDynamicPullMode) is the ONLY writer of

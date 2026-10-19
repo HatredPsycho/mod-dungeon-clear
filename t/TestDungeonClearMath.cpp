@@ -1382,6 +1382,138 @@ TEST(DungeonClearPatrolGateTest, ZeroBudgetProceeds)
     EXPECT_FALSE(ShouldWaitForPatrol(6u, 5u, 5u, since, 100u, 0u, since));
 }
 
+// --- ShouldHoldForPatrol (the patrol guard's clock) -------------------------
+
+using DungeonClearMath::ShouldHoldForPatrol;
+
+// Soft budget: holds while inside it whatever the patrol is doing.
+TEST(DungeonClearPatrolGateTest, GuardHoldsInsideTheSoftBudget)
+{
+    std::uint32_t since = 0u;
+    EXPECT_TRUE(ShouldHoldForPatrol(true, false, since, 2000u, 30000u, 60000u, since));
+    EXPECT_EQ(since, 2000u);
+    EXPECT_TRUE(ShouldHoldForPatrol(true, false, since, 31000u, 30000u, 60000u, since));
+}
+
+// Past the soft budget a RECEDING patrol releases at once (and the latch stays
+// spent, so the same patrol does not start a second wait)...
+TEST(DungeonClearPatrolGateTest, GuardPastBudgetReleasesOnAWalkingAwayTick)
+{
+    std::uint32_t since = 2000u;
+    EXPECT_FALSE(ShouldHoldForPatrol(true, false, since, 32000u, 30000u, 60000u, since));
+    EXPECT_EQ(since, 2000u);
+}
+
+// ...a CLOSING one keeps the hold — expiry must never commit the pull the moment
+// the patrol walks into it — until the hard cap, then pulls regardless.
+TEST(DungeonClearPatrolGateTest, GuardPastBudgetHoldsAClosingPatrolUntilTheHardCap)
+{
+    std::uint32_t since = 2000u;
+    EXPECT_TRUE(ShouldHoldForPatrol(true, true, since, 32000u, 30000u, 60000u, since));
+    EXPECT_TRUE(ShouldHoldForPatrol(true, true, since, 61000u, 30000u, 60000u, since));
+    EXPECT_FALSE(ShouldHoldForPatrol(true, true, since, 62000u, 30000u, 60000u, since));
+    EXPECT_EQ(since, 2000u);
+}
+
+// The patrol walking off releases the hold at once and clears the latch.
+TEST(DungeonClearPatrolGateTest, GuardReleasesWhenThePatrolLeaves)
+{
+    std::uint32_t since = 2000u;
+    EXPECT_FALSE(ShouldHoldForPatrol(false, true, since, 9000u, 30000u, 60000u, since));
+    EXPECT_EQ(since, 0u);
+}
+
+// getMSTime wraps every ~49.7 days: a hold armed just before the wrap still runs
+// its budget, and a latch ahead of now (the now==0 corner) reads as zero elapsed.
+TEST(DungeonClearPatrolGateTest, GuardClockSurvivesTheMsTimeWrap)
+{
+    std::uint32_t since = 0xFFFFF000u;  // armed 4096ms before the wrap
+    EXPECT_TRUE(ShouldHoldForPatrol(true, false, since, 1000u, 30000u, 60000u, since));
+    EXPECT_FALSE(ShouldHoldForPatrol(true, false, since, 27000u, 30000u, 60000u, since));
+    since = 0u;
+    EXPECT_TRUE(ShouldHoldForPatrol(true, false, since, 0u, 30000u, 60000u, since));
+    EXPECT_EQ(since, 1u);
+    EXPECT_TRUE(ShouldHoldForPatrol(true, false, since, 0u, 30000u, 60000u, since));
+}
+
+// ShouldWaitForPatrol is ShouldHoldForPatrol on the estimate's contention, with
+// no closing extension: the lone-patroller wait keeps its old single budget.
+TEST(DungeonClearPatrolGateTest, WaitForPatrolIsHoldOnContention)
+{
+    for (std::uint32_t full : {4u, 5u, 6u, 8u})
+        for (std::uint32_t reduced : {4u, 5u, 6u})
+            for (std::uint32_t now : {100u, 9100u})
+            {
+                std::uint32_t a = 100u, b = 100u;
+                bool const contended = full > 5u && reduced <= 5u;
+                EXPECT_EQ(ShouldWaitForPatrol(full, reduced, 5u, a, now, 8000u, a),
+                          ShouldHoldForPatrol(contended, false, b, now, 8000u, 8000u, b));
+                EXPECT_EQ(a, b);
+            }
+}
+
+// --- Patrol guard filters ---------------------------------------------------
+
+using DungeonClearMath::IsPatrolMover;
+using DungeonClearMath::IsPatrolPackmate;
+
+TEST(DungeonClearPatrolGuardTest, WhoMovesOnItsOwn)
+{
+    EXPECT_TRUE(IsPatrolMover(true, false, false, false, false));   // waypoint mover
+    EXPECT_TRUE(IsPatrolMover(false, true, false, false, false));   // Lucifron's Protector
+    EXPECT_TRUE(IsPatrolMover(false, false, true, true, false));    // wandering boss
+    EXPECT_TRUE(IsPatrolMover(false, false, true, false, true));    // boss walking now
+    EXPECT_FALSE(IsPatrolMover(false, false, true, false, false));  // parked boss: skirt's job
+    EXPECT_FALSE(IsPatrolMover(false, false, false, true, true));   // wandering trash
+}
+
+TEST(DungeonClearPatrolGuardTest, PackmatesAreNeverThreats)
+{
+    // Same formation, or linked respawn: part of the pull.
+    EXPECT_TRUE(IsPatrolPackmate(true, true, true, false, 30.0f, 12.0f));
+    EXPECT_TRUE(IsPatrolPackmate(false, true, false, true, 30.0f, 12.0f));
+    // A loose pack of individual waypoint movers (no formations) within 12yd.
+    EXPECT_TRUE(IsPatrolPackmate(false, false, false, false, 8.0f, 12.0f));
+    EXPECT_FALSE(IsPatrolPackmate(false, false, false, false, 14.0f, 12.0f));
+    // Lucifron's formation 8.6yd from a hound formation: a threat, not a packmate.
+    EXPECT_FALSE(IsPatrolPackmate(false, true, true, false, 8.6f, 12.0f));
+    // A formation-less patrol passing a formation pack: a threat.
+    EXPECT_FALSE(IsPatrolPackmate(false, true, false, false, 6.0f, 12.0f));
+}
+
+TEST(DungeonClearPatrolGuardTest, RecedingMeansNoCloserAtTheDestination)
+{
+    EXPECT_TRUE(DungeonClearMath::IsReceding(20.0f, 35.0f));
+    EXPECT_TRUE(DungeonClearMath::IsReceding(20.0f, 20.0f));
+    EXPECT_FALSE(DungeonClearMath::IsReceding(20.0f, 12.0f));
+}
+
+// Lucifron's waypoint path 566050 (a closed loop). The camp/lane clearance is
+// measured to the whole route, not to where he stands.
+TEST(DungeonClearPatrolGuardTest, DistanceToAClosedPatrolRoute)
+{
+    std::vector<G3D::Vector3> const luc{
+        {1037.02f, -986.342f, 0}, {1053.15f, -990.755f, 0}, {1070.41f, -1006.77f, 0},
+        {1053.3f, -990.894f, 0},  {1037.02f, -986.342f, 0}, {1014.71f, -978.651f, 0},
+        {1007.78f, -958.088f, 0}, {1000.2f, -955.407f, 0},  {1007.78f, -958.088f, 0},
+        {1014.45f, -978.563f, 0}};
+    using DungeonClearMath::DistToClosedRoute2D;
+    // On a node / on a leg.
+    EXPECT_NEAR(DistToClosedRoute2D(1070.41f, -1006.77f, luc), 0.0f, 1e-3f);
+    EXPECT_NEAR(DistToClosedRoute2D(1045.0f, -988.5f, luc), 0.0f, 0.2f);
+    // Hound 56636 (pack 56638) at (1001.5,-966.5) sits 8.6yd off the west leg.
+    EXPECT_NEAR(DistToClosedRoute2D(1001.5f, -966.5f, luc), 8.6f, 0.1f);
+    // A camp 40yd north of the hound packs clears the whole loop (51.5yd, to the
+    // north end), though it is 71yd from his spawn: the route, not the spawn,
+    // is what binds.
+    EXPECT_NEAR(DistToClosedRoute2D(1036.0f, -915.0f, luc), 51.5f, 0.1f);
+    // A camp 40yd from his spawn can still sit on his west leg.
+    EXPECT_LT(DistToClosedRoute2D(1007.0f, -958.0f, luc), 1.0f);
+    // Degenerate routes.
+    EXPECT_EQ(DistToClosedRoute2D(0.0f, 0.0f, {}), std::numeric_limits<float>::max());
+    EXPECT_NEAR(DistToClosedRoute2D(3.0f, 4.0f, {{0, 0, 0}}), 5.0f, 1e-4f);
+}
+
 // --- ShouldHandoffFizzledPull (advanced-pull engage-fizzle latch) ----------
 using DungeonClearMath::ShouldHandoffFizzledPull;
 

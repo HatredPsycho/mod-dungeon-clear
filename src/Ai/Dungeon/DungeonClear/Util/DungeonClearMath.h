@@ -453,6 +453,54 @@ namespace DungeonClearMath
                              std::uint32_t now, std::uint32_t waitMs,
                              std::uint32_t& waitSinceOut);
 
+    // The latch/clock half of ShouldWaitForPatrol with the contention already
+    // decided by the caller, so the patrol guard (a patrolling creature or moving
+    // boss near the pack or the fight spot — DcEngageGeometry::PatrolThreatNear)
+    // shares ONE wait budget per pull with the lone-patroller contention above.
+    // `contended` false clears the latch and proceeds. True arms/keeps it and:
+    //   * waits while inside the soft budget `waitMs`;
+    //   * past it, keeps waiting only while the threat is `closing` (walking at
+    //     the pack/camp, or paused) — expiry must never commit the pull at the
+    //     moment a patrol is walking INTO it; a receding tick releases at once;
+    //   * at `hardMs` proceeds regardless, so nothing waits forever.
+    // The latch stays armed past the budget so the same contention cannot re-fire
+    // the wait. Elapsed time is modular (getMSTime wraps every ~49.7 days); a
+    // latch AHEAD of `now` reads as zero elapsed. ShouldWaitForPatrol is this with
+    // contended = fullCount > ceiling && reducedCount <= ceiling, closing false
+    // and hardMs = waitMs.
+    // The hard cap as a multiple of the soft budget (PullPatrolWaitSec).
+    inline constexpr std::uint32_t PatrolHoldHardFactor = 2;
+    bool ShouldHoldForPatrol(bool contended, bool closing, std::uint32_t waitSince,
+                             std::uint32_t now, std::uint32_t waitMs,
+                             std::uint32_t hardMs, std::uint32_t& waitSinceOut);
+
+    // Patrol guard kernels (DcEngageGeometry::PatrolThreatNear resolves the game
+    // state; these carry the decisions so they are testable without a map).
+    //
+    // Does the candidate move on its own? A DB waypoint mover, a follower of a
+    // waypoint-moving formation leader (Lucifron's Protectors), or a boss that
+    // wanders or is walking right now. A boss parked on its spot is NOT: waiting
+    // does not move it, so it is the room-aggro skirt's problem, not the guard's.
+    bool IsPatrolMover(bool selfWaypoint, bool leaderWaypoint, bool isBoss,
+                       bool bossWanders, bool movingNow);
+    // Is the candidate part of the pack being pulled (so never a threat to it)?
+    // Same formation; a creature_linked_respawn partner; or, when NEITHER is in a
+    // formation, anything within `packRadius` (loose packs of individual waypoint
+    // movers). A formation-less mob near a FORMATION pack is a lone patrol passing
+    // by, and Lucifron's own formation is never the hounds' — those stay threats.
+    bool IsPatrolPackmate(bool sameFormation, bool targetInFormation,
+                          bool candInFormation, bool linkedRespawn,
+                          float distToTarget, float packRadius);
+    // Walking away: the spline destination is no closer than the creature is now.
+    inline bool IsReceding(float distNow, float distAtDestination)
+    {
+        return distAtDestination >= distNow;
+    }
+
+    // Shortest 2D distance from (px, py) to a CLOSED patrol route (a waypoint
+    // path loops last -> first). One node = a point; empty = +inf.
+    float DistToClosedRoute2D(float px, float py, std::vector<G3D::Vector3> const& route);
+
     // Scripted-stage MUSTER gate (pure). A ScriptedPullRegistry stage is a planned
     // fight against a hand-counted pack, and the party should arrive at it topped
     // up — the way it arrives at a boss — rather than merely "not resting".

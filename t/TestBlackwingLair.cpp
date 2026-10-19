@@ -14,6 +14,7 @@
 #include "Ai/Dungeon/DungeonClear/Data/DcTargetExclusionRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Data/DungeonClearRouteRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Data/DungeonEventRegistry.h"
+#include "Ai/Dungeon/DungeonClear/Data/ScriptedPullRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Data/Events/DungeonEventTables.h"
 #include "Ai/Dungeon/DungeonClear/Overrides/BossRosterRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Overrides/ObjectiveHookRegistry.h"
@@ -1561,4 +1562,128 @@ TEST(DungeonEventBlackwingLairTest, NefarianIsAddedToARosterThatCannotDeriveHim)
     // He sorts LAST, behind Chromaggus.
     EXPECT_EQ(BossOrderKey(*nef), 8u);
     EXPECT_EQ(out.back().entry, NPC_NEFARIAN);
+}
+
+// --- the two Death Talon packs past Vaelastrasz (ScriptedPullRegistry rows) ----
+//
+// 2026-10-17: the tank fought the east pack from anchor 13, 21.9yd from the west
+// pack, and the raid pulled both. The rows are only right because of the spawn
+// geometry below (acore_world.creature, map 469), so it is pinned here.
+namespace
+{
+    struct Spawn { float x, y, z; };
+
+    // Formation 84519 (east) and 84520 (west), every member.
+    Spawn const kDeathTalonEast[] = {
+        {-7525.67f, -925.212f, 427.908f}, {-7539.57f, -914.064f, 428.012f},
+        {-7527.41f, -911.406f, 427.920f}, {-7534.23f, -926.704f, 427.963f},
+        {-7539.97f, -921.612f, 428.016f}, {-7523.96f, -917.881f, 427.921f}};
+    Spawn const kDeathTalonWest[] = {
+        {-7590.30f, -930.078f, 428.261f}, {-7568.89f, -934.958f, 428.192f},
+        {-7580.70f, -945.092f, 428.161f}, {-7583.51f, -924.026f, 428.317f},
+        {-7573.80f, -927.041f, 428.258f}, {-7590.22f, -939.636f, 428.222f}};
+
+    // A level-60 raid against level-62 elites, plus the bounding radii.
+    float constexpr ELITE_REACH = 23.0f;
+    // How far a follower may stand off a camp mid-fight.
+    float constexpr CAMP_SPREAD = DC_SCRIPTED_PULL_FOLLOWER_LEASH;
+
+    float Dist2d(float ax, float ay, Spawn const& b)
+    {
+        return std::hypot(ax - b.x, ay - b.y);
+    }
+
+    template <std::size_t N>
+    float Nearest(float x, float y, Spawn const (&pack)[N])
+    {
+        float best = 1e9f;
+        for (Spawn const& s : pack)
+            best = std::min(best, Dist2d(x, y, s));
+        return best;
+    }
+
+    ScriptedPullStage const& DtRow(uint32 order)
+    {
+        ScriptedPullStage const* s = ScriptedPullRegistry::Find(MAP_ID, order);
+        EXPECT_NE(s, nullptr);
+        return *s;
+    }
+}
+
+TEST(DcBlackwingLairDeathTalonTest, BothPacksArePlannedBeforeBroodlord)
+{
+    std::vector<ScriptedPullStage const*> const rows = ScriptedPullRegistry::Rows(MAP_ID);
+    ASSERT_EQ(rows.size(), 2u);
+    EXPECT_EQ(rows[0]->order, 0u);  // east first: the west row camps on its floor
+    EXPECT_EQ(rows[1]->order, 1u);
+    for (ScriptedPullStage const* s : rows)
+    {
+        EXPECT_EQ(s->bossEntry, NPC_BROODLORD_LASHLAYER);
+        EXPECT_EQ(s->entries, (std::vector<uint32>{12463, 12464, 12465, 12467}));
+    }
+}
+
+TEST(DcBlackwingLairDeathTalonTest, PackCylindersHoldTheirOwnPackAndNotTheOther)
+{
+    for (Spawn const& m : kDeathTalonEast)
+    {
+        EXPECT_TRUE(ScriptedPullRegistry::InPack(DtRow(0), m.x, m.y, m.z));
+        EXPECT_FALSE(ScriptedPullRegistry::InPack(DtRow(1), m.x, m.y, m.z));
+    }
+    for (Spawn const& m : kDeathTalonWest)
+    {
+        EXPECT_TRUE(ScriptedPullRegistry::InPack(DtRow(1), m.x, m.y, m.z));
+        EXPECT_FALSE(ScriptedPullRegistry::InPack(DtRow(0), m.x, m.y, m.z));
+    }
+}
+
+// The whole point of the plan: while a pack is fought at its camp, nobody on the
+// camp leash is in the OTHER live pack's reach.
+TEST(DcBlackwingLairDeathTalonTest, TheEastCampFightStaysOutOfTheWestPacksReach)
+{
+    ScriptedPullStage const& east = DtRow(0);
+    EXPECT_GT(Nearest(east.campX, east.campY, kDeathTalonWest), ELITE_REACH + CAMP_SPREAD);
+    // ...and the party waiting there does not body-pull the east pack before the tag.
+    EXPECT_GT(Nearest(east.campX, east.campY, kDeathTalonEast), ELITE_REACH);
+}
+
+TEST(DcBlackwingLairDeathTalonTest, TheWestCampIsTheEastPacksFloor)
+{
+    ScriptedPullStage const& west = DtRow(1);
+    EXPECT_GT(Nearest(west.campX, west.campY, kDeathTalonWest), ELITE_REACH + CAMP_SPREAD);
+    EXPECT_LT(Nearest(west.campX, west.campY, kDeathTalonEast), 6.0f)
+        << "the camp is ground the east pack stood on, so it is floor";
+    // The tag is a ranged opener from the stand spot: in spell range of the nearest
+    // west member, and not inside the pack.
+    float const tag = Nearest(west.standX, west.standY, kDeathTalonWest);
+    EXPECT_GT(tag, 15.0f);
+    EXPECT_LT(tag, 30.0f);
+    EXPECT_FALSE(west.bodyPull);
+}
+
+TEST(DcBlackwingLairDeathTalonTest, StandSpotsAreCertifiedRouteGround)
+{
+    std::vector<WaypointHint> const* route =
+        DungeonClearRouteRegistry::Get(MAP_ID, DUNGEON_DIFFICULTY_NORMAL, NPC_BROODLORD_LASHLAYER);
+    ASSERT_NE(route, nullptr);
+    ASSERT_GT(route->size(), 13u);
+    // The west row stands on anchor 13; both rows arm off anchor 12.
+    EXPECT_FLOAT_EQ(DtRow(1).standX, (*route)[13].x);
+    EXPECT_FLOAT_EQ(DtRow(1).standY, (*route)[13].y);
+    EXPECT_FLOAT_EQ(DtRow(0).armX, (*route)[12].x);
+    EXPECT_FLOAT_EQ(DtRow(0).armY, (*route)[12].y);
+    // The east camp is a few yards off anchor 12, toward its pack.
+    EXPECT_LT(std::hypot(DtRow(0).campX - (*route)[12].x, DtRow(0).campY - (*route)[12].y), 5.0f);
+}
+
+// The NO_STOP leg out of anchor 12 covers the east camp; the stage, not the zone,
+// decides what happens there (DungeonClearPullModeCurrentValue).
+TEST(DcBlackwingLairDeathTalonTest, TheEastCampIsInsideTheNoStopCapsule)
+{
+    std::vector<WaypointHint> const* route =
+        DungeonClearRouteRegistry::Get(MAP_ID, DUNGEON_DIFFICULTY_NORMAL, NPC_BROODLORD_LASHLAYER);
+    ASSERT_NE(route, nullptr);
+    ScriptedPullStage const& east = DtRow(0);
+    EXPECT_TRUE(DcNoStopZone::CoversPoint(*route, east.campX, east.campY, east.campZ,
+                                          DC_NO_STOP_CORRIDOR));
 }

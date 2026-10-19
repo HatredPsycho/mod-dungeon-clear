@@ -536,6 +536,90 @@ TEST(DcSuppressionTransitTest, AContinuingHoldKeepsItsClock)
     EXPECT_EQ(Decide(in).holdSinceMs, in.nowMs - 40000);
 }
 
+// THE TOW BEFORE THE STANDOFF. The standoff is at Broodlord's feet, so the last
+// legs are not walked while anything but whelps is still fighting the raid
+// (2026-10-17: the raid walked in towing Hatchers and Taskmasters, he joined two
+// seconds later). Twenty anchors and two held legs: the leader may walk TO anchor
+// 17, and the leg out of it is the one refused.
+namespace
+{
+    Inputs TowingTowardTheStandoff()
+    {
+        Inputs in = Walking();
+        in.cursorIndex = 17;
+        in.engagedElites = 3;
+        in.engagedHoldLegs = 2;
+        in.engagedHoldTimeoutMs = 120000;
+        return in;
+    }
+}
+
+TEST(DcSuppressionTransitTest, ATowIsNotWalkedOntoTheStandoff)
+{
+    Inputs in = TowingTowardTheStandoff();
+    in.distToCursor = 2.0f;  // just reached anchor 17; the next leg ends 18yd from him
+
+    Verdict const v = Decide(in);
+    EXPECT_EQ(v.hold, Hold::Engaged);
+    EXPECT_FALSE(v.advance);
+    EXPECT_TRUE(v.cursorAdvance) << "the cursor still names the leg it is refusing";
+
+    // ...and it keeps holding with the cursor on the next anchor.
+    in.cursorIndex = 18;
+    in.distToCursor = 22.0f;
+    EXPECT_EQ(Decide(in).hold, Hold::Engaged);
+}
+
+TEST(DcSuppressionTransitTest, TheTowHoldLeavesTheWalkToTheLastSafeAnchorAlone)
+{
+    Inputs in = TowingTowardTheStandoff();
+    in.distToCursor = 14.0f;  // still walking to anchor 17
+
+    Verdict const v = Decide(in);
+    EXPECT_EQ(v.hold, Hold::None);
+    EXPECT_TRUE(v.advance);
+}
+
+TEST(DcSuppressionTransitTest, TheTowHoldIsOnlyForTheLastLegs)
+{
+    Inputs in = TowingTowardTheStandoff();
+    in.cursorIndex = 5;
+    in.distToCursor = 2.0f;
+    EXPECT_EQ(Decide(in).hold, Hold::None) << "mid-crossing fights are the elite hold's";
+
+    in = TowingTowardTheStandoff();
+    in.engagedHoldLegs = 0;
+    in.distToCursor = 2.0f;
+    EXPECT_EQ(Decide(in).hold, Hold::None) << "0 legs disables it";
+}
+
+TEST(DcSuppressionTransitTest, WithNothingEngagedTheLastLegsAreWalked)
+{
+    Inputs in = TowingTowardTheStandoff();
+    in.engagedElites = 0;
+    in.distToCursor = 2.0f;
+
+    Verdict const v = Decide(in);
+    EXPECT_EQ(v.hold, Hold::None);
+    EXPECT_TRUE(v.advance);
+}
+
+// Like the pack hold, a timed-out tow hold is one leg of progress, not a latch:
+// walking on is what pulls the boss.
+TEST(DcSuppressionTransitTest, ATowReleaseIsOneLegNotALatch)
+{
+    Inputs in = TowingTowardTheStandoff();
+    in.cursorIndex = 18;
+    in.distToCursor = 22.0f;
+    in.holdReason = static_cast<uint8>(Hold::Engaged);
+    in.holdSinceMs = in.nowMs - in.engagedHoldTimeoutMs;
+
+    Verdict const released = Decide(in);
+    ASSERT_TRUE(released.advance);
+    ASSERT_TRUE(released.timedOut);
+    EXPECT_EQ(released.hold, Hold::None);
+}
+
 // getMSTime() wraps. Every clock here is compared as an unsigned interval for
 // exactly this case, which a naive `now >= since + budget` gets backwards for the
 // ~49 days on either side of the wrap.

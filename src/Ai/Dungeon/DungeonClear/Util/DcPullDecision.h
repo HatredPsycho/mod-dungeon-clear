@@ -65,7 +65,16 @@ namespace DcPullDecision
         bool patrolWaitEnabled = false;  // DcSettings PullPatrolWait
         bool atCommitRange     = false;  // tank within PullCommitRange of the pack
         bool patrolContended   = false;  // fullCount > ceiling && reducedCount <= ceiling
-        bool patrolWaitExpired = false;  // at commit: ShouldWaitForPatrol() said proceed
+        bool patrolWaitExpired = false;  // ShouldHoldForPatrol() said proceed (wait budget spent)
+
+        // --- patrol guard (PullPatrolGuard) ---
+        // A patrolling creature or moving boss that is not engaged and not part of
+        // the pack stands within its aggro reach + PullPatrolBuffer of the pack or
+        // the camp (DcEngageGeometry::PatrolThreatNear). Unlike patrolContended this
+        // does not depend on the estimate: the fight would last long enough for the
+        // patrol to walk into it whatever the pack weighs. patrolWaitExpired carries
+        // the shared wait budget.
+        bool patrolNear        = false;
     };
 
     // Returns the verdict the governor should apply (or NoOp to leave the

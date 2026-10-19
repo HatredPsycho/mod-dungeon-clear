@@ -190,6 +190,83 @@ TEST(RoomAggroRegistryTest, GundrakSladranClearsTheSnakePit)
     EXPECT_EQ(RoomAggroRegistry::Find(604, 29774), nullptr);
 }
 
+// Garr (Molten Core, 409) has no scripted room pull, but raid logs of 2026-10-15/16
+// had his surrounding trash join every Garr pull. Spawn-row and path distances from
+// his spawn (691.0, -498.4): Ancient Core Hound patrols 18.2-39.7, 38.5-46.3 and a
+// long patrol passing at 58.4yd; Molten Destroyers 55.9-78.9; Lava Annihilators
+// 56.0 / 78.0 (+5yd wander) and 108.8. radius 85 takes all but the 108.8yd one.
+TEST(RoomAggroRegistryTest, MoltenCoreGarrClearsHisCave)
+{
+    RoomAggroBoss const* garr = RoomAggroRegistry::Find(409, 12057);
+    ASSERT_NE(garr, nullptr);
+    EXPECT_FLOAT_EQ(garr->radius, 85.0f);
+    EXPECT_EQ(garr->memberEntries, (std::vector<uint32>{11673, 11659, 11665}));
+    EXPECT_FALSE(RoomAggroRegistry::IsMemberEntry(*garr, 12099));  // Firesworn: his own adds
+    EXPECT_FLOAT_EQ(garr->pullOutRadius, 0.0f);
+    EXPECT_FLOAT_EQ(RoomAggroRegistry::SkirtOverride(409, 12057), 35.0f);
+
+    float const sphere = 28.0f;  // ~aggro + reaches + margin + padding
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*garr, 11665, 83.0f, sphere));   // wandered Annihilator
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*garr, 11659, 78.9f, sphere));   // far Destroyer
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*garr, 11673, 39.7f, sphere));   // hound on its path
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*garr, 11673, 18.2f, sphere));  // at his side: comes along
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*garr, 11665, 108.8f, sphere)); // next room
+    EXPECT_EQ(RoomAggroRegistry::Find(409, 12099), nullptr);
+}
+
+// Lucifron (Molten Core, 409) patrols a loop (path 566050) that passes 8.6-12.4yd
+// from three Core Hound packs; 2026-10-16 he walked into a hound fight held on his
+// path. Distances from his LIVE position, over the whole loop: pack 56629 3-64yd,
+// 56638 9-94yd, 56639 21-91yd; the Magmadar-side packs 56651 11-121yd and 56648
+// 39-134yd.
+TEST(RoomAggroRegistryTest, MoltenCoreLucifronClearsTheHoundsOnHisPatrol)
+{
+    RoomAggroBoss const* luc = RoomAggroRegistry::Find(409, 12118);
+    ASSERT_NE(luc, nullptr);
+    EXPECT_FLOAT_EQ(luc->radius, 100.0f);
+    EXPECT_EQ(luc->memberEntries, (std::vector<uint32>{11671}));
+    EXPECT_FALSE(RoomAggroRegistry::IsMemberEntry(*luc, 12119));  // Protectors: his formation
+    // A pull-out radius forces the drag-to-camp pull for every room-clear pull.
+    EXPECT_GT(luc->pullOutRadius, 0.0f);
+    EXPECT_FLOAT_EQ(RoomAggroRegistry::SkirtOverride(409, 12118), 40.0f);
+
+    // Kept wherever he is on the loop: the farthest hound of his three packs
+    // (+5yd wander), and a hound he is walking right past.
+    float const bossSafe = luc->pullOutRadius;  // a pull-out row's exclusion
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*luc, 11671, 99.4f, bossSafe));
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*luc, 11671, 8.6f, bossSafe));
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*luc, 11671, 134.0f, bossSafe));
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*luc, 12119, 4.0f, bossSafe));
+    EXPECT_EQ(RoomAggroRegistry::Find(409, 12119), nullptr);
+}
+
+// Firemaw (Blackwing Lair, 469) stands in a ring of goblin-workshop trash: 22 mobs
+// 22.1-35.2yd from his spawn (16 Technicians, 4 Warlocks, 2 Spellbinders, an
+// Overseer), the next group from 41.2 to 46.7yd, Technician 84134 at 49.2yd and
+// the lower-floor Technicians from 51yd (3D) on. 2026-10-16 and 10-17 both had
+// the ring join the Firemaw pull.
+TEST(RoomAggroRegistryTest, BlackwingLairFiremawClearsTheWorkshopRing)
+{
+    RoomAggroBoss const* firemaw = RoomAggroRegistry::Find(469, 11983);
+    ASSERT_NE(firemaw, nullptr);
+    EXPECT_FLOAT_EQ(firemaw->radius, 47.0f);
+    EXPECT_EQ(firemaw->memberEntries, (std::vector<uint32>{13996, 12459, 12457, 12461}));
+    EXPECT_FALSE(RoomAggroRegistry::IsMemberEntry(*firemaw, 14020));  // Chromaggus, a floor up
+    // The ring's nearest members are inside the computed ~28yd exclusion, so the
+    // row needs a pull-out radius (and with it the drag-to-camp pull)...
+    EXPECT_GT(firemaw->pullOutRadius, 0.0f);
+    EXPECT_LT(firemaw->pullOutRadius, 22.1f);
+    // ...and a skirt past the whole ring, so no camp is fought inside it.
+    EXPECT_GT(RoomAggroRegistry::SkirtOverride(469, 11983), 35.2f);
+
+    float const bossSafe = firemaw->pullOutRadius;
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*firemaw, 12459, 22.1f, bossSafe));  // nearest Warlock
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*firemaw, 13996, 35.2f, bossSafe));  // ring's far edge
+    EXPECT_TRUE(RoomAggroRegistry::IsRoomTrash(*firemaw, 12461, 46.7f, bossSafe));  // next group's Overseer
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*firemaw, 13996, 49.2f, bossSafe)); // further down the room
+    EXPECT_FALSE(RoomAggroRegistry::IsRoomTrash(*firemaw, 13996, 51.1f, bossSafe)); // the floor below
+}
+
 TEST(RoomAggroRegistryTest, MechanarSepethreaHasPullOutRoom)
 {
     RoomAggroBoss const* sep = RoomAggroRegistry::Find(554, 19221);

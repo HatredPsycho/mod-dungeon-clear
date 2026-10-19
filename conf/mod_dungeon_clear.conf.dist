@@ -1254,12 +1254,51 @@ DungeonClear.PullPatrolWait = 1
 #        before giving up and committing the Advanced verdict anyway — so a patrol
 #        that is parked on a stationary waypoint, or pacing very slowly, can't stall
 #        the run indefinitely. The clock starts when the tank reaches commit range
-#        and the contention is confirmed.
+#        and the contention is confirmed. Also the soft budget of the patrol guard
+#        below (one wait per pull, shared by both); past it the guard keeps holding
+#        only while the patrol walks toward the pull, up to twice this, then pulls.
+#        Range 1-120.
 #
-#        Default: 8.0
+#        Default: 8.0 (heroic 18.0, raid 30.0)
 #
 
 DungeonClear.PullPatrolWaitSec = 8.0
+
+#
+#    DungeonClear.PullPatrolGuard
+#        Dynamic mode only. Never start a pull while a patrolling creature (a
+#        waypoint patroller, or a mob in a formation led by one) or a boss that
+#        moves, not yet in combat and not part of the pack, stands within its
+#        aggro reach (+ PullEnRouteMargin + PullPatrolBuffer) of the pack or of the
+#        camp. The tank holds where it stands ("Waiting for patrol") until the
+#        patrol walks off — one already walking away and outside its real reach
+#        does not hold — and checks again right before the advanced pull's tag.
+#        Unlike PullPatrolWait this does not depend on the pack's size: a raid fight
+#        lasts long enough for any patrol to walk into it (Molten Core: Lucifron
+#        joining a Core Hound pull). Packmates (same formation, linked respawn) and
+#        patrols with no line of sight to the pack or camp are ignored. After
+#        PullPatrolWaitSec the hold releases on the first tick the patrol is
+#        walking away, and at twice that it pulls regardless, so it can never stall
+#        the run. A boss that stands still is never waited on.
+#        While a PATROLLING room-aggro boss's room is pre-cleared (Lucifron), the
+#        drag-to-camp camp also keeps its clearance from his whole patrol route,
+#        not just from where he stands.
+#            0 = off, 1 = on
+#
+#        Default: 0 (raid: 1)
+#
+
+DungeonClear.PullPatrolGuard = 0
+
+#
+#    DungeonClear.PullPatrolBuffer
+#        Extra yards the patrol guard adds to a patrol's aggro reach, for the few
+#        seconds it keeps walking between the hold releasing and the fight starting.
+#
+#        Default: 10.0
+#
+
+DungeonClear.PullPatrolBuffer = 10.0
 
 #
 #    DungeonClear.PullChaseLeash
@@ -1565,6 +1604,12 @@ DungeonClear.SpectateSpeed = 2.5
 #    Many more corpses to walk between and drink for after a bad fight — the
 #    5-man budget ends winnable raid recoveries early.
 # DungeonClear.PostCombatRezTimeoutSecs.Raid = 180
+
+#    Patrol guard on: a raid trash fight outlasts any patrol loop, and a raid
+#    boss walking into it is a wipe (Lucifron into a Core Hound pull). The wait
+#    budget is raised to cover a raid loop (Lucifron's is ~75s).
+# DungeonClear.PullPatrolGuard.Raid = 1
+# DungeonClear.PullPatrolWaitSec.Raid = 30.0
 
 ###############################################################################
 # `.dc test` — AUTOMATED DUNGEON TEST RUNS

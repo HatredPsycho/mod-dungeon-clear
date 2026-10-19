@@ -284,6 +284,72 @@ namespace
           /*pullOutRadius*/ 12.0f, /*skirtRadius*/ 32.0f,
           /*hasCampBox*/ true, /*campMinX*/ -11013.0f, /*campMaxX*/ -10900.0f,
           /*campMinY*/ -1940.0f, /*campMaxY*/ -1800.0f },
+
+        // Molten Core (409): Garr. No scripted room pull, but his fight is long
+        // and mobile (eight Firesworn chase their targets, Destroyers' Knockdown,
+        // Garr wanders) and his cave is ringed by trash: two Ancient Core Hounds
+        // patrolling through it (18 and 38yd from his spawn), Molten Destroyers
+        // at 56-79yd and wandering Lava Annihilators at 56-78yd. Raid logs of
+        // 2026-10-15/16 had both Destroyers, two or three Annihilators and both
+        // hounds join every Garr pull, and a Firesworn that runs more than 40yd
+        // from him erupts for four times the damage, so the fight can't be moved
+        // away from them either. Clear them first. Whitelist = those three
+        // entries only (the Firesworn are his own adds and come with him).
+        // skirtRadius 35 keeps the dragged packs fought well clear of his
+        // 20yd aggro and the Firesworn around him.
+        { 409, 12057, 85.0f, { 11673, 11659, 11665 }, false, 0.0f, 0.0f,
+          /*pullOutRadius*/ 0.0f, /*skirtRadius*/ 35.0f },
+
+        // Molten Core (409): Lucifron. No scripted room pull either; the problem is
+        // his PATROL. He walks a ~186yd loop (waypoint path 566050: 1000,-955 ->
+        // 1037,-986 spawn -> 1070,-1007, ~75s at walk) with his two Flamewaker
+        // Protectors in formation, and it passes 8.6, 11.4 and 12.4yd from three of
+        // the five Core Hound packs in his hall. The 2026-10-16 log: the hound pack
+        // led by 56629 was walked in on and fought where it stood, Lucifron and both
+        // Protectors walked into the fight five seconds later and the 56638 pack
+        // nine seconds after that — ten hounds and a boss for 7.5 minutes. A hound
+        // fight outlasts his loop, so no pull TIMING keeps him out of a fight held
+        // on his path; the fight has to move off it. Flag him so the hounds around
+        // him are cleared before he is pulled, each by the drag-to-camp pull (a
+        // non-zero pullOutRadius forces it), with the camp held outside the skirt.
+        // Several packs coming along in one drag is fine; fighting on his path is
+        // not. (The patrol guard — PullPatrolGuard — times each tag for when he has
+        // walked off.)
+        //
+        // Measured from the LIVE boss, so the radius has to hold every pack from
+        // every point of the loop: farthest pack member from any waypoint is 63.9
+        // (56629), 94.4 (56638) and 91.3yd (56639), +5yd wander -> 100. The two
+        // packs by Magmadar (56648 / 56651) drift in and out as he walks; they are
+        // hounds, pulled the same careful way, and his east end passes 11yd from
+        // 56651, so taking them early is the right side to err on.
+        //
+        // pullOutRadius 6: the packs his loop brushes must stay room trash while he
+        // walks past them. The computed exclusion (~33yd) would drop a pack each
+        // time he passed, and a room that reads empty for a moment opens the boss
+        // pull with that pack standing on his path. 6 is under his 8.6yd closest
+        // approach. Whitelist = Core Hounds only (his Protectors come with him).
+        { 409, 12118, 100.0f, { 11671 }, false, 0.0f, 0.0f,
+          /*pullOutRadius*/ 6.0f, /*skirtRadius*/ 40.0f },
+
+        // Blackwing Lair (469): Firemaw. No scripted room pull; his floor is the
+        // goblin workshop. From his spawn (84572, -7520.2,-1025.8,449.1) there are
+        // 22 mobs 22.1-35.2yd out on his own floor — 16 Blackwing Technicians, 4
+        // Warlocks, 2 Spellbinders, an Overseer — then a gap to the next group at
+        // 41.2-46.7yd (Technician 84135, Spellbinder 84559, Warlock 84560, Overseer
+        // 84558). Live (2026-10-17 13:36, and the 10/16 night run the same way):
+        // the tank opened on Firemaw with that ring standing, 20 Technicians and 4
+        // Warlocks joined within seconds, and Bomb / Rain of Fire / Shadow Flame
+        // killed 47 (43 the night before).
+        //
+        // radius 47 takes the ring and the near edge of the next group and stops
+        // short of Technician 84134 (49.2yd) and the lower-floor Technicians at
+        // 51yd+ (z 408.6, unreachable from here). Whitelist = those four entries
+        // (Chromaggus' spawn is 28yd off, a floor up). pullOutRadius 10 keeps the
+        // ring's nearest members (22yd, inside the computed ~28yd exclusion)
+        // clearable and forces the drag-to-camp pull; skirtRadius 40 puts the camp
+        // outside the whole ring, so no dragged pack is fought in his aggro.
+        { 469, 11983, 47.0f, { 13996, 12459, 12457, 12461 }, false, 0.0f, 0.0f,
+          /*pullOutRadius*/ 10.0f, /*skirtRadius*/ 40.0f },
     };
 }
 

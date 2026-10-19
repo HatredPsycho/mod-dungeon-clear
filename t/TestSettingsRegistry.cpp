@@ -148,10 +148,14 @@ TEST(DcSettingsRegistryTest, RaidProfileIsExactlyTheScaleSet)
     // Pinned like the heroic set: adding a raid default to an unrelated key has
     // to fail here and be justified. Keep in step with the RAID DEFAULTS block
     // in mod_dungeon_clear.conf.dist. (Plan B/C keys — quorum, muster budgets —
-    // join this list when they land with authored raid values.)
+    // join this list when they land with authored raid values.) The patrol guard
+    // pair is the one behaviour row: a raid fight outlasts any patrol loop, and a
+    // raid boss walking into a trash pull (Lucifron, 2026-10-16) is a wipe.
     std::vector<std::string> const expected{
         "PartyMaxSpread",
         "PostCombatRezTimeoutSecs",
+        "PullPatrolWaitSec",
+        "PullPatrolGuard",
     };
 
     std::vector<std::string> actual;

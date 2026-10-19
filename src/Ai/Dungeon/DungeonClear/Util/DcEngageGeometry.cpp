@@ -52,6 +52,8 @@
 #include "Map.h"
 #include "ModelIgnoreFlags.h"
 #include "MotionMaster.h"
+#include "MoveSpline.h"
+#include "WaypointMgr.h"
 #include "ObjectAccessor.h"
 #include "Pet.h"
 #include "PathGenerator.h"
@@ -647,6 +649,158 @@ bool DcEngageGeometry::TargetInsideBystanderPack(Player* bot, Unit* target)
         }
     }
     return false;
+}
+
+DcEngageGeometry::PatrolThreat DcEngageGeometry::PatrolThreatNear(Player* bot,
+                                                                  AiObjectContext* ctx,
+                                                                  Unit* target,
+                                                                  Position const* camp)
+{
+    PatrolThreat out;
+    if (!bot || !ctx || !target)
+        return out;
+    if (!DcSettings::GetBool(bot, "PullPatrolGuard"))
+        return out;
+
+    // The padding a threat's own reach gets: the en-route avoidance's margin (the
+    // party cutting corners behind the tank) plus the guard's buffer (the patrol
+    // keeps walking for the few seconds between the release and the first hit).
+    float const pad = DcSettings::GetFloat(bot, "PullEnRouteMargin") +
+                      DcSettings::GetFloat(bot, "PullPatrolBuffer");
+
+    // Search around the TARGET wide enough to also hold anything near the camp,
+    // which sits up to a full drag behind it — the same bound the governor uses
+    // to decide whether the published camp belongs to this approach at all.
+    // kMaxAggroReach mirrors the classifier.
+    constexpr float kMaxAggroReach = 50.0f;
+    constexpr float kPackRadius = 12.0f;
+    float const campBound = DcSettings::GetFloat(bot, "PullMaxDrag") +
+                            DcSettings::GetFloat(bot, "PullSetback");
+    float const campSpan = camp ? std::min(target->GetExactDist2d(camp), campBound) : 0.0f;
+    float const searchRadius = kMaxAggroReach + pad + campSpan;
+
+    std::list<Creature*> nearby;
+    Acore::AnyUnitInObjectRangeCheck check(target, searchRadius);
+    Acore::CreatureListSearcher<Acore::AnyUnitInObjectRangeCheck> searcher(
+        target, nearby, check);
+    Cell::VisitObjects(target, searcher, searchRadius);
+
+    Creature const* const targetCreature = target->ToCreature();
+    CreatureGroup const* targetGroup = targetCreature ? targetCreature->GetFormation() : nullptr;
+    uint32 const targetFormation = targetGroup ? targetGroup->GetId() : 0u;
+    // creature_linked_respawn is keyed by the spawn's DB guid (entry + spawn id), not the
+    // live guid the map hands out.
+    auto const dbGuid = [](Creature const* c)
+    { return ObjectGuid::Create<HighGuid::Unit>(c->GetEntry(), c->GetSpawnId()); };
+    ObjectGuid const targetDb = targetCreature ? dbGuid(targetCreature) : ObjectGuid::Empty;
+    ObjectGuid const targetLinked =
+        targetCreature ? sObjectMgr->GetLinkedRespawnGuid(targetDb) : ObjectGuid::Empty;
+
+    for (Creature* c : nearby)
+    {
+        if (!c || !c->IsAlive() || c == target)
+            continue;
+        if (!bot->IsHostileTo(c) || c->IsCritter() || c->IsTotem() || IsDisplayedDead(c))
+            continue;
+        // Already fighting: it is in the fight we are in, not one we could start.
+        if (c->IsInCombat())
+            continue;
+        if (std::fabs(c->GetPositionZ() - target->GetPositionZ()) > DC_Z_LEVEL_TOLERANCE)
+            continue;
+
+        CreatureGroup const* grp = c->GetFormation();
+        float const toTarget = target->GetExactDist2d(c);
+        ObjectGuid const candDb = dbGuid(c);
+        bool const linked = targetCreature &&
+                            ((targetLinked && targetLinked == candDb) ||
+                             sObjectMgr->GetLinkedRespawnGuid(candDb) == targetDb);
+        if (DungeonClearMath::IsPatrolPackmate(
+                targetFormation && grp && grp->GetId() == targetFormation,
+                targetFormation != 0u, grp != nullptr, linked, toTarget, kPackRadius))
+            continue;
+
+        // Does it move on its own? A formation follower inherits its leader's
+        // route, so Lucifron's Protectors count as patrollers with him.
+        Creature const* const leader = grp ? grp->GetLeader() : nullptr;
+        bool const boss = DcTargeting::IsDungeonBossEntry(ctx, c->GetEntry()) ||
+                          c->isWorldBoss();
+        if (!DungeonClearMath::IsPatrolMover(
+                c->GetDefaultMovementType() == WAYPOINT_MOTION_TYPE,
+                leader && leader != c &&
+                    leader->GetDefaultMovementType() == WAYPOINT_MOTION_TYPE,
+                boss, c->GetDefaultMovementType() == RANDOM_MOTION_TYPE, c->isMoving()))
+            continue;
+
+        // In reach of what it can SEE: a patrol one wall over neither notices the
+        // fight nor walks into it.
+        float const reach = AggroReach(bot, c, pad);
+        float const toCamp = camp ? c->GetExactDist2d(camp)
+                                  : std::numeric_limits<float>::max();
+        bool const nearTarget =
+            toTarget <= reach &&
+            c->IsWithinLOSInMap(target, VMAP::ModelIgnoreFlags::Nothing, LINEOFSIGHT_CHECK_VMAP);
+        bool const nearCamp =
+            camp && toCamp <= reach &&
+            c->IsWithinLOS(camp->GetPositionX(), camp->GetPositionY(), camp->GetPositionZ() + 2.0f,
+                           VMAP::ModelIgnoreFlags::Nothing, LINEOFSIGHT_CHECK_VMAP);
+        if (!nearTarget && !nearCamp)
+            continue;
+
+        // Walking away from both? A creature not walking (paused on a waypoint)
+        // is not receding: it is about to turn either way.
+        bool receding = false;
+        if (c->isMoving() && c->movespline && !c->movespline->Finalized())
+        {
+            // The next point it walks to: a smooth path is one spline over the whole loop,
+            // whose final point says nothing about where it is heading now.
+            G3D::Vector3 const dest = c->movespline->CurrentDestination();
+            Position const destPos(dest.x, dest.y, dest.z);
+            receding = DungeonClearMath::IsReceding(toTarget, target->GetExactDist2d(&destPos)) &&
+                       (!camp || DungeonClearMath::IsReceding(toCamp, camp->GetExactDist2d(&destPos)));
+        }
+        // ...and already outside its real (unpadded) reach of both: by the time
+        // the pull lands it is further still. The release a human times — "he's
+        // turned and walking off, go".
+        float const rawReach = AggroReach(bot, c, 0.0f);
+        if (receding && toTarget > rawReach && toCamp > rawReach)
+            continue;
+
+        if (!out.creature)
+        {
+            out.creature = c;
+            DC_PULL_DEBUG("[DC:{}] patrol guard: {} (entry {}{}) {:.1f}yd from pack {}, "
+                          "{:.1f}yd from camp, reach+buffer {:.1f}, {} -> not pulling yet",
+                          bot->GetName(), c->GetName(), c->GetEntry(),
+                          boss ? ", boss" : "", toTarget, target->GetGUID().ToString(),
+                          camp ? toCamp : -1.0f, reach, receding ? "receding" : "closing");
+        }
+        out.closing = out.closing || !receding;
+    }
+    return out;
+}
+
+std::vector<G3D::Vector3> DcEngageGeometry::PatrolRouteOf(Creature const* c)
+{
+    std::vector<G3D::Vector3> route;
+    if (!c)
+        return route;
+    Creature const* walker = c;
+    if (c->GetDefaultMovementType() != WAYPOINT_MOTION_TYPE)
+    {
+        CreatureGroup const* grp = c->GetFormation();
+        Creature const* leader = grp ? grp->GetLeader() : nullptr;
+        if (!leader || leader->GetDefaultMovementType() != WAYPOINT_MOTION_TYPE)
+            return route;
+        walker = leader;
+    }
+    uint32 const pathId = walker->GetWaypointPath();
+    WaypointPath const* path = pathId ? sWaypointMgr->GetPath(pathId) : nullptr;
+    if (!path)
+        return route;
+    route.reserve(path->Nodes.size());
+    for (WaypointNode const& n : path->Nodes)
+        route.emplace_back(n.X, n.Y, n.Z);
+    return route;
 }
 
 void DcEngageGeometry::AnchorChase(Player* bot, AiObjectContext* ctx, Unit* target)

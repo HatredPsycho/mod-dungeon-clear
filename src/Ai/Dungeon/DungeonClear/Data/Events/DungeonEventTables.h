@@ -2010,9 +2010,21 @@ namespace DcBlackwingLair
     // THE BROODLORD STANDOFF — where the transit ends and the ordinary raid
     // pipeline (muster, standoff, engage) takes back over. Nearest whelp 27.5yd,
     // nearest device 21.7yd; clean ground, on the upper room's floor.
+    //
+    // It is also 0.9yd from Broodlord's own spawn (guid 84387, -7573.97, -1034.39),
+    // so arriving here IS the boss pull — with whatever the crossing is still
+    // towing. Live (2026-10-17 13:23): the raid walked in with Hatchers, Taskmasters,
+    // a Technician pack and whelps on it, Broodlord joined two seconds later, 41
+    // deaths. The crossing therefore holds at TRANSIT_ENGAGED_HOLD_LEGS anchors out
+    // until nothing but whelps is fighting the raid (DcSuppressionTransit::
+    // Hold::Engaged); anchor 37, where that hold lands, is 42.1yd from him.
     constexpr float TRANSIT_END_X = -7573.8f;
     constexpr float TRANSIT_END_Y = -1033.5f;
     constexpr float TRANSIT_END_Z = 449.3f;
+
+    // The last two legs (anchor 37 -> 38 -> the standoff) are the ones that walk
+    // into Broodlord's reach: anchor 38 is 18.1yd from him.
+    constexpr uint32 TRANSIT_ENGAGED_HOLD_LEGS = 2;
 
     // How close the leader has to get before the transit is over. Also the
     // predicate's own OFF switch: the event is due while the leader is inside the
@@ -2125,6 +2137,11 @@ namespace DcBlackwingLair
     constexpr uint32 TRANSIT_PACK_HOLD_TIMEOUT_MS   = 30000;
     constexpr uint32 TRANSIT_ELITE_HOLD_TIMEOUT_MS  = 120000;
     constexpr uint32 TRANSIT_DISARM_HOLD_TIMEOUT_MS = 1500;
+    // The fourth: the tow fight before the last legs. Same order as the elite hold
+    // (it is the same kind of fight, just carried in rather than met), but its
+    // release does NOT latch — walking on is what pulls the boss — so a tow that
+    // never ends costs one leg per budget, like the pack hold.
+    constexpr uint32 TRANSIT_ENGAGED_HOLD_TIMEOUT_MS = 120000;
 
 
     // Telemetry threshold only. How far a live combat reference has to be from

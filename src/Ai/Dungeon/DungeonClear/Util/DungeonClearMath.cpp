@@ -7,6 +7,7 @@
 
 #include "DungeonClearTuning.h"  // DC_PI
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -297,6 +298,15 @@ bool DungeonClearMath::ShouldWaitForPatrol(std::uint32_t fullCount,
     // Patrol-contended only when the lone patrollers are the ONLY reason the pull
     // is over the ceiling: full over, reduced (without them) at/under.
     bool const contended = fullCount > ceiling && reducedCount <= ceiling;
+    return ShouldHoldForPatrol(contended, /*closing*/ false, waitSince, now, waitMs,
+                               waitMs, waitSinceOut);
+}
+
+bool DungeonClearMath::ShouldHoldForPatrol(bool contended, bool closing,
+                                           std::uint32_t waitSince, std::uint32_t now,
+                                           std::uint32_t waitMs, std::uint32_t hardMs,
+                                           std::uint32_t& waitSinceOut)
+{
     if (!contended)
     {
         waitSinceOut = 0;
@@ -306,12 +316,49 @@ bool DungeonClearMath::ShouldWaitForPatrol(std::uint32_t fullCount,
     // so a contention seen at the very first millisecond still latches.
     std::uint32_t const start = waitSince != 0 ? waitSince : (now != 0 ? now : 1u);
     waitSinceOut = start;
-    // Guard the unsigned subtraction (the now==0 corner can leave start ahead of
-    // now). Wait while inside the budget; once it elapses, proceed with the heavy
-    // verdict — the latch stays armed so the wait does not re-fire. waitMs == 0
-    // proceeds immediately.
-    std::uint32_t const elapsed = now >= start ? now - start : 0u;
-    return elapsed < waitMs;
+    // Modular difference, as getMSTimeDiff: survives the getMSTime wrap. A latch
+    // AHEAD of now (the now==0 corner above) wraps to a huge value; no real wait
+    // is 24 days long, so read that as zero elapsed. waitMs == 0 proceeds at once.
+    std::uint32_t elapsed = now - start;
+    if (elapsed > 0x80000000u)
+        elapsed = 0;
+    if (elapsed < waitMs)
+        return true;
+    // Past the soft budget: hold only while the threat walks INTO the pull, and
+    // never past the hard cap.
+    return closing && elapsed < hardMs;
+}
+
+bool DungeonClearMath::IsPatrolMover(bool selfWaypoint, bool leaderWaypoint, bool isBoss,
+                                     bool bossWanders, bool movingNow)
+{
+    if (selfWaypoint || leaderWaypoint)
+        return true;
+    return isBoss && (bossWanders || movingNow);
+}
+
+bool DungeonClearMath::IsPatrolPackmate(bool sameFormation, bool targetInFormation,
+                                        bool candInFormation, bool linkedRespawn,
+                                        float distToTarget, float packRadius)
+{
+    if (sameFormation || linkedRespawn)
+        return true;
+    return !targetInFormation && !candInFormation && distToTarget <= packRadius;
+}
+
+float DungeonClearMath::DistToClosedRoute2D(float px, float py,
+                                            std::vector<G3D::Vector3> const& route)
+{
+    if (route.empty())
+        return std::numeric_limits<float>::max();
+    float best = std::numeric_limits<float>::max();
+    for (std::size_t i = 0; i < route.size(); ++i)
+    {
+        G3D::Vector3 const& a = route[i];
+        G3D::Vector3 const& b = route[(i + 1) % route.size()];
+        best = std::min(best, DistSqToSegment2D(px, py, a.x, a.y, b.x, b.y));
+    }
+    return std::sqrt(best);
 }
 
 bool DungeonClearMath::ShouldMusterForScriptedStage(bool stagePending, bool toppedUp,

@@ -112,8 +112,19 @@ bool DungeonClearPullModeCurrentValue::Calculate()
     // followers are released and un-passived on the next world update. A veto at
     // the trigger alone would have stopped the NEXT pull and left the raid pinned
     // and passive at the one already standing.
+    //
+    // A DUE SCRIPTED STAGE OUTRANKS THE NO_STOP LEG, and only that one of the three.
+    // NO_STOP is the route's blanket "nobody knows a safe camp on this stretch"; a
+    // stage is that knowledge, authored per pack, exactly as it outranks a
+    // fight-in-place room below. BWL's Death Talon packs need it: the NO_STOP capsule
+    // out of anchor 12 reaches 18yd past it, which covers the only ground the two
+    // packs can be peeled apart from (ScriptedPullRegistry.cpp, the BWL rows). A
+    // pull-owning event and a live encounter still win over a stage.
+    bool const isLeader = DcLeaderSignal::IsDungeonClearLeader(bot);
+    ScriptedPullStage const* const dueStage =
+        isLeader ? DcTickMemoAccess::ScriptedStage(bot, context) : nullptr;
     if (DungeonEventExecutor::IsPullOwningEventDriving(bot, context) ||
-        DcNoStopZone::IsInNoStopZone(bot, context) ||
+        (!dueStage && DcNoStopZone::IsInNoStopZone(bot, context)) ||
         DcBossStandDown::IsActive(bot))
     {
         pull.ClearDynamicVerdict();
@@ -166,8 +177,7 @@ bool DungeonClearPullModeCurrentValue::Calculate()
     //
     // Leader-only, like the Dynamic governor: a follower's own copy of the bool
     // drives nothing, and writing it there would just add churn.
-    bool const isLeader = DcLeaderSignal::IsDungeonClearLeader(bot);
-    if (isLeader && DcTickMemoAccess::ScriptedStage(bot, context) != nullptr)
+    if (dueStage != nullptr)
     {
         if (!pull.scriptedForced)
         {

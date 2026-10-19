@@ -897,6 +897,54 @@ namespace
         return out;
     }
 
+    // How many live creatures that are NOT whelps (and not Broodlord) are fighting a
+    // living member right now, wherever they stand. Same combat-reference walk as
+    // BwlRemoteHolders, without its distance filter: the question before the last
+    // legs is not "what are we carrying from far away" but "is the raid still
+    // fighting anything worth finishing before it walks onto the boss". Whelps are
+    // left out for the reason BwlNearestElite leaves them out — there is no number
+    // of them the raid can finish — and Broodlord because, once he is in, the
+    // encounter is live and DC has stood down anyway.
+    uint32 BwlEngagedElites(Player* leader)
+    {
+        Map* const map = leader ? leader->GetMap() : nullptr;
+        if (!leader || !map)
+            return 0;
+
+        static std::vector<uint32> const kIgnored = {
+            NPC_CORRUPTED_RED_WHELP, NPC_CORRUPTED_GREEN_WHELP, NPC_CORRUPTED_BLUE_WHELP,
+            NPC_CORRUPTED_BRONZE_WHELP, NPC_BROODLORD_LASHLAYER};
+
+        std::unordered_set<ObjectGuid> seen;
+        auto const walk = [&](Player* member)
+        {
+            if (!member || !member->IsAlive() || member->GetMap() != map)
+                return;
+            for (auto const& kv : member->GetCombatManager().GetPvECombatRefs())
+            {
+                CombatReference* const ref = kv.second;
+                if (!ref)
+                    continue;
+                Unit* const other = ref->GetOther(member);
+                Creature* const c = other ? other->ToCreature() : nullptr;
+                if (!c || !c->IsAlive() || c->GetMap() != map)
+                    continue;
+                if (c->GetCombatManager().IsInEvadeMode())
+                    continue;
+                if (std::find(kIgnored.begin(), kIgnored.end(), c->GetEntry()) != kIgnored.end())
+                    continue;
+                seen.insert(c->GetGUID());
+            }
+        };
+
+        if (Group* const group = leader->GetGroup())
+            for (GroupReference* r = group->GetFirstMember(); r; r = r->next())
+                walk(r->GetSource());
+        else
+            walk(leader);
+        return static_cast<uint32>(seen.size());
+    }
+
     // Nearest ARMED Suppression Device, or -1. GO_STATE_READY is the armed state —
     // go_suppression_device pulses 22247 every 5s while it holds it, and the bot
     // disarm rung turns it off with SetGoState(GO_STATE_ACTIVE). A device turned
@@ -1114,6 +1162,12 @@ ObjectiveArriveResult DriveSuppressionTransit(Player* bot, AiObjectContext* cont
     in.packHoldTimeoutMs = TRANSIT_PACK_HOLD_TIMEOUT_MS;
     in.eliteHoldTimeoutMs = TRANSIT_ELITE_HOLD_TIMEOUT_MS;
     in.disarmHoldTimeoutMs = TRANSIT_DISARM_HOLD_TIMEOUT_MS;
+    // Only walked near the end: the kernel ignores the count everywhere else, and
+    // the combat-reference walk is forty members' worth of refs.
+    in.engagedHoldLegs = TRANSIT_ENGAGED_HOLD_LEGS;
+    in.engagedHoldTimeoutMs = TRANSIT_ENGAGED_HOLD_TIMEOUT_MS;
+    if (cursor + 1 + TRANSIT_ENGAGED_HOLD_LEGS >= anchorCount)
+        in.engagedElites = BwlEngagedElites(bot);
 
     // Measured every tick and REPORTED ONLY. There is no hold behind this number
     // any more: the gate that used to read it was written on the theory that the

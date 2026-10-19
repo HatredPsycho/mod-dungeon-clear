@@ -1074,6 +1074,9 @@ bool DungeonClearPullAction::Execute(Event /*event*/)
             // cleanup can detect a fizzled drag (target alive + idle after the
             // camp fight) and latch the pack over to the walk-in engage.
             pull.pullTarget = trash->GetGUID();
+            // The patrol-hold budget the Forming dwell spends belongs to this pack:
+            // carried over only from the Dynamic governor's hold on the SAME pack.
+            pull.ScopePatrolBudgetTo(trash->GetGUID());
 
             // Anchor the chase leash HERE, not on the tag leg's first tick. This is
             // the moment the plan exists: the camp above was measured against this
@@ -1142,6 +1145,37 @@ bool DungeonClearPullAction::Execute(Event /*event*/)
                 DC_PULL_TRACE("[DC:{}] pull forming: waiting for party to set at camp "
                               "({}/{} ms)", bot->GetName(), now - since, setTimeoutMs);
                 return true;
+            }
+
+            // PATROL GUARD AT THE TAG. The governor's guard (DcPullPlanner) runs only
+            // until a verdict commits — an Advanced commit is locked for the rest of
+            // the approach — so this dwell is the last point where the pull can still
+            // not happen: the party is set, the tank is at its commit spot, and a
+            // patrol may have walked back in since the verdict (Lucifron's ~75s loop
+            // passes 9-12yd from three of the hound packs). Hold the tag until it
+            // walks off, on the same one-per-pull PullPatrolWaitSec budget, so it can
+            // never stall the run. Pull-backs and scripted stages are authored plans
+            // with their own timing, and are left alone.
+            if (pull.scriptedStage < 0 && !pull.bossPullback)
+            {
+                Unit* const packNow = DcTargeting::GetPullTarget(botAI);
+                DcEngageGeometry::PatrolThreat const guard =
+                    packNow ? DcEngageGeometry::PatrolThreatNear(bot, context, packNow, &camp)
+                            : DcEngageGeometry::PatrolThreat{};
+                uint32 const waitMs =
+                    uint32(DcSettings::GetFloat(bot, "PullPatrolWaitSec") * 1000.0f);
+                if (DungeonClearMath::ShouldHoldForPatrol(
+                        guard.creature != nullptr, guard.closing, pull.patrolWaitSince, now,
+                        waitMs, waitMs * DungeonClearMath::PatrolHoldHardFactor,
+                        pull.patrolWaitSince))
+                {
+                    DC_PULL_TRACE("[DC:{}] pull forming: party set, holding the tag for "
+                                  "{} ({:.1f}yd from the pack, {})", bot->GetName(),
+                                  guard.creature->GetName(),
+                                  packNow->GetExactDist2d(guard.creature),
+                                  guard.closing ? "closing" : "receding");
+                    return true;
+                }
             }
             // SCRIPTED: drop anything still driving the tank before the tag leg
             // starts. The route rungs stand down once the phase leaves Idle, but
