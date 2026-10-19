@@ -37,6 +37,7 @@
 #include "PlayerbotAI.h"
 #include "Playerbots.h"
 #include "Timer.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcCoaCompat.h"
 
 namespace
 {
@@ -52,7 +53,7 @@ namespace
             case CLASS_DRUID:
                 return true;
             default:
-                return false;
+                return DcCoaCompat::CanResurrect(p);
         }
     }
 

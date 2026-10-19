@@ -2047,3 +2047,16 @@ DungeonClear.BgQueueFill.GearQuality = 0
 #
 
 DungeonClear.BgQueueFill.LogoutOnRelease = 1
+
+#
+#    DungeonClear.LockFreeClickableDoors
+#        Comma-separated gameobject entries the realm vouches for as plain click
+#        doors although their lock is 0. Lock-0 doors are refused by default
+#        because script-controlled seals look the same. Conquest of Azeroth reset
+#        74 vanilla instance doors to lock 0 (PR #6477); the Deadmines Heavy Doors
+#        17153 and 17154 are verified plain doors there.
+#
+#        Default: "17153,17154"
+#
+
+DungeonClear.LockFreeClickableDoors = "17153,17154"

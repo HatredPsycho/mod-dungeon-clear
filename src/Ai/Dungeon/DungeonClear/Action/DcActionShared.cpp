@@ -6,6 +6,7 @@
 #include "DungeonClearActions.h"
 #include "Ai/Dungeon/DungeonClear/Data/HealLeashRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcCoaCompat.h"
 #include "TestRun/DcTestRunManager.h"
 
 #include <algorithm>
@@ -251,6 +252,8 @@ namespace DcActionShared
     {
         if (!botAI || !bot)
             return std::nullopt;
+        if (auto coa = DcCoaCompat::ResolvePullOpener(bot))
+            return ResolvedPullSpell{coa->spellId, coa->minRange, coa->maxRange};
         if (auto pick = PickPullSpell(bot))
         {
             uint32 const spellId =

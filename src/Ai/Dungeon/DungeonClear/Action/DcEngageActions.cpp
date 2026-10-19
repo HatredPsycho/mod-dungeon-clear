@@ -3,6 +3,7 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
+#include "Ai/Dungeon/DungeonClear/Util/DcCoaCompat.h"
 #include "DungeonClearActions.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 
@@ -208,7 +209,8 @@ namespace
             // script/event seals (Uldaman's Seal of Khaz'Mul) the bot must not
             // pop. Default to refusing; open only entries the registry verifies
             // are ordinary player-clickable doors (Scholomance's Iron Gates).
-            return DcEventDoorRegistry::IsLockFreeClickable(go->GetEntry());
+            return DcEventDoorRegistry::IsLockFreeClickable(go->GetEntry()) ||
+                   DcCoaCompat::IsConfiguredLockFreeDoor(go->GetEntry());
         }
 
         LockEntry const* lock = sLockStore.LookupEntry(lockId);
