@@ -80,6 +80,7 @@
 #include "ShamanAiObjectContext.h"
 #include "WarlockAiObjectContext.h"
 #include "WarriorAiObjectContext.h"
+#include "CoaAiObjectContext.h"
 
 #include "BgQueueFill/DcBgQueueFillManager.h"
 #include "DungeonQueueFill/DcDungeonQueueFillManager.h"
@@ -230,6 +231,9 @@ public:
         RegisterClassContexts<RogueAiObjectContext>();
         RegisterClassContexts<ShamanAiObjectContext>();
         RegisterClassContexts<WarlockAiObjectContext>();
+        // Conquest of Azeroth's Playerbots give every custom class (ids 12-32) one context of its own.
+        // Without the DC values there, any CoA bot entering combat crashed in DcRun::Of.
+        RegisterClassContexts<CoaAiObjectContext>();
 
         // Base registry — only the class-0 fallback uses it, kept for parity.
         dc_access::SharedStrategyContexts()->Add(new DungeonClearStrategyContext());
