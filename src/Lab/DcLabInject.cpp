@@ -373,7 +373,7 @@ void DcLabInjector::Fire(std::size_t idx)
                 sx = src.front()->GetPositionX();
                 sy = src.front()->GetPositionY();
             }
-            u->GetMotionMaster()->MoveKnockbackFrom(sx, sy, xy, z, true);
+            u->GetMotionMaster()->MoveKnockbackFrom(sx, sy, xy, z);
             first = first ? first : u->GetGUID().GetRawValue();
         }
     }
