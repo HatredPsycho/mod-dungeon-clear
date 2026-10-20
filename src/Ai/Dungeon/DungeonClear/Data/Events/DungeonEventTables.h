@@ -82,6 +82,293 @@ namespace DcHellfireRamparts
     constexpr float FINAL_APPROACH_MIN_Z = 76.0f;
 }
 
+// Blackrock Depths (map 230) — the Upper City numbers BlackrockDepthsEvents.cpp's
+// events, hooks and roster patch share with the gtests (t/TestDungeonEvent,
+// t/TestBlackrockDepthsRouteProbe). The reasoning for each is in that file.
+namespace DcBlackrockDepths
+{
+    constexpr uint32 MAP_ID = 230;
+
+    // instance_blackrock_depths DataTypes / EncounterState, kept local so the
+    // module needn't pull the core BRD header.
+    constexpr uint32 TYPE_BAR = 3;
+    constexpr uint32 STATE_NOT_STARTED = 0;
+    constexpr uint32 STATE_IN_PROGRESS = 1;
+    constexpr uint32 STATE_DONE = 3;
+    constexpr uint32 STATE_SPECIAL = 4;
+
+    // Event ids (map-230 latch keys) and the roster objective sequence numbers
+    // (OBJ(n)) that carry them. Events 1/2 (Ring of Law, Shadowforge Lock) are
+    // older and keep their inline literals.
+    constexpr uint32 EVENT_HURLEY_KEGS = 3;
+    constexpr uint32 EVENT_RIBBLY = 4;
+    constexpr uint32 EVENT_ROCKNOT = 5;
+    constexpr uint32 OBJ_HURLEY_KEGS = 3;
+    constexpr uint32 OBJ_RIBBLY = 4;
+    constexpr uint32 OBJ_ROCKNOT = 5;
+
+    // ObjectiveHookRegistry ids (one flat space across every dungeon).
+    constexpr uint32 HOOK_START_ROCKNOT_ALE_RUN = 47;
+    constexpr uint32 HOOK_WAKE_HURLEY = 52;
+    constexpr uint32 HOOK_BUY_ROCKNOT_ALE = 54;
+    constexpr uint32 HOOK_PHALANX_AT_DOOR = 55;
+
+    constexpr uint32 NPC_HURLEY = 9537;
+    constexpr uint32 NPC_PHALANX = 9502;
+    constexpr uint32 NPC_ROCKNOT = 9503;
+    constexpr uint32 NPC_RIBBLY = 9543;
+    constexpr uint32 NPC_PLUGGER = 9499;
+    constexpr uint32 GO_THUNDERBREW_KEG = 164911;
+    constexpr uint32 GO_BAR_DOOR = 170571;
+    constexpr uint32 QUEST_ALE = 4295;   // Rocknot's "Dark Iron Ale" turn-in
+    constexpr uint32 ITEM_DARK_IRON_ALE_MUG = 11325;  // Plugger sells them, 4295 takes two
+    // Three turn-ins of two mugs start Rocknot's walk (BarAleCount == 3).
+    constexpr uint32 ALE_TURN_INS = 3;
+    constexpr uint32 ALE_MUGS_PER_TURN_IN = 2;
+
+    // Between the three Thunderbrew Lager Kegs, on the lower bar floor.
+    constexpr float KEG_X = 916.7f;
+    constexpr float KEG_Y = -150.2f;
+    constexpr float KEG_Z = -49.76f;
+
+    // Rocknot's hold: on the upper bar floor between his walk to the keg
+    // (script_waypoint 9503, y -186..-198) and the Bar Door / Phalanx (y -225..-229),
+    // off both. Probed in t/TestBlackrockDepthsRouteProbe.
+    constexpr float ROCKNOT_HOLD_X = 878.0f;
+    constexpr float ROCKNOT_HOLD_Y = -211.0f;
+    constexpr float ROCKNOT_HOLD_Z = -43.7f;
+    constexpr float ROCKNOT_HOLD_RADIUS = 6.0f;
+
+    // Where the ale is bought. Plugger patrols BEHIND his counter (path 477030,
+    // no delays, a ~10s loop) and the customer side only comes within trading
+    // range at the counter's west end, where he turns at (878.1,-179.5). Probed
+    // in t/TestBlackrockDepthsRouteProbe (PluggerIsReachableAcrossHisCounter).
+    constexpr float PLUGGER_STAND_X = 877.0f;
+    constexpr float PLUGGER_STAND_Y = -180.0f;
+    constexpr float PLUGGER_STAND_Z = -43.53f;
+
+    // Phalanx's guard spot in the Bar Door: the end of his wake-up run (path
+    // 95020), where npc_phalanx turns him hostile.
+    constexpr float PHALANX_DOOR_X = 867.295f;
+    constexpr float PHALANX_DOOR_Y = -222.645f;
+
+    // Where Plugger is fought (BossPullbackRegistry): 7.6yd out past the Bar
+    // Door on the upper floor, 59yd of navmesh from his counter. His death turns
+    // every patron within 100yd hostile; from here the nearest patron spawn is
+    // 19.4yd off (a Hammered Patron, level 48-52, so at most a 14yd aggro radius
+    // against a level-58 party) and the nearest Flamelash-side mob 25.5yd. Inside
+    // the bar, at his counter, three patrons stand within 8yd of him and the way
+    // out runs through two more groups at 1-3yd. Probed in
+    // t/TestBlackrockDepthsRouteProbe.
+    constexpr float PLUGGER_CAMP_X = 871.0f;
+    constexpr float PLUGGER_CAMP_Y = -235.0f;
+    constexpr float PLUGGER_CAMP_Z = -43.27f;
+
+    // --- the Tomb of the Seven (event 6) ---------------------------------
+    constexpr uint32 TYPE_TOMB_OF_SEVEN = 4;
+    constexpr uint32 EVENT_TOMB_OF_SEVEN = 6;
+    constexpr uint32 OBJ_TOMB_OF_SEVEN = 6;
+    constexpr uint32 HOOK_TOMB_MUSTER = 51;
+    constexpr uint32 HOOK_TOMB_RESET_WATCH = 53;
+    constexpr uint32 NPC_DOOMREL = 9039;
+    constexpr uint32 GO_TOMB_ENTER = 170576;
+    constexpr uint32 GO_TOMB_EXIT = 170577;
+
+    // The garrison: Doom'rel's upper tier, a few yards in front of him and off
+    // the exit door. Every ghost wakes by SelectNearestPlayer(130) from its own
+    // spawn, and this spot is inside 130yd of all six; it is also 90+yd from the
+    // entrance door, so a member mustered on it is inside the tomb when the
+    // gossip closes both doors. Probed in t/TestBlackrockDepthsRouteProbe.
+    constexpr float TOMB_HOLD_X = 1268.0f;
+    constexpr float TOMB_HOLD_Y = -272.0f;
+    constexpr float TOMB_HOLD_Z = -78.1f;
+    constexpr float TOMB_HOLD_RADIUS = 6.0f;
+    // Muster: every living member this close to the hold (and on the tomb's
+    // floors) before the gossip that seals the doors.
+    constexpr float TOMB_MUSTER_RADIUS = 25.0f;
+    constexpr float TOMB_MUSTER_ZBAND = 12.0f;
+    // The core's wake range (instance_blackrock_depths::TombOfSevenEvent).
+    constexpr float TOMB_WAKE_RANGE = 130.0f;
+
+    // The six ghosts the instance wakes before Doom'rel, in wake order.
+    struct TombGhost { uint32 entry; float x, y, z; };
+    constexpr TombGhost TOMB_GHOSTS[] = {
+        { 9035, 1215.05f, -220.66f, -85.59f },   // Anger'rel (encounter credit, bit 16)
+        { 9038, 1286.56f, -253.33f, -78.06f },   // Seeth'rel
+        { 9040, 1236.55f, -291.53f, -78.14f },   // Dope'rel
+        { 9037, 1226.69f, -246.12f, -85.59f },   // Gloom'rel
+        { 9036, 1272.32f, -199.82f, -85.59f },   // Vile'rel
+        { 9034, 1246.18f, -189.97f, -85.59f },   // Hate'rel
+    };
+
+    // --- the Lyceum (events 7 and 8) -------------------------------------
+    constexpr uint32 TYPE_LYCEUM = 5;
+    constexpr uint32 EVENT_LYCEUM_SOUTH = 7;
+    constexpr uint32 EVENT_LYCEUM_NORTH = 8;
+    constexpr uint32 OBJ_LYCEUM_SOUTH = 7;
+    constexpr uint32 OBJ_LYCEUM_NORTH = 8;
+    constexpr uint32 HOOK_GATHER_TORCH = 48;
+    constexpr uint32 HOOK_LIGHT_BRAZIER_S = 49;
+    constexpr uint32 HOOK_LIGHT_BRAZIER_N = 50;
+    constexpr uint32 NPC_FLAME_KEEPER = 9956;       // Shadowforge Flame Keeper, pool 1550
+    constexpr uint32 ITEM_SHADOWFORGE_TORCH = 11885;
+    constexpr uint32 GO_BRAZIER_S = 174744;
+    constexpr uint32 GO_BRAZIER_N = 174745;
+    constexpr uint32 GO_GOLEM_DOOR_N = 170573;
+    constexpr uint32 GO_GOLEM_DOOR_S = 170574;
+    constexpr uint32 GO_STATE_LIT_OR_OPEN = 0;      // GOState ACTIVE: a lit brazier, an open door
+
+    // Where the tank stands to light each brazier: in front of it, on the
+    // Lyceum floor, with its Fireguard Destroyer (8911) on the far side. The
+    // braziers themselves are at (1330.14, -508.86) / (1431.13, -508.94), z -88.87.
+    constexpr float BRAZIER_S_X = 1330.1f;
+    constexpr float BRAZIER_S_Y = -503.0f;
+    constexpr float BRAZIER_S_Z = -88.9f;
+    constexpr float BRAZIER_N_X = 1431.1f;
+    constexpr float BRAZIER_N_Y = -503.0f;
+    constexpr float BRAZIER_N_Z = -88.9f;
+
+    // Where each brazier OBJECTIVE is anchored — not on its brazier. An anchored
+    // event stands the pull system, the scout-lag and the off-line route rejoin
+    // down only once the tank is inside the anchor's arriveRadius; everything
+    // before that is ordinary Advance. With the anchors on the brazier stands,
+    // tp-20261018-211235-1 crossed the room to each one in Advance — 1m27s-2m27s
+    // to the south stand from the door, 1m11s-2m31s on to the north one — with
+    // the party scout-lagging 15-25yd behind, a rest gate after every fight, and
+    // every one of the tank's 68 route-rejoin backtracks (none once an event
+    // ran). So the south event starts 10yd inside the Lyceum door (1311.48,
+    // -343.07), and the north event where the south one leaves the tank: on the
+    // south stand. Both walks to a brazier are the events' own MoveTo steps.
+    constexpr float LYCEUM_ENTRY_X = 1311.5f;
+    constexpr float LYCEUM_ENTRY_Y = -353.0f;
+    constexpr float LYCEUM_ENTRY_Z = -92.0f;
+
+    // The four points pool 1550 (max_limit 2, 300s respawn) spawns its Flame
+    // Keepers on. Every one is inside LYCEUM_KEEPER_SCAN of both anchors and both
+    // brazier stands (t/TestDungeonEvent pins it): the hunt and the torch hook
+    // both scan with this ONE radius, and if they disagreed the hook could ask
+    // for a hunt the hunt step reads as already done, rewinding forever.
+    // ROOM-WIDE (= LYCEUM_ROOM_SCAN): the hunt now starts at the door, and keeper
+    // points 2 and 3 are 186yd and 213yd from it.
+    struct PoolPoint { float x, y, z; };
+    constexpr PoolPoint FLAME_KEEPER_POINTS[] = {
+        { 1382.62f, -397.68f, -94.59f },
+        { 1385.20f, -439.44f, -94.59f },
+        { 1431.38f, -462.24f, -91.93f },
+        { 1382.00f, -528.69f, -91.96f },
+    };
+    constexpr float LYCEUM_KEEPER_SCAN = 280.0f;
+
+    // The room itself: the never-target Reservist box (DcNeverTargetRegistry —
+    // all 232 of them, and every Flame Keeper point, lie inside it) plus a floor
+    // band. Every one of the room's 238 spawns stands at z -96..-88, the Lyceum
+    // door included, so the band keeps the box off any other level. The pet
+    // sweep (DcLyceum::Tick) holds pets passive inside it.
+    constexpr float LYCEUM_BOX_X_MIN = 1275.0f;
+    constexpr float LYCEUM_BOX_X_MAX = 1480.0f;
+    constexpr float LYCEUM_BOX_Y_MIN = -560.0f;
+    constexpr float LYCEUM_BOX_Y_MAX = -305.0f;
+    constexpr float LYCEUM_BOX_Z_MIN = -102.0f;
+    constexpr float LYCEUM_BOX_Z_MAX = -80.0f;
+
+    // How far the braziers are looked for, and the radius of the north event's
+    // door completion. ROOM-WIDE: the braziers are 101yd apart and each has its
+    // own entry, so nothing can be mistaken for its pair, while a scan sized to
+    // the stand point loses the brazier the moment a fight drags the tank off
+    // it. Live tr-20261018-190617-15: the south brazier was lit, the tank chased
+    // Reservists off the healer to 102yd, the 40yd completion and the light
+    // hook's 40yd lookup both read "no brazier", and the step ran Running until
+    // the stall watchdog killed the run. Sized to reach both braziers and the
+    // north Golem door (1389.55, -555.85) from every corner of the room box —
+    // the furthest pair, door to the Lyceum-door corner, is 276yd
+    // (t/TestDungeonEvent pins it).
+    constexpr float LYCEUM_ROOM_SCAN = 280.0f;
+
+    // Pack leash for both brazier events (DungeonEvent::packLeash): between
+    // fights the tank holds until every living member is within this of it.
+    // Followers trail the tank by ~6yd and a ranged healer by 15-20; past this,
+    // a member is a column, not a party.
+    constexpr float LYCEUM_PACK_LEASH = 22.0f;
+
+    // A torch lost (never looted, or expired in the bags after its 300s) costs a
+    // pool respawn: 300s plus slack. Past this with no keeper back, the torch
+    // step stalls visibly — the signature of the pooled-respawn bug fixed by
+    // AC PR #25826, not something DC works around.
+    constexpr uint32 TORCH_WAIT_MS = 330000;
+
+    // --- the Iron Hall (Magmus) -------------------------------------------
+    // mod-individual-progression replaces the six C++ Ironhand Guardians (8982)
+    // with SmartAI 108982s that cast Gout of Flame (15529 -> 15538 every second,
+    // TARGET_UNIT_SRC_AREA_ENEMY, 30yd CIRCLE around the guardian) for as long as
+    // they exist — deliberately (IP PR #890). DC fights around it: hazard rows
+    // keep camps and follower slots out of the circles, a fight-in-place zone
+    // keeps the tank from dragging Magmus out of the gap he spawns in, and the
+    // safe-spot hop (below) keeps every member from stopping in the fire.
+    constexpr uint32 NPC_MAGMUS = 9938;
+    constexpr uint32 NPC_IRONHAND_GUARDIAN = 8982;      // stock AC
+    constexpr uint32 NPC_IRONHAND_GUARDIAN_IP = 108982; // mod-individual-progression
+    constexpr uint32 GO_THRONE_DOOR = 170575;
+    constexpr float IRONHAND_FIRE_RADIUS = 30.0f;       // spell 15538's radius
+    struct HallPoint { float x, y; };
+    constexpr HallPoint IRONHAND_GUARDIANS[] = {
+        { 1407.29f, -587.30f }, { 1353.43f, -587.32f },
+        { 1406.88f, -632.44f }, { 1353.92f, -632.75f },
+        { 1407.67f, -677.72f }, { 1353.16f, -677.38f },
+    };
+    constexpr float MAGMUS_X = 1380.72f;
+    constexpr float MAGMUS_Y = -659.31f;
+    constexpr float MAGMUS_Z = -91.97f;
+    // The fire-free gap Magmus spawns in, measured against the six circles: a
+    // diamond ~14yd across (x) by ~17yd long (y) centred on (1380.5, -655.5).
+    // These are its four tips pulled in by a yard, i.e. points the party can
+    // stand on with nothing landing on them. (The plan's band rectangle, x
+    // 1372-1388 by y -648..-663, does NOT fit: its corners are 23-24yd from the
+    // nearest guardians.)
+    constexpr HallPoint IRON_HALL_SAFE[] = {
+        { 1380.5f, -647.8f }, { 1380.5f, -663.6f },   // north / south tips
+        { 1374.7f, -655.5f }, { 1386.5f, -655.5f },   // west / east tips
+    };
+    // Fight-in-place zone: the hall between the Golem doors (y -555.9) and the
+    // throne door (y -710.5), wall to wall.
+    constexpr float IRON_HALL_MIN_X = 1340.0f;
+    constexpr float IRON_HALL_MAX_X = 1420.0f;
+    constexpr float IRON_HALL_MIN_Y = -705.0f;
+    constexpr float IRON_HALL_MAX_Y = -562.0f;
+
+    // The safe-spot hop (DcIronHall, DungeonClearIronHallSafeSpot). A member may
+    // walk through the fire but never STOP in it, so the hall is a chain of four
+    // stopping places on the centre line, each a fire-free gap between the
+    // statue bands: north by the Golem doors, gap 1, gap 2 (Magmus), south by
+    // the throne door.
+    //
+    // "In the fire" is 32yd, not the raw 30: AC's area search measures to the
+    // target's edge (IsWithinDist adds the unit's ~1.5yd reach), and half a yard
+    // more covers drift. Every slot below sits at >= 33yd from every statue, so a
+    // bot that arrives is a yard clear of the test that sent it — it cannot
+    // re-fire on landing.
+    constexpr float IRON_HALL_FIRE_KEEPOUT = 32.0f;
+    // The hop's box: the fight-in-place box widened to the doors on both ends,
+    // since the north and south stops stand past its y edges.
+    constexpr float IRON_HALL_HOP_MIN_Y = -712.0f;
+    constexpr float IRON_HALL_HOP_MAX_Y = -554.0f;
+    constexpr float IRON_HALL_HOP_MIN_Z = -100.0f;
+    constexpr float IRON_HALL_HOP_MAX_Z = -84.0f;
+    constexpr float IRON_HALL_FLOOR_Z = -91.97f;
+    constexpr uint32 IRON_HALL_ZONE_COUNT = 4;
+    constexpr HallPoint IRON_HALL_ZONES[IRON_HALL_ZONE_COUNT] = {
+        { 1380.5f, -562.5f },   // north, by the Golem doors
+        { 1380.3f, -609.7f },   // gap 1
+        { 1380.6f, -655.5f },   // gap 2, Magmus's
+        { 1380.5f, -702.0f },   // south, by the throne door
+    };
+    // Five slots per stop, so a party does not stack on one point. The gaps are
+    // diamonds ~8yd across by ~10 long at 32yd, so the slots are a 2.5yd cross.
+    constexpr uint32 IRON_HALL_SLOT_COUNT = 5;
+    constexpr HallPoint IRON_HALL_SLOT_OFFSETS[IRON_HALL_SLOT_COUNT] = {
+        { 0.0f, 0.0f }, { 2.5f, 0.0f }, { -2.5f, 0.0f }, { 0.0f, 2.5f }, { 0.0f, -2.5f },
+    };
+}
+
 void RegisterHellfireRampartsEvents(std::vector<DungeonEvent>& out);
 void RegisterBloodFurnaceEvents(std::vector<DungeonEvent>& out);
 void RegisterSlavePensEvents(std::vector<DungeonEvent>& out);
@@ -5368,7 +5655,8 @@ void RegisterKarazhanRoster(std::vector<BossRosterPatch>& t);
 // --- wing layouts (one appender per split map) ---------------------------
 // Records which boss credit-entries belong to which wing of a multi-wing map;
 // aggregated by DungeonWingRegistry. Only split maps appear here. Maraudon has
-// no events (wings + one roster removal) and lives in MaraudonEvents.cpp.
+// no events (wings + one roster removal) and lives in MaraudonEvents.cpp; like
+// Blackrock Spire its wing is chosen per run (WingSelect::Explicit).
 void RegisterDireMaulWings(std::unordered_map<uint32, DungeonWingLayout>& store);
 void RegisterScarletMonasteryWings(std::unordered_map<uint32, DungeonWingLayout>& store);
 void RegisterMaraudonWings(std::unordered_map<uint32, DungeonWingLayout>& store);

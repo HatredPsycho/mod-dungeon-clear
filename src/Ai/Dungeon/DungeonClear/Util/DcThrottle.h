@@ -47,6 +47,8 @@ enum class DcThrottle : uint8
     DtkCampIssue,        // the Drak'Tharon camp-return point move (time only)
     HosTravelIssue,      // HosTravelTo — the Halls of Stone Tribunal arena
     HorStayAheadIssue,   // the HoR escape's per-follower forward step
+    IronHallHopIssue,    // the BRD Iron Hall's hop to a fire-free stop
+    LyceumCloseUpIssue,  // the BRD Lyceum close-up walk back to the tank
     TocMoveIssue,        // the ToC driver's point move (the horse, or the tank on foot)
     OcMoveIssue,         // the Oculus rider's drake move (the vehicle base) and its giver walk
     ChessMoveIssue,      // a Karazhan chess member's walk (sideline, a piece, Echo, the chest)
@@ -91,12 +93,21 @@ enum class DcThrottle : uint8
     ChessLog,            // the Karazhan chess conductor's DC_CHESS state line
     ChessGossip,         // a chess member's piece gossip (one per 3s)
     ChessSeatTeleport,   // a chess controller's hop to its sideline seat
+    BrdEventLog,         // the Blackrock Depths Upper City hooks' waiting lines
+    BrdTorchWarn,        // "no Flame Keeper respawned" WARN (once per torch wait)
+    EventLeashLog,       // an event's pack-leash hold line (DungeonEvent::packLeash)
 
     // --- action floors (time only) -----------------------------------------
     UpHarpoonFire,       // floor between two Harpoon Launcher clicks (its own
                          // autoclose is 1000ms and GO_FLAG_IN_USE blocks a click
                          // until GameObject::Update clears it, so a faster cadence
                          // can only produce swallowed clicks and log noise)
+    BrdTorchNudge,       // floor on walking a torch-holding follower to a brazier
+    BrdKegUse,           // floor between two Thunderbrew Lager Keg uses: all three
+                         // are needed to wake Hurley, one per tick-floor so each
+                         // keg's SmartAI chain lands before the next
+    BrdAleTurnIn,        // floor between two Rocknot's Ale hand-ins, so each lands
+                         // as its own drink and yell instead of three in one tick
 
     Count
 };

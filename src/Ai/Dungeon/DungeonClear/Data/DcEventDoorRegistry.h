@@ -326,6 +326,35 @@ namespace DcEventDoorRegistry
             // row keeps it refused if a future edit lists lock-free doors more
             // loosely, so nobody walks past Chess to Prince.
             case 184277:  // Karazhan — Gamesman's Hall Exit Door (opens on Chess DONE)
+            // Blackrock Depths (map 230) — the Bar Door (170571, lock 739, the
+            // Grim Guzzler Key). npc_rocknot breaks it to state 2 with his last
+            // kick; 7s later Phalanx is woken and runs to it, turning hostile
+            // when he arrives, and TYPE_BAR goes DONE. A click that
+            // opened it early would let the party walk out past a Phalanx who is
+            // still faction 35 — unattackable, and blocking his own credit. The
+            // key-item lock already refuses a bot without the key (only a
+            // pickpocketed Plugger drops it); this row keeps it refused if that
+            // ever changes. Map-230 event 5 owns it.
+            case 170571:  // Blackrock Depths — Bar Door (opens at the end of Rocknot's ale run)
+            // The Summoner's Tomb doors, both empty-lock-85 and both driven only by
+            // instance_blackrock_depths' TYPE_TOMB_OF_SEVEN: IN_PROGRESS shuts both,
+            // DONE opens both, a reset reopens the entrance. 170576 spawns open, so
+            // it is only ever "blocking" while the Seven are up — and a bot that
+            // clicked it then would let the party walk out mid-encounter into the
+            // 15s reset. 170577 (the exit) spawns shut and is the way on to the
+            // Lyceum; opening it early would skip the Seven. Map-230 event 6 owns both.
+            case 170576:  // Blackrock Depths — Summoner's Tomb entrance (shut while the Seven are up)
+            case 170577:  // Blackrock Depths — Summoner's Tomb exit (opens on the Seven DONE)
+            // The two Golem Room doors out of the Lyceum to Magmus, empty-lock-85,
+            // opened only by TYPE_LYCEUM DONE (both braziers lit). A click would
+            // skip the braziers and leave the Lyceum's respawn running behind a
+            // party that never earned its way out. Map-230 events 7/8 own them.
+            case 170573:  // Blackrock Depths — Golem Room North (opens on TYPE_LYCEUM DONE)
+            case 170574:  // Blackrock Depths — Golem Room South (opens on TYPE_LYCEUM DONE)
+            // The Throne Room doors (empty-lock-85), opened only by TYPE_IRON_HALL
+            // DONE — Magmus's death. Clicking them would walk the party past
+            // Magmus to the Emperor.
+            case 170575:  // Blackrock Depths — Throne Room doors (opens on Magmus's death)
                 return true;
             default:
                 return false;
