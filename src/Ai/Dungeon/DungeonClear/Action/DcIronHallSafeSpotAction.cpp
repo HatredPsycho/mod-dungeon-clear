@@ -12,6 +12,7 @@
 #include "Player.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
+#include "Util/DcPlayerbotsConfig.h"
 #include "Playerbots.h"
 #include "SharedDefines.h"
 #include "Timer.h"
@@ -149,7 +150,7 @@ namespace
             in.targetX = victim->GetPositionX();
             in.targetY = victim->GetPositionY();
             in.reach = PlayerbotAI::IsRanged(bot)
-                           ? sPlayerbotAIConfig.SpellDistance - 2.0f
+                           ? DC_PB_CONFIG(SpellDistance, spellDistance) - 2.0f
                            : bot->GetMeleeRange(victim) - 0.5f;
         }
         in.slotSeed = static_cast<uint32>(bot->GetGUID().GetCounter());
