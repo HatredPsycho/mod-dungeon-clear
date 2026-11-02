@@ -193,10 +193,12 @@ if (BUILD_TESTING)
         # same reason (see the C4005 note above).
         if (MSVC)
             target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES=)
+            target_compile_definitions(dungeon_clear_tests PRIVATE NOMINMAX)
         endif()
 
         # Link the necessary targets
         target_link_libraries(dungeon_clear_tests
+            acore-core-interface
             game
             gtest_main
             gmock_main

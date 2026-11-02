@@ -785,11 +785,11 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
     // second of a freed Razorgore, and the new runner's WALK is nearly all of it.
     // Among candidates of equal rank the election therefore takes the one already
     // closest to the ledge.
-    DcRazorgore::RunnerCandidate near = Bot(90);  near.isRanged = true;  near.distToOrb = 5.0f;
-    DcRazorgore::RunnerCandidate far = Bot(10);   far.isRanged = true;   far.distToOrb = 70.0f;
-    EXPECT_EQ(DcRazorgore::SelectRunner({near, far}), 0)
+    DcRazorgore::RunnerCandidate nearRunner = Bot(90);  nearRunner.isRanged = true;  nearRunner.distToOrb = 5.0f;
+    DcRazorgore::RunnerCandidate farRunner = Bot(10);   farRunner.isRanged = true;   farRunner.distToOrb = 70.0f;
+    EXPECT_EQ(DcRazorgore::SelectRunner({nearRunner, farRunner}), 0)
         << "the lower GUID is 70yd away; distance decides before GUID does";
-    EXPECT_EQ(DcRazorgore::SelectRunner({far, near}), 1);
+    EXPECT_EQ(DcRazorgore::SelectRunner({farRunner, nearRunner}), 1);
 
     // RANK STILL WINS OUTRIGHT. A healer standing on the orb does not displace a
     // ranged DPS across the room: losing the healer to a 90s root is how the raid
@@ -797,7 +797,7 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
     DcRazorgore::RunnerCandidate healerAtOrb = Bot(1);
     healerAtOrb.isHealer = true;
     healerAtOrb.distToOrb = 0.0f;
-    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, far}), 1);
+    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, farRunner}), 1);
 
     // And the bucket is coarse on purpose: two bots standing together must not
     // trade the job back and forth as they shuffle, so inside one bucket the GUID
