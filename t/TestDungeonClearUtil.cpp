@@ -287,6 +287,17 @@ TEST_F(DungeonClearUtilTest, SoloPlayerReadyChecks)
     EXPECT_FALSE(DcPartyState::IsAnyPartyMemberLooting(player));
 }
 
+// A bot context the registrar did not reach reads as a disabled run, and nothing written sticks
+TEST_F(DungeonClearUtilTest, RunStateOfUnregisteredContextIsDisabled)
+{
+    MockAiObjectContext unregistered;
+
+    DcRun::Of(&unregistered).enabled = true;
+
+    EXPECT_FALSE(DcRun::Of(&unregistered).enabled);
+    EXPECT_FALSE(DcRun::IsRaid(&unregistered));
+}
+
 // Test nullptr robustness for utility methods
 TEST_F(DungeonClearUtilTest, NullptrSafetyChecks)
 {

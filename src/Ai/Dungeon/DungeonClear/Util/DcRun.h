@@ -7,9 +7,12 @@
 #define _PLAYERBOT_DCRUN_H
 
 #include "AiObjectContext.h"
+#include "Log.h"
 #include "PlayerbotAI.h"
 #include "Ai/Dungeon/DungeonClear/DcRunState.h"
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
+
+#include <mutex>
 
 // Typed accessor for the leader-owned DcRunState value. Every read/write of the
 // run-level facts (enabled, paused, the pause cluster, the selected-boss override,
@@ -22,7 +25,24 @@ namespace DcRun
 {
     inline DcRunState& Of(AiObjectContext* ctx)
     {
-        return ctx->GetValue<DcRunState&>(DcKey::RunState)->Get();
+        if (Value<DcRunState&>* value = ctx->GetValue<DcRunState&>(DcKey::RunState))
+            return value->Get();
+
+        // The first-tick registrar appends the DC values class by class, so a bot
+        // context it did not reach has none. Combat and damage hooks read this for
+        // every bot, which made that gap a crash on entering combat (2026-10-19). A
+        // disabled state keeps such a bot out of every run instead; rebuilt on each
+        // read so nothing written to it survives.
+        static std::once_flag reported;
+        std::call_once(reported, []
+        {
+            LOG_ERROR("playerbots.dungeonclear",
+                      "[DC] a bot context has no DungeonClear values: its class context is "
+                      "missing from DungeonClearRegistrarWorldScript");
+        });
+        thread_local DcRunState inert;
+        inert = DcRunState{};
+        return inert;
     }
 
     inline DcRunState& Of(PlayerbotAI* botAI)
