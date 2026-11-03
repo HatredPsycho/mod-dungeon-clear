@@ -241,6 +241,13 @@ namespace
         return false;
     }
 
+    bool RaidRezStalled(Player* p, DcRunState const& run, uint32 now)
+    {
+        return p && p->GetMap() && p->GetMap()->IsRaid() && run.rezEpisodeOpen &&
+               run.rezProgressMs != 0 &&
+               getMSTimeDiff(run.rezProgressMs, now) >= DC_REZ_RAID_STALL_MAX_MS;
+    }
+
     // "Is there a corpse at all?" — EvaluateImpl's very first question, answered
     // from the group list instead of from the two vectors BuildSnapshot allocates
     // to ask it. IsElectedRezzer runs on every rez-class follower on every tick
@@ -350,6 +357,11 @@ namespace
                 ++deadNow;
         if (mutate)
         {
+            if (!run.rezEpisodeOpen || deadNow != run.rezLastDeadCount)
+            {
+                run.rezProgressMs = now ? now : 1;
+                run.rezStalled = false;
+            }
             if (!run.rezEpisodeOpen)
             {
                 run.rezEpisodeOpen = true;
@@ -500,6 +512,26 @@ namespace
         in.blockedHoldMaxMs = DC_REZ_BLOCKED_HOLD_MAX_MS;
 
         plan.verdict = DcRezDecision::Decide(in, members);
+
+        // A raid recovery that raises nobody stands down (DC_REZ_RAID_STALL_MAX_MS):
+        // whatever keeps the rezzer back, holding twenty bodies over a corpse buys
+        // nothing, and the next death or raise re-arms the recovery.
+        if (RaidRezStalled(bot, run, now) &&
+            plan.verdict.outcome == DcRezDecision::Outcome::Hold &&
+            plan.verdict.reason == DcRezDecision::Reason::Recovering)
+        {
+            plan.verdict.outcome = DcRezDecision::Outcome::None;
+            plan.verdict.reason = DcRezDecision::Reason::StalledStandDown;
+            plan.verdict.rezzerIdx = -1;
+            plan.verdict.pairs.clear();
+            if (mutate && !run.rezStalled)
+            {
+                run.rezStalled = true;
+                LOG_INFO("playerbots.dungeonclear",
+                         "[DC:{}] post-combat rez: nobody raised for {}s, clearing short-handed",
+                         owner->GetName(), DC_REZ_RAID_STALL_MAX_MS / 1000);
+            }
+        }
 
         // Advance the floor's clocks from the verdict we just got. They can only be
         // stamped after the fact — whether a rezzer is left is precisely what the
@@ -705,6 +737,8 @@ namespace DcRezRecovery
 
         if (leaderTank->isDead())
             return true;
+        if (RaidRezStalled(leaderTank, run, getMSTime()))
+            return false;
         Group* group = leaderTank->GetGroup();
         if (!group)
             return false;

@@ -147,7 +147,8 @@ namespace DcRezDecision
         BlockedWaiting,  // the instance forbids resurrection — hold, it may lift
         BlockedStandDown, // ...it did not lift; carry on short-handed, do not disable
         UnsafeStandDown,  // every corpse lies among idle hostiles; carry on short-handed
-        DeathLoop         // members keep dying again after being raised (DC_REZ_LOOP_*) — end the run
+        DeathLoop,        // members keep dying again after being raised (DC_REZ_LOOP_*) — end the run
+        StalledStandDown  // raid recovery raised nobody for DC_REZ_RAID_STALL_MAX_MS; carry on short-handed
     };
 
     struct Result

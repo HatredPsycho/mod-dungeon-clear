@@ -664,6 +664,21 @@ std::string DcPartyState::DescribePartyNotReady(Player* bot,
             }
         }
 
+        // Say why a low member is not recovering: the "needs eat/drink" triggers
+        // cannot sit a bot down in combat, mounted or in water, and nothing makes
+        // a human eat. A bare "low HP" read as the healer ignoring them.
+        if (reason == "low HP" || reason == "low mana")
+        {
+            if (!GET_PLAYERBOT_AI(member))
+                reason += ", player";
+            else if (member->IsInCombat())
+                reason += ", in combat";
+            else if (member->IsMounted())
+                reason += ", mounted";
+            else if (member->IsInWater())
+                reason += ", in water";
+        }
+
         if (reason.empty())
             continue;  // This member is ready — not blocking.
 

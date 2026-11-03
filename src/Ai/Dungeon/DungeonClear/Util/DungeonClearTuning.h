@@ -71,6 +71,11 @@ constexpr uint32 DC_ENGAGE_WALK_YIELD_MS = 1000;
 constexpr uint32 DC_ENGAGE_WALK_GIVEUP_MS = 8 * 1000;
 constexpr uint32 DC_ENGAGE_WALK_GIVEN_UP_MS = 60 * 1000;
 constexpr uint32 DC_ENGAGE_WALK_TICK_GAP_MS = 2 * 1000;
+// The same give-up for a walk-in that keeps being interrupted: Advance's off-line
+// rejoin takes the tank back to its route every few seconds, the gap restarts the
+// measurement above, and the tank shuttled between the route and a Sea Witch 57yd
+// off it for the whole no-progress budget (BFD, six runs on 31/10).
+constexpr uint32 DC_ENGAGE_WALK_SPAN_MAX_MS = 45 * 1000;
 
 // The boss engage's walk-in refused outright (DungeonClearMath::ShouldTagBossFromStandoff):
 // how long the refusal must persist before the tank tags the boss from where it
@@ -277,6 +282,14 @@ constexpr uint32 DC_NO_REZZER_HOLD_MAX_MS    = 60000;
 // is the same episode: the raised members died again before anyone could rest.
 constexpr uint32 DC_REZ_LOOP_EXTRA_DEATHS = 2;
 constexpr uint32 DC_REZ_LOOP_REOPEN_MS    = 30000;
+
+// --- raid recovery that raises nobody ----------------------------------------
+// A raid recovery whose corpse count has not moved for this long stops holding
+// the raid and lets it clear short-handed; a new death or a raise re-arms it.
+// MC, 31/10: a survivor kept engaged out of reach froze the timeout clock and
+// held the elected rezzer back, so "X is coming to resurrect Y" stood until the
+// bench watchdog ended five runs; a player-led run has no such watchdog.
+constexpr uint32 DC_REZ_RAID_STALL_MAX_MS = 240000;
 
 // --- the instance refuses the spell ----------------------------------------
 // How long the run holds over a corpse the instance will not let anyone raise

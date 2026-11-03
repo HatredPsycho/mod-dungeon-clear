@@ -1958,6 +1958,23 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoOffLineRejoin(Advan
     DungeonFollowerState& follower = *st.follower;
     DungeonPathFollower::Hop const& hop = st.hop;
 
+    // Fell through the floor between two ticks, still holding the route it walked:
+    // the rejoin would path from the hole and the next rebuild re-plans from down
+    // there, on a layer under the street (Stratholme, Timmy: 65yd under the route at
+    // (3603,-3333), three runs on 31/10). Same cure as the stranded-cursor case.
+    if (DungeonPathFollower::FellThroughFloor(bot->GetPositionZ(), hop.point.z) &&
+        !bot->GetVehicle() && DC_ALLOW_RECOVERY_MOVES)
+    {
+        LOG_WARN("playerbots.dungeonclear",
+                 "[DC:{}] fell through the floor: {:.1f}yd under route point "
+                 "({:.1f},{:.1f},{:.1f}) -> near-teleport back onto it",
+                 bot->GetName(), hop.point.z - bot->GetPositionZ(), hop.point.x, hop.point.y,
+                 hop.point.z);
+        bot->GetMotionMaster()->Clear();
+        bot->NearTeleportTo(hop.point.x, hop.point.y, hop.point.z + 0.5f, bot->GetOrientation());
+        return Step::ReturnTrue;
+    }
+
     // Route points are Detour corridor vertices: their z is already the floor the
     // route runs on. Stock MoveTo's z-search would instead also try the ground 8yd
     // BELOW the requested height and keep whichever path is shorter — over a spiral

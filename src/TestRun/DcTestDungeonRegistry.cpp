@@ -134,6 +134,9 @@ namespace DcTestDungeonRegistry
             { "bwl",             "Blackwing Lair",                469, -7673.03f, -1106.08f,  396.65f, 0.178f, 60, "" },
             // Zul'Gurub, from the same table (areatrigger 3928).
             { "zg",              "Zul'Gurub",                     309, -11916.10f, -1230.53f,  92.53f, 4.719f, 60, "" },
+            // Onyxia's Lair (areatrigger 2848) and the Temple of Ahn'Qiraj (4010), same table.
+            { "ony",             "Onyxia's Lair",                 249,    29.16f,   -71.34f,   -8.18f, 4.580f, 60, "" },
+            { "aq40",            "Temple of Ahn'Qiraj",           531, -8231.33f,  2010.60f,  129.33f, 0.930f, 60, "" },
             // Gruul's Lair (TBC, level 70, 25-man): two kill-credit encounters
             // — High King Maulgar with his four-ogre council (instance
             // MINIONS of his encounter, despawned on his death), then Gruul —

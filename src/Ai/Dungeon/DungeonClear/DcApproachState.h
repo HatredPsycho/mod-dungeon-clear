@@ -110,6 +110,9 @@ struct DcApproachState
     // given up on when it was not. See DungeonClearMath::EngageWalkGivenUp.
     ObjectGuid engageWalkWatchTarget;
     DungeonClearMath::WalkInWatch engageWalkWatch;
+    // When the watch first took that target (getMSTime): the bound on a walk-in
+    // that keeps being interrupted (DC_ENGAGE_WALK_SPAN_MAX_MS).
+    uint32 engageWalkSpanMs = 0;
     DcGiveUpList engageWalkGivenUp;
     // The boss whose engage walk-in stock refused, since when (getMSTime, 0 = not
     // refused) and the latest refusal — a refusal that lapses restarts the window.

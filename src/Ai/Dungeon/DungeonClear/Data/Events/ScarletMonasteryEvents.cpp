@@ -6,6 +6,9 @@
 #include "Ai/Dungeon/DungeonClear/Data/Events/DungeonEventTables.h"
 #include "Ai/Dungeon/DungeonClear/Data/Events/DungeonRosterBuilders.h"
 #include "Ai/Dungeon/DungeonClear/Data/DungeonWingRegistry.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
+#include "GameObject.h"
+#include "Player.h"
 
 #include <unordered_map>
 
@@ -26,11 +29,49 @@
 // other RoomAggroRegistry maps migrate by adding one more row each (and keep the
 // legacy path until they do).
 
+// --- Fairbanks' secret door ------------------------------------------------
+// High Inquisitor Fairbanks (4542) waits behind the Secret Door (GO 97700) at
+// (1167.8, 1347.3), opened by the Torch beside it (GO 97701, SmartGameObjectAI).
+// The navmesh walks straight through the shut door, so the tank arrived 10yd
+// from him, the at-boss trigger stood down on the closed door, the advance held
+// on the engage range, and nothing ever pulled the torch: "held 540s within
+// engage range of High Inquisitor Fairbanks ... door=1", five runs on 31/10.
+// Due once Mograine is down, Fairbanks is still up and the door is shut.
+namespace
+{
+    constexpr uint32 SM_FAIRBANKS = 4542;
+    constexpr uint32 SM_MOGRAINE = 3976;
+    constexpr uint32 SM_SECRET_DOOR = 97700;
+    constexpr uint32 SM_SECRET_TORCH = 97701;
+
+    bool SmFairbanksDoorShut(Player* bot, AiObjectContext* /*context*/)
+    {
+        if (!bot || bot->GetMapId() != 189)
+            return false;
+        if (bot->GetExactDist2d(1167.8f, 1347.3f) > 60.0f)
+            return false;
+        if (DcTargeting::FindLiveCreatureOnMap(bot, SM_MOGRAINE) ||
+            !DcTargeting::FindLiveCreatureOnMap(bot, SM_FAIRBANKS))
+            return false;
+        GameObject* door = bot->FindNearestGameObject(SM_SECRET_DOOR, 60.0f);
+        return door && door->GetGoState() == GO_STATE_READY;
+    }
+}
+
 void RegisterScarletMonasteryEvents(std::vector<DungeonEvent>& out)
 {
     out.push_back(EventBuilder(189, 1, "Clear the Cathedral (room-aggro pre-clear)")
                       .Conditional(&DcRoomAggroPreClearCondition)
                       .KillCreature(/*room trash*/ 0)
+                      .Build());
+
+    out.push_back(EventBuilder(189, 2, "Open Fairbanks' secret door")
+                      .Conditional(&SmFairbanksDoorShut)
+                      .MoveTo(1167.1f, 1346.4f, 31.5f, /*radius*/ 4.0f)
+                      .UseGO(SM_SECRET_TORCH, /*searchRadius*/ 10.0f)
+                      .WaitForGOState(SM_SECRET_DOOR, /*GO_STATE_ACTIVE*/ 0, /*timeout*/ 15000)
+                      .PanelAfterBoss(SM_MOGRAINE)
+                      .Optional()
                       .Build());
 }
 

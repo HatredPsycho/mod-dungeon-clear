@@ -185,6 +185,11 @@ struct DcRunState
     uint32 rezEpisodeEndMs      = 0;      // getMSTime() the last episode closed
     uint32 rezEpisodeDeaths     = 0;      // deaths counted in the (chained) episode
     uint32 rezLastDeadCount     = 0;      // corpses at the previous evaluation
+    // The raid stall bound (DC_REZ_RAID_STALL_MAX_MS): stamped when the episode
+    // opens and whenever the corpse count changes; a raid recovery that raises
+    // nobody for that long stands down and the raid clears short-handed.
+    uint32 rezProgressMs        = 0;
+    bool   rezStalled           = false;  // stood down (logged once per stall)
 
     // === raid boss stand-down (leader-owned, read cross-bot) ======================
     // The hysteresis state + per-tick memo behind DcBossStandDown::IsActive: while

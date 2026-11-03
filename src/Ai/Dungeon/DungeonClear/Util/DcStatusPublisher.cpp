@@ -261,7 +261,11 @@ std::string DcStatusPublisher::BuildStatusPayload(PlayerbotAI* botAI)
     {
         // The floors the between-pulls gate is actually holding for (0/0 under
         // Smart Rest or a phantom flag) — read once, used by the rest arm below.
-        DcPartyState::RestGate const rest = DcPartyState::GetRestGate(bot, context);
+        // Once the 120s rest wait has given up, the gates no longer hold on HP/mana
+        // either, so the panel must stop naming a "low HP" member.
+        DcPartyState::RestGate const rest = DcRun::Of(context).restWaitReleased
+                                                ? DcPartyState::RestGate{}
+                                                : DcPartyState::GetRestGate(bot, context);
 
         // "In combat" alone is not a fight. Under a phantom flag (a 45yd hostile
         // area aura, nothing aggroed) this arm reported "fighting_trash —

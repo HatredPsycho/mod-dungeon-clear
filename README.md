@@ -1,4 +1,15 @@
+<p align="center">
+  <img src="squidbots-logo.png" alt="SquidBots" width="260">
+</p>
+
 # mod-dungeon-clear
+
+> **⚠️ SquidBots / Conquest of Azeroth build.** This branch is a customised
+> version of [jrad7/mod-dungeon-clear](https://github.com/jrad7/mod-dungeon-clear)
+> for the Conquest of Azeroth AzerothCore core and the SquidBots fork of
+> mod-playerbots (CoA classes, CoA dungeons and raids, SquidBots Lite addon). It
+> is **not recommended on a classic WotLK AzerothCore server**: use the original
+> module there.
 
 Autonomous dungeon-clearing mode for **mod-playerbots** tank bots, packaged as a
 drop-in AzerothCore module. A tank bot drives the party from boss to boss,
@@ -9,8 +20,8 @@ tank run the dungeon.
 Routes are generated on the fly from the live navigation mesh, with no waypoints
 or hardcoded paths, so the clear works in any instance — the hand-built data the
 module does carry is for scripted events and known navmesh breaks, not for
-routing. It runs against a **stock, unmodified mod-playerbots** checkout with no
-playerbots source edits.
+routing. On this branch it needs the **SquidBots fork of mod-playerbots** (CoA
+classes and raid strategies); the original module targets stock mod-playerbots.
 
 > ## Use the companion addon
 >

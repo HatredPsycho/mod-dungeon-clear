@@ -343,6 +343,14 @@ bool DcOnAction::Execute(Event event)
         DcRefuse(botAI, bot, "Not in a dungeon.");
         return false;
     }
+    // Scripted private instances (Manastorm and the like) build their own
+    // layout and objectives at runtime; the dungeon routes and boss rosters
+    // do not describe them.
+    if (bot->GetMap()->IsScriptedPrivateInstance())
+    {
+        DcRefuse(botAI, bot, "Not available in this instance.");
+        return false;
+    }
     if (std::string const refused = RefusedDifficulty(bot); !refused.empty())
     {
         std::string const why = "Dungeon clear is not enabled for " + refused + " dungeons on this realm.";

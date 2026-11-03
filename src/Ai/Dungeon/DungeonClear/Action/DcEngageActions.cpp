@@ -915,18 +915,30 @@ bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
         {
             appr.engageWalkWatchTarget = target->GetGUID();
             appr.engageWalkWatch = DungeonClearMath::WalkInWatch{};
+            appr.engageWalkSpanMs = nowMs ? nowMs : 1;
         }
-        if (DungeonClearMath::EngageWalkGivenUp(appr.engageWalkWatch, bot->GetExactDist(target),
+        bool const spanSpent = appr.engageWalkSpanMs != 0 &&
+                               getMSTimeDiff(appr.engageWalkSpanMs, nowMs) >= DC_ENGAGE_WALK_SPAN_MAX_MS;
+        if (spanSpent ||
+            DungeonClearMath::EngageWalkGivenUp(appr.engageWalkWatch, bot->GetExactDist(target),
                                                 DC_STUCK_DISPLACEMENT, nowMs,
                                                 DC_ENGAGE_WALK_GIVEUP_MS,
                                                 DC_ENGAGE_WALK_TICK_GAP_MS))
         {
-            LOG_INFO("playerbots.dungeonclear",
-                     "[DC:{}] engage trash: walk-in on {} {} made no ground for {} ms "
-                     "({:.1f}yd, best {:.1f}yd) -> given up for {}s, advance resumes",
-                     bot->GetName(), target->GetName(), target->GetGUID().ToString(),
-                     nowMs - appr.engageWalkWatch.progressMs, bot->GetExactDist(target),
-                     appr.engageWalkWatch.bestDist, DC_ENGAGE_WALK_GIVEN_UP_MS / 1000);
+            if (spanSpent)
+                LOG_INFO("playerbots.dungeonclear",
+                         "[DC:{}] engage trash: walk-in on {} {} still unfinished after {}s of "
+                         "interruptions ({:.1f}yd) -> given up for {}s, advance resumes",
+                         bot->GetName(), target->GetName(), target->GetGUID().ToString(),
+                         DC_ENGAGE_WALK_SPAN_MAX_MS / 1000, bot->GetExactDist(target),
+                         DC_ENGAGE_WALK_GIVEN_UP_MS / 1000);
+            else
+                LOG_INFO("playerbots.dungeonclear",
+                         "[DC:{}] engage trash: walk-in on {} {} made no ground for {} ms "
+                         "({:.1f}yd, best {:.1f}yd) -> given up for {}s, advance resumes",
+                         bot->GetName(), target->GetName(), target->GetGUID().ToString(),
+                         nowMs - appr.engageWalkWatch.progressMs, bot->GetExactDist(target),
+                         appr.engageWalkWatch.bestDist, DC_ENGAGE_WALK_GIVEN_UP_MS / 1000);
             appr.engageWalkGivenUp.Add(target->GetGUID(), nowMs, DC_ENGAGE_WALK_GIVEN_UP_MS);
             appr.engageWalkWatchTarget.Clear();
             appr.engageWalkWatch = DungeonClearMath::WalkInWatch{};
@@ -937,6 +949,8 @@ bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
             return false;
         }
     }
+    else
+        appr.engageWalkWatchTarget.Clear();  // a fight is progress: re-arm both bounds after it
 
     // Stamp a live walk-in so Advance leaves it alone on the ticks this action
     // does not win (DungeonClearMath::ShouldYieldToEngageWalk). Only while out of
@@ -1875,8 +1889,28 @@ DungeonClearEngageActionBase::EventRest DungeonClearEngageActionBase::EventRestD
         return EventRest::None;
     if (BotBelowRest(bot, minHp, minMp))
         return EventRest::Yield;
-    if (!DcPartyState::IsPartyReady(bot, minHp, minMp, /*maxSpread*/ 100000.0f))
+    // Same 120s bound as the between-pulls gate (DcPartyState::IsBetweenPullsReady):
+    // a member the healer never tops up (a human who does not eat, a bot below the
+    // DC floor but above its healer's out-of-combat threshold) held a set-piece
+    // forever on "Waiting on X (low HP)".
+    DcRunState& run = DcRun::Of(context);
+    bool const ready = DcPartyState::IsPartyReady(bot, minHp, minMp, /*maxSpread*/ 100000.0f);
+    if (ready || bot->IsInCombat())
+    {
+        run.restWaitSinceMs = 0;
+        run.restWaitReleased = false;
+        return ready ? EventRest::None : EventRest::Hold;
+    }
+    if (run.restWaitReleased)
+        return EventRest::None;
+    uint32 const now = getMSTime();
+    if (run.restWaitSinceMs == 0)
+        run.restWaitSinceMs = now ? now : 1;
+    if (!DungeonClearMath::RestWaitExpired(run.restWaitSinceMs, now, DC_REST_WAIT_MAX_MS))
         return EventRest::Hold;
+    run.restWaitReleased = true;
+    LOG_INFO("playerbots.dungeonclear", "[DC:{}] event rest wait: {}s -> going on without topping up",
+             bot->GetName(), DC_REST_WAIT_MAX_MS / 1000);
     return EventRest::None;
 }
 
