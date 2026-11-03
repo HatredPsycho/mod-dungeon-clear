@@ -120,6 +120,27 @@ namespace
     // by gate 1. Ick -> gate 1 (88yd) and gate 1 -> ramp top (100yd) are
     // unchanged. costMult 40, the shortcut class.
     //
+    // Vaults of the Inquisition (map 936, CoA) — the TowerBoss Barrier behind
+    // Merciless Echo (162700). The barrier (GO 2300561, guid 9360014, at
+    // (-6814.0, -5805.45, 169.97)) is a go_coa_vaults_boss_gate: it stays shut
+    // until Echo is dead (CoAVaults.cpp GateBoss / BossDefeated) and nothing a
+    // player does opens it. The way in is the room's east mouth, where the
+    // script's EchoThreshold (-6748.1, -5797.6) starts Echo's RP and makes him
+    // engageable. The navmesh is door-blind, so from the pocket west of the
+    // barrier (the corridor x~-6795 south to y~-5767, then west) A* walks
+    // through it: tank (-6830, -5793) -> Echo is 58yd through the barrier
+    // against 195yd round by the threshold. Two runs out of two paused there,
+    // "a closed door is blocking the path", 37yd from an Echo still in his RP.
+    //
+    // MEASURED AGAINST THE MAP'S OWN MMTILES (936 44/42-43, 3,447 polys): the
+    // box x -6824..-6808, y -5822..-5789, z 160..178 holds the 4 polys of the
+    // doorway and its steps; hard-removing them maroons nothing reachable from
+    // the entrance. Tank -> Echo now goes round by the threshold (195yd), and
+    // entrance -> Echo (454yd) and the west jail corridor -> Echo (199yd) are
+    // unchanged. Echo's spawn (-6794.9) and fight spot (-6805.8) stay outside.
+    // After Echo the barrier opens, and Echo -> the TowerBoss Door south goes
+    // 141yd -> 145yd without it. costMult 40, the shortcut class.
+    //
     // Blackrock Spire (map 229) — the LBRS / UBRS WING REGIONS, the only
     // wing-tagged rows (see the header). A "ubrs" row keeps an LBRS run's routes
     // out of Upper Blackrock Spire, an "lbrs" row keeps a UBRS run out of Lower;
@@ -163,7 +184,7 @@ namespace
     // 113yd and keeps 3.29yd off every egg (t/TestBlackrockSpireRouteProbe,
     // 2026-10-19). The tank's leg is an authored anchor route instead
     // (RegisterBlackrockSpireRoute), and the probe pins the untaxed corridor.
-    constexpr std::array<DcNavPenaltyVolume, 18> kVolumes = {{
+    constexpr std::array<DcNavPenaltyVolume, 19> kVolumes = {{
         { 229, -134.0f, -406.0f, 33.0f, -118.0f, -374.0f, 56.0f, 40.0f },
         { 229,  -65.5f, -384.0f, 49.4f,  -60.5f, -377.0f, 54.2f, 40.0f },
         { 556,   25.0f,  150.0f, -5.0f,   68.0f,  248.0f, 30.0f, 40.0f },
@@ -174,6 +195,7 @@ namespace
         { 552,  314.5f,    5.4f, 36.4f,  358.5f,   49.4f, 60.4f,  8.0f },
         { 552,  373.4f,   -3.8f, 36.3f,  417.4f,   40.2f, 60.3f,  8.0f },
         { 658,  862.0f,   71.0f, 520.0f,  873.0f,   81.0f, 531.0f, 40.0f },
+        { 936, -6824.0f, -5822.0f, 160.0f, -6808.0f, -5789.0f, 178.0f, 40.0f },
         // 229 UBRS: upper floor z>=104 — Drakkisath hall, Rend/Gyth stadium, The Beast
         { 229,  -35.0f, -595.0f, 104.0f,  245.0f, -225.0f, 140.0f, 40.0f, "ubrs" },
         // 229 UBRS: rookery / Father Flame above the hall, Emberseer's room, ramps

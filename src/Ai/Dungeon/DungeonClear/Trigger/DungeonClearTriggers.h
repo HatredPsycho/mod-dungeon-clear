@@ -270,6 +270,18 @@ public:
     bool IsActive() override;
 };
 
+// Fires on a CoA healer of an active DC run, out of combat, while a living
+// member within heal range is below the between-pulls HP floor (the one the
+// tank's rest gate waits on). Drives the CoA "coa heal" action, which picks
+// the target itself and declines once its mana-scaled heal line is above the
+// member (the healer then drinks). Inert for classes without that action.
+class DungeonClearTopOffPartyTrigger : public Trigger
+{
+public:
+    DungeonClearTopOffPartyTrigger(PlayerbotAI* botAI) : Trigger(botAI, "dungeon clear top off party", 500) {}
+    bool IsActive() override;
+};
+
 // Fires on EVERY member of a DC run that is PAUSED — the leader AND its
 // followers (see DcLeaderSignal::IsInPausedDungeonClearRun). While paused the
 // driving ladder goes inert and "dungeon clear party tank" goes null, so the

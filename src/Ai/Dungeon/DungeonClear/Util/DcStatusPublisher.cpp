@@ -104,8 +104,7 @@ namespace
         if (!bot)
             return 0;
 
-        InstanceScript* inst = DcTargeting::GetInstanceScript(bot);
-        uint32 const mask = inst ? inst->GetCompletedEncounterMask() : 0u;
+        uint32 const mask = DcTargeting::CompletedEncounterMask(bot);
         uint32 const skipped =
             static_cast<uint32>(AI_VALUE(std::unordered_set<uint32>&, DcKey::Skipped).size());
         // Objectives and conditional events report "dead" off the cleared-anchor
@@ -177,8 +176,7 @@ namespace
         if (!next.has_value() || next->kind != DungeonAnchorKind::Boss ||
             next->encounterIndex >= 32)
             return false;
-        InstanceScript* inst = DcTargeting::GetInstanceScript(bot);
-        uint32 const mask = inst ? inst->GetCompletedEncounterMask() : 0u;
+        uint32 const mask = DcTargeting::CompletedEncounterMask(bot);
         return (mask & (1u << next->encounterIndex)) != 0u;
     }
 }

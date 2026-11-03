@@ -1707,13 +1707,12 @@ void DcTestRunJob::TickStarting()
     // A reused instance with dead bosses would flash an instant (false)
     // all-clear — refuse it rather than record a fake success. A wing-scoped run
     // only cares about its own wing's bits.
-    if (InstanceScript* inst = DcTargeting::GetInstanceScript(tank))
-        if (uint32 const done = inst->GetCompletedEncounterMask() & (_wingMask ? _wingMask : ~0u))
-        {
-            FailSetup("stale instance: encounters already completed (mask " +
-                      std::to_string(done) + ")");
-            return;
-        }
+    if (uint32 const done = DcTargeting::CompletedEncounterMask(tank) & (_wingMask ? _wingMask : ~0u))
+    {
+        FailSetup("stale instance: encounters already completed (mask " +
+                  std::to_string(done) + ")");
+        return;
+    }
 
     // The boss roster needs a tick or two to populate after the teleport;
     // retry inside the stage timeout.
@@ -1849,8 +1848,7 @@ void DcTestRunJob::TickStarting()
                      _success.IsSet() ? " + " + std::to_string(_successGraceMs / 1000) + "s grace"
                                       : std::string());
         }
-        if (InstanceScript* inst = DcTargeting::GetInstanceScript(tank))
-            _lastMask = inst->GetCompletedEncounterMask();
+        _lastMask = DcTargeting::CompletedEncounterMask(tank);
         _lastAnchors =
             ctx->GetValue<std::unordered_set<uint32>&>(DcKey::ClearedAnchors)->Get().size();
         LOG_INFO("playerbots.dungeonclear",
@@ -2327,9 +2325,12 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         std::optional<DungeonBossInfo> const next =
             ctx->GetValue<std::optional<DungeonBossInfo>>(DcKey::NextDungeonBoss)->Get();
 
+        // Read only while the tank stands in an instance: outside one (a ghost
+        // run, a teleport) the mask reads 0, and keeping the last one is what
+        // stops the return from replaying every kill as fresh.
         uint32 mask = _lastMask;
-        if (InstanceScript* inst = DcTargeting::GetInstanceScript(tank))
-            mask = inst->GetCompletedEncounterMask();
+        if (tank->GetMap() && tank->GetMap()->ToInstanceMap())
+            mask = DcTargeting::CompletedEncounterMask(tank);
         std::size_t const anchors =
             ctx->GetValue<std::unordered_set<uint32>&>(DcKey::ClearedAnchors)->Get().size();
 

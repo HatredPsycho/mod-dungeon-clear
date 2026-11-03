@@ -117,7 +117,7 @@ std::optional<DungeonBossInfo> NextDungeonBossValue::Calculate()
     // for every dungeon whose encounters are ENCOUNTER_CREDIT_KILL_CREATURE,
     // which is precisely the set BossSpawnIndex indexes.
     InstanceScript* inst = DcTargeting::GetInstanceScript(bot);
-    uint32 const completedMask = inst ? inst->GetCompletedEncounterMask() : 0u;
+    uint32 const completedMask = DcTargeting::CompletedEncounterMask(bot);
 
     // Resolve every boss's liveness in a single store pass (shared by the
     // selected-override check and the partition loop below).

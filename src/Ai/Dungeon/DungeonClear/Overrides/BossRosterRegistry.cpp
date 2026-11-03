@@ -75,6 +75,7 @@ namespace
             RegisterTrialOfTheChampionRoster(t);
             RegisterOculusRoster(t);
             RegisterKarazhanRoster(t);
+            RegisterRoadToDeOtherSideRoster(t);
             return t;
         }();
         return kPatches;

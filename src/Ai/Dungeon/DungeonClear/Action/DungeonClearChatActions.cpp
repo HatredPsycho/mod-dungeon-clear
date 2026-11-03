@@ -700,8 +700,7 @@ bool DcBossesAction::Execute(Event event)
     // crux of the fix: a boss corpse despawns about a minute after death, so the
     // old "present-but-no-live-creature == dead" heuristic made every killed boss
     // silently flip from "dead" to "missing" the moment its body vanished.
-    InstanceScript* inst = DcTargeting::GetInstanceScript(bot);
-    uint32 const completedMask = inst ? inst->GetCompletedEncounterMask() : 0u;
+    uint32 const completedMask = DcTargeting::CompletedEncounterMask(bot);
 
     // Resolve the room-aggro anchor boss (the first room-aggro boss in this
     // wing-filtered list) up front — a room-aggro pre-clear event has no boss
@@ -1189,8 +1188,7 @@ bool DcGoAction::Execute(Event event)
         return false;
     }
 
-    InstanceScript* inst = DcTargeting::GetInstanceScript(bot);
-    uint32 const completedMask = inst ? inst->GetCompletedEncounterMask() : 0u;
+    uint32 const completedMask = DcTargeting::CompletedEncounterMask(bot);
     if (matched->kind == DungeonAnchorKind::Boss &&
         matched->encounterIndex < 32 && (completedMask & (1u << matched->encounterIndex)))
     {

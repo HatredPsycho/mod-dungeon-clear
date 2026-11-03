@@ -203,4 +203,14 @@ void RegisterOculusHooks(ObjectiveHookRegistry::HookTable& out);
 // Util/DcChessConductor.h.
 void RegisterKarazhanChessHooks(ObjectiveHookRegistry::HookTable& out);
 
+// Vaults of the Inquisition (map 936, CoA) — break the Deceiver's seal crystals
+// (id 64). Lives beside the event in VaultsEvents.cpp, which owns the map's
+// constants.
+void RegisterVaultsHooks(ObjectiveHookRegistry::HookTable& out);
+
+// Road to De Other Side (map 937, CoA) — offer the Bodies of Offering to the
+// Quimera Portal (id 69). Lives beside the event in RoadToDeOtherSideEvents.cpp,
+// which owns the map's constants.
+void RegisterRoadToDeOtherSideHooks(ObjectiveHookRegistry::HookTable& out);
+
 #endif

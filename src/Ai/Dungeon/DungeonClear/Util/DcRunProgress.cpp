@@ -14,6 +14,7 @@
 
 #include "AiObjectContext.h"
 #include "InstanceScript.h"
+#include "Map.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
 #include "Playerbots.h"
@@ -40,8 +41,8 @@ namespace DcRunProgress
         bool progressed = false;
 
         uint32 encounterMask = mark.mask;
-        if (InstanceScript* inst = DcTargeting::GetInstanceScript(leader))
-            encounterMask = inst->GetCompletedEncounterMask();
+        if (leader->GetMap() && leader->GetMap()->ToInstanceMap())
+            encounterMask = DcTargeting::CompletedEncounterMask(leader);
         if (encounterMask != mark.mask)
         {
             mark.mask = encounterMask;

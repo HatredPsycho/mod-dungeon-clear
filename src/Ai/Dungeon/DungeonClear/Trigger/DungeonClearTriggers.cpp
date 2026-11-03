@@ -1190,6 +1190,50 @@ bool DungeonClearNeedsEatTrigger::IsActive()
     return bot->GetHealthPct() < static_cast<float>(target);
 }
 
+bool DungeonClearTopOffPartyTrigger::IsActive()
+{
+    // The CoA kit's only out-of-combat heal ("coa group member dropping", coa
+    // buff) waits for 45% while the group is not fighting; its 65-85% heals live
+    // in the combat strategy. So after a fight members at 45-85% sat below the
+    // between-pulls floor (85 by default) with idle healers: bots until food, a
+    // human for the whole 120s rest wait (ZG raid, "Collecting loot.", 02/11).
+    if (!bot || bot->isDead() || bot->IsInCombat() || !bot->GetGroup())
+        return false;
+    if (!PlayerbotAI::IsHeal(bot) || !context->GetAction("coa heal"))
+        return false;
+    Player* tank = AI_VALUE(Player*, DcKey::PartyTank);
+    if (!tank || tank->GetMapId() != bot->GetMapId())
+        return false;
+
+    // Held passive at camp while the tank tags: the camp owns the healer.
+    Position camp;
+    bool passive = false;
+    if (DcLeaderSignal::GetLeaderCampHold(bot, camp, passive) && passive)
+        return false;
+
+    // The floor the rest gate waits on: the run's target (or the muster floor),
+    // else the inherited RestMinHpPct. Smart Rest released: the party pushes on,
+    // nothing to top off (latched, the target is 100).
+    uint32 const target = RestTargetIfActive(bot, context, "RestHealthPct");
+    float floor = static_cast<float>(target);
+    if (!DcSettings::GetBool(bot, "SmartRest"))
+        floor = std::max(floor, DcPartyState::RestMinHpPct(bot));
+    if (floor <= 0.0f)
+        return false;
+
+    float const range = DC_PB_CONFIG(HealDistance, healDistance);
+    for (GroupReference* ref = bot->GetGroup()->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (!member || !member->IsAlive() || member->IsGameMaster() || !member->IsInWorld() ||
+            member->GetMapId() != bot->GetMapId() || member->GetInstanceId() != bot->GetInstanceId())
+            continue;
+        if (member->GetHealthPct() < floor && bot->GetDistance2d(member) <= range)
+            return true;
+    }
+    return false;
+}
+
 bool DungeonClearPullTrigger::IsActive()
 {
     if (!IsEnabled(context, bot))  // enabled, not paused, leader

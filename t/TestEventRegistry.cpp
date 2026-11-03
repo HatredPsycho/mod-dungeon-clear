@@ -350,6 +350,23 @@ namespace
             // to island, which no arrival step can express — so Done is its yield.
             // Repeatable: it never completes; the predicate going false ends it.
             {578, 9},
+            // Vaults of the Inquisition "Break the Deceiver's seals": VaultsDeceiverSealed
+            // does a 60yd FindNearestCreature FROM THE BOT for a live, still
+            // unattackable Deceiver, and his three seal crystals stand 12yd from
+            // him, so it cannot read true until boss-nav has parked the party in
+            // his room. Its lone step (hook 64, BreakDeceiverSeals) walks the
+            // leader crystal to crystal inside that room — an arrival step would
+            // add nothing — and reports Done only once no seal is left alive.
+            {936, 1},
+            // Road to De Other Side "Offer the bodies to the Quimera Portal":
+            // RoadBodiesAwaitOffering lists the Bodies of Offering within 40yd OF
+            // THE BOT, and they lie on the arena platform ~90yd above the rest of
+            // the road, so it cannot read true until boss-nav has parked the party
+            // on the Chimeric Embryo's anchor beside them. Its lone step (hook 69,
+            // OfferTheBodies) walks the leader body to body on that platform — an
+            // arrival step would add nothing — and reports Done once none is left
+            // to offer. Repeatable: a momentary Done latches nothing.
+            {937, 1},
         };
         for (Row const& r : kRows)
             if (r.mapId == mapId && r.eventId == eventId)

@@ -414,6 +414,14 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         "dungeon clear needs eat",
         { NextAction("food", DcRel::NeedsRest) }));
 
+    // CoA healers top the party off to the same floor between pulls (loot
+    // collection included): the class kit's own out-of-combat heal waits for
+    // 45%. Above the rest rung so the healer heals before it sits to drink;
+    // "coa heal" stands it up anyway. See DungeonClearTopOffPartyTrigger.
+    triggers.push_back(new TriggerNode(
+        "dungeon clear top off party",
+        { NextAction("coa heal", DcRel::TopOffParty) }));
+
     // Keep the DC loot policy (quality floor / IgnoreChests) enforced for the
     // WHOLE party while the run is PAUSED — leader and followers alike. The
     // driving ladder above is inert when paused and followers stop trailing the

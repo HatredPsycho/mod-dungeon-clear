@@ -55,9 +55,12 @@
 #include "CellImpl.h"
 #include "Creature.h"
 #include "CreatureAI.h"
+#include "DBCStructure.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
+#include "GlobalScript.h"
 #include "Log.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "PlayerScript.h"
 #include "UnitScript.h"
@@ -73,6 +76,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
 #include "Group.h"
 #include "Map.h"
 #include "InstanceSaveMgr.h"
@@ -849,6 +853,44 @@ public:
     }
 };
 
+// Kill credit in an instance with no InstanceScript (CoA's Vaults 936 and Road
+// to De Other Side 937: instance_template script ''). Map::UpdateEncounterState
+// sets the completed bit only through the script, so there it is dropped; but
+// the hook after it still fires, with the encounter list. Latch the bit per
+// instance id for DcTargeting::CompletedEncounterMask: Road's final boss, the
+// Chimeric Embryo, is summoned by the Quimera Portal and has no spawn whose
+// corpse or respawn timer could tell his kill otherwise. Recorded whether or
+// not DC is on, so a run started after the kill still reads it.
+class DungeonClearScriptlessCreditScript : public GlobalScript
+{
+public:
+    DungeonClearScriptlessCreditScript()
+        : GlobalScript("DungeonClearScriptlessCreditScript", {
+            GLOBALHOOK_ON_AFTER_UPDATE_ENCOUNTER_STATE,
+            GLOBALHOOK_ON_INSTANCEID_REMOVED
+        }) {}
+
+    void OnAfterUpdateEncounterState(Map* map, EncounterCreditType type, uint32 creditEntry,
+                                     Unit* /*source*/, Difficulty /*difficulty_fixed*/,
+                                     std::list<DungeonEncounter const*> const* encounters,
+                                     uint32 /*dungeonCompleted*/, bool /*updated*/) override
+    {
+        InstanceMap* instance = map ? map->ToInstanceMap() : nullptr;
+        if (!instance || instance->GetInstanceScript() || !encounters)
+            return;
+        for (DungeonEncounter const* encounter : *encounters)
+            if (encounter && encounter->dbcEntry && encounter->creditType == type &&
+                encounter->creditEntry == creditEntry)
+                DcTargeting::NoteScriptlessCredit(map->GetInstanceId(),
+                                                  encounter->dbcEntry->encounterIndex);
+    }
+
+    void OnInstanceIdRemoved(uint32 instanceId) override
+    {
+        DcTargeting::ForgetScriptlessCredits(instanceId);
+    }
+};
+
 // Keeps an all-bot party in its dungeon while the run is on. See
 // DcRunTravelGuard.h for the runs that ended on "the tank left the instance".
 class DungeonClearRunTravelGuardScript : public PlayerScript
@@ -988,6 +1030,7 @@ void AddSC_dungeon_clear_module()
     new DungeonClearStratFallenCritterScript();
     new DungeonClearIronHallGuardianScript();
     new DungeonClearEranikusCombatReleaseScript();
+    new DungeonClearScriptlessCreditScript();
 
     // `.dc test` harness: receive each changed STATUS frame for the monitored
     // tank (addon messages only reach real players in the bot's group, and the

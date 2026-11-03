@@ -48,6 +48,9 @@ namespace DcTestDungeonRegistry
             { "stockade",        "The Stockade",                   34,    54.23f,     0.28f,  -18.34f, 6.260f, 24, "" },
             { "bfd",             "Blackfathom Deeps",              48,  -151.89f,   106.96f,  -39.87f, 4.530f, 24, "" },
             { "rfk",             "Razorfen Kraul",                 47,  1943.00f,  1544.63f,   82.00f, 1.380f, 30, "" },
+            // CoA's own dungeons (15-59, scaled to the party), at their areatrigger_teleport targets.
+            { "vaults",          "Vaults of the Inquisition",     936, -6658.54f, -5565.00f,  175.05f, 4.712f, 30, "" },
+            { "road",            "Road to De Other Side",         937,   480.61f,  -232.17f,  173.47f, 4.153f, 30, "" },
             { "sm-gy",           "Scarlet Monastery: Graveyard",  189,  1688.99f,  1053.48f,   18.68f, 0.001f, 30, "Graveyard" },
             { "gnomer",          "Gnomeregan",                     90,  -332.22f,    -2.28f, -150.86f, 2.770f, 32, "" },
             { "sm-lib",          "Scarlet Monastery: Library",    189,   255.35f,  -209.09f,   18.68f, 6.267f, 35, "Library" },

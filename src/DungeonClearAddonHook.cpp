@@ -327,7 +327,9 @@ public:
         // Dispatch to the tank bot(s) silently (no PlaySound emotes). Relay
         // suppression is handled by OnPlayerCanUseChat — see the note there.
         if (!DungeonClearDispatch::DispatchToTankBots(player, action, param))
-            SendAddonError(player, "No tank bot found in your group.");
+            SendAddonError(player, player->GetMap() && player->GetMap()->IsScriptedPrivateInstance()
+                                       ? "Not available in this instance."
+                                       : "No tank bot found in your group.");
     }
 };
 

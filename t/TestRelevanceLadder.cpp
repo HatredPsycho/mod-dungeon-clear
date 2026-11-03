@@ -34,6 +34,9 @@ TEST(DungeonClearRelevanceTest, NonCombatLadderStrictlyDescends)
     EXPECT_GT(DcRel::EventDue,        DcRel::AtBoss);
     EXPECT_GT(DcRel::AtBoss,          DcRel::AssistCamp);
     EXPECT_GT(DcRel::AssistCamp,      DcRel::HoldAtCamp);
+    EXPECT_GT(DcRel::HoldAtCamp,      DcRel::TopOffParty);
+    EXPECT_GT(DcRel::TopOffParty,     DcRel::NeedsRest);
+    EXPECT_GT(DcRel::TopOffParty,     DcRel::FollowTank);
     EXPECT_GT(DcRel::HoldAtCamp,      DcRel::NeedsRest);
     EXPECT_GT(DcRel::NeedsRest,       DcRel::RoomTrash);   // tie-broken (was ==)
     EXPECT_GT(DcRel::RoomTrash,       DcRel::BlockingTrash);

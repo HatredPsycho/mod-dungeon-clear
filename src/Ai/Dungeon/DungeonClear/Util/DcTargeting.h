@@ -240,6 +240,30 @@ public:
     // falling back to spawn-store creature scanning.
     static InstanceScript* GetInstanceScript(Player* bot);
 
+    // The completed-encounter mask (bit = DungeonEncounter.dbc encounterIndex)
+    // of the bot's instance. With an InstanceScript it is the script's own mask.
+    // An instance whose instance_template names no script never has one:
+    // Map::UpdateEncounterState writes the bit through the script and drops it
+    // otherwise. CoA's custom dungeons are that case (Vaults of the Inquisition
+    // 936, Road to De Other Side 937: script ''), so every kill there stayed
+    // invisible — test runs "allCleared" with bosses 0/2 and an empty timeline,
+    // the panel's boss rows "alive" then "missing". There the bits are read off
+    // the boss spawns themselves: a boss whose every spawn is dead or waiting
+    // on a respawn timer is done, the read the core's own CoA scripts make
+    // (CoAVaults.cpp BossDefeated). A boss with no spawn at all (Road's Chimeric
+    // Embryo, summoned by the Quimera Portal's SmartAI) has nothing to read
+    // there, so the kill credit itself is latched as well: see
+    // NoteScriptlessCredit below.
+    static uint32 CompletedEncounterMask(Player* bot);
+
+    // The encounter credits Map::UpdateEncounterState hands an instance with no
+    // InstanceScript, kept per instance id for CompletedEncounterMask (the
+    // module's GlobalScript feeds them, OnAfterUpdateEncounterState). The core
+    // frees and reuses instance ids, so ForgetScriptlessCredits drops an id's
+    // bits when it is removed (OnInstanceIdRemoved).
+    static void NoteScriptlessCredit(uint32 instanceId, uint32 encounterIndex);
+    static void ForgetScriptlessCredits(uint32 instanceId);
+
     // Wipe the run-scoped completion state (cleared anchors / skips / seen-boss
     // and seen-due-event bookkeeping / boss commit) the first time the bot is seen
     // in a NEW instance id, stamping "dungeon clear run instance" so it fires once

@@ -448,7 +448,7 @@ namespace DcDiag
             snap.tankVictim = victim->GetName();
 
         InstanceScript* inst = DcTargeting::GetInstanceScript(tank);
-        snap.completedEncounterMask = inst ? inst->GetCompletedEncounterMask() : 0u;
+        snap.completedEncounterMask = DcTargeting::CompletedEncounterMask(tank);
 
         std::unordered_set<std::uint32_t> const& cleared =
             AI_VALUE(std::unordered_set<uint32>&, DcKey::ClearedAnchors);

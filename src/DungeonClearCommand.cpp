@@ -84,7 +84,11 @@ namespace
         }
 
         if (!DungeonClearDispatch::DispatchToTankBots(issuer, action, param))
-            handler->SendSysMessage("No tank bot found in your group.");
+            // Without a tank the bot-side refusal never runs: say the instance's
+            // own reason, not a missing tank (Manastorm, 02/11).
+            handler->SendSysMessage(issuer->GetMap() && issuer->GetMap()->IsScriptedPrivateInstance()
+                                        ? "Not available in this instance."
+                                        : "No tank bot found in your group.");
 
         return true;
     }

@@ -14,6 +14,7 @@
 #include "ObjectMgr.h"
 
 std::unordered_map<uint64, std::vector<DungeonBossInfo>> BossSpawnIndex::_store;
+std::unordered_map<uint64, std::vector<ObjectGuid::LowType>> BossSpawnIndex::_spawnIds;
 std::once_flag BossSpawnIndex::_once;
 
 std::vector<DungeonBossInfo> const& BossSpawnIndex::Get(uint32 mapId, Difficulty difficulty)
@@ -22,6 +23,16 @@ std::vector<DungeonBossInfo> const& BossSpawnIndex::Get(uint32 mapId, Difficulty
     static std::vector<DungeonBossInfo> const empty;
     auto it = _store.find(MakeKey(mapId, difficulty));
     if (it == _store.end())
+        return empty;
+    return it->second;
+}
+
+std::vector<ObjectGuid::LowType> const& BossSpawnIndex::SpawnIds(uint32 mapId, uint32 entry)
+{
+    EnsureBuilt();
+    static std::vector<ObjectGuid::LowType> const empty;
+    auto it = _spawnIds.find((static_cast<uint64>(mapId) << 32) | entry);
+    if (it == _spawnIds.end())
         return empty;
     return it->second;
 }
@@ -88,11 +99,20 @@ void BossSpawnIndex::Build()
             continue;
 
         auto range = byCreditEntry.equal_range(entry);
+        bool spawnIdKept = false;
         for (auto it = range.first; it != range.second; ++it)
         {
             EncounterRow const& row = it->second;
             if (row.mapId != data.mapid)
                 continue;
+
+            // Once per spawn, whatever its difficulty mask: one row per
+            // difficulty matches the same spawn.
+            if (!spawnIdKept)
+            {
+                _spawnIds[(static_cast<uint64>(data.mapid) << 32) | entry].push_back(kv.first);
+                spawnIdKept = true;
+            }
 
             // A spawn belongs to a difficulty bucket only when its spawnMask
             // bit says it exists there. Most 5-man spawns are mask 3 (both);
