@@ -2105,6 +2105,34 @@ void DcTestRunJob::ClosePull(bool wipedHere)
 // widened from "name one opponent" to "count them all". Sampled at MONITOR_STEP_MS,
 // so it is a floor on what was fought: a mob that joined and died inside one
 // second never appears.
+// Who each mob is beating on this sample, by the member's comp role, folded into
+// the #11173 off-tank counts (the rule is DcTestRun::FoldOffTankAggro). A mob is
+// read off the attacker list of the member it is ON — its victim, not merely a
+// threat entry — so a healer merely sitting on a threat list is not counted.
+void DcTestRunJob::TrackOffTankAggro(Player* tank, uint32 dt)
+{
+    if (!tank)
+        return;
+
+    std::vector<DcTestRun::MobOnMember> now;
+    for (Slot const& slot : _slots)
+    {
+        Player* const member = ObjectAccessor::FindPlayer(slot.guid);
+        if (!member || !member->IsAlive() || !member->IsInWorld() ||
+            member->GetMapId() != tank->GetMapId() || !member->IsInCombat())
+            continue;
+        std::string_view const role = slot.role ? slot.role : "";
+        DcTestRun::AggroRole const r = member == tank   ? DcTestRun::AggroRole::Tank
+                                       : role == "heal" ? DcTestRun::AggroRole::Healer
+                                       : role == "tank" ? DcTestRun::AggroRole::Tank
+                                                        : DcTestRun::AggroRole::Dps;
+        for (Unit* attacker : member->getAttackers())
+            if (attacker && attacker->IsAlive() && attacker->ToCreature() && attacker->GetVictim() == member)
+                now.push_back({attacker->GetGUID().GetRawValue(), member->GetGUID().GetRawValue(), r});
+    }
+    DcTestRun::FoldOffTankAggro(_offTankLast, now, tank->IsAlive(), dt, _record.offTank);
+}
+
 void DcTestRunJob::TrackPulls(Player* tank)
 {
     if (!tank)
@@ -2439,6 +2467,7 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         // first, against the previous tick's latch — see TrackDeaths.
         TrackDeaths(tank);
         TrackEngagement(tank);
+        TrackOffTankAggro(tank, dt);
         TrackPulls(tank);
 
         if (next.has_value() && next->mapId == tank->GetMapId())

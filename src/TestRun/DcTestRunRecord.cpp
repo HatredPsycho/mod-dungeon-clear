@@ -120,6 +120,10 @@ namespace DcTestRunRecord
           << ",\"gearIlvlBefore\":" << rec.gearIlvlBefore
           << ",\"gearIlvlAfter\":" << rec.gearIlvlAfter
           << ",\"wipeRetries\":" << rec.wipeRetries
+          << ",\"offTank\":{\"healer\":" << rec.offTank.healerSwitches
+          << ",\"dps\":" << rec.offTank.dpsSwitches
+          << ",\"healerMobS\":" << rec.offTank.healerMobMs / 1000
+          << ",\"dpsMobS\":" << rec.offTank.dpsMobMs / 1000 << '}'
           << ",\"roster\":" << (rec.roster ? "true" : "false")
           << ",\"comp\":[";
         for (std::size_t i = 0; i < rec.comp.size(); ++i)

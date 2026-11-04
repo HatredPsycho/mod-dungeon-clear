@@ -315,6 +315,7 @@ private:
     void CaptureExtras(Player* tank);
     void TrackDeaths(Player* tank);
     void TrackEngagement(Player* tank);
+    void TrackOffTankAggro(Player* tank, uint32 dt);
     void TrackPulls(Player* tank);
     void ClosePull(bool wipedHere = false);
     DcTestRun::Engagement DeathBlame() const;
@@ -558,6 +559,9 @@ private:
     // the map is being seeded, never reported — the first sample must not file
     // a death for someone who was already down when monitoring opened.
     std::unordered_map<ObjectGuid, bool> _aliveLast;
+    // Which member each mob was on at the previous sample (raw guids), for the
+    // #11173 off-tank counts — DcTestRun::FoldOffTankAggro.
+    std::unordered_map<std::uint64_t, std::uint64_t> _offTankLast;
     // The engagement latched at the most recent death. The live latch clears the
     // moment the survivors drop combat, so a run that ends on a failed rez has
     // nothing left to blame; this keeps the killer alive for the post-mortem.

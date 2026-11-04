@@ -177,7 +177,7 @@ TEST(DcTestRunRecordTest, BossRosterSerializesInProgressionOrder)
               std::string::npos);
 }
 
-TEST(DcTestRunRecordTest, SchemaIsFifteen)
+TEST(DcTestRunRecordTest, SchemaIsSixteen)
 {
     // 12: added combatHolders[].trigger, and with it a change of meaning in the
     // sibling `legitimate` field — a trigger creature now sinks the verdict.
@@ -186,7 +186,8 @@ TEST(DcTestRunRecordTest, SchemaIsFifteen)
     // 14: added difficulty (the raw group difficulty; CoA raid modes on raids).
     // 15: added gear worn before/after (gearIlvlBefore/After, itemLevelAfter,
     // itemsChanged).
-    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":15"), std::string::npos);
+    // 16: added offTank (mobs on a healer or a dps while the tank stands).
+    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":16"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"size\":"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"difficulty\":"), std::string::npos);
 }
@@ -447,4 +448,16 @@ TEST(DcRunStateTelemetryTest, TelemetrySurvivesResetUntilExplicitlyCleared)
     rs.ClearTestTelemetry();
     EXPECT_EQ(rs.eventProgressSeq, 0u);
     EXPECT_TRUE(rs.testExtras.empty());
+}
+
+// Jealous #11173: the off-tank counts reach the line as whole seconds.
+TEST(DcTestRunRecordTest, OffTankCountsAreWritten)
+{
+    auto rec = SampleRecord();
+    rec.offTank.healerSwitches = 7;
+    rec.offTank.dpsSwitches = 3;
+    rec.offTank.healerMobMs = 12500;
+    rec.offTank.dpsMobMs = 999;
+    EXPECT_NE(ToJsonl(rec).find("\"offTank\":{\"healer\":7,\"dps\":3,\"healerMobS\":12,\"dpsMobS\":0}"),
+              std::string::npos);
 }
