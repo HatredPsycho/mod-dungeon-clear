@@ -16,6 +16,7 @@
 #include <limits>
 #include <optional>
 #include <set>
+#include <unordered_set>
 
 #include "CharacterCache.h"
 #include "DBCStores.h"
@@ -30,6 +31,8 @@
 #include "Item.h"
 #include "Log.h"
 #include "Map.h"
+#include "SpellAuras.h"
+#include "SpellInfo.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "StringFormat.h"
@@ -2133,6 +2136,42 @@ void DcTestRunJob::TrackOffTankAggro(Player* tank, uint32 dt)
     DcTestRun::FoldOffTankAggro(_offTankLast, now, tank->IsAlive(), dt, _record.offTank);
 }
 
+// Every dispellable harmful aura a creature put on a living member, folded into
+// the per-spell dispel counts (the rule is DcTestRun::FoldDispelWatch). Only
+// magic, curse, disease and poison: what a bot healer or a class cure can take
+// off. Player-cast auras are left out — a party member's own debuff on a friend
+// (a Barbarian's self-cost, a duel leftover) is not the encounter's.
+void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
+{
+    if (!tank)
+        return;
+
+    std::vector<DcTestRun::DebuffSample> now;
+    std::unordered_set<std::uint64_t> alive;
+    for (Slot const& slot : _slots)
+    {
+        Player* const member = ObjectAccessor::FindPlayer(slot.guid);
+        if (!member || !member->IsInWorld() || member->GetMapId() != tank->GetMapId())
+            continue;
+        if (!member->IsAlive())
+            continue;
+        alive.insert(member->GetGUID().GetRawValue());
+        for (auto const& [spellId, app] : member->GetAppliedAuras())
+        {
+            Aura const* const aura = app ? app->GetBase() : nullptr;
+            if (!aura || app->IsPositive() || !aura->GetCasterGUID().IsCreatureOrVehicle())
+                continue;
+            SpellInfo const* const info = aura->GetSpellInfo();
+            if (!info || info->Dispel < DISPEL_MAGIC || info->Dispel > DISPEL_POISON)
+                continue;
+            now.push_back({member->GetGUID().GetRawValue(), spellId, aura->GetCasterGUID().GetRawValue(),
+                           static_cast<std::uint8_t>(info->Dispel), aura->GetDuration(),
+                           info->SpellName[LOCALE_enUS]});
+        }
+    }
+    DcTestRun::FoldDispelWatch(_dispelLast, now, alive, dt, 500u, _record.dispels);
+}
+
 void DcTestRunJob::TrackPulls(Player* tank)
 {
     if (!tank)
@@ -2468,6 +2507,7 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         TrackDeaths(tank);
         TrackEngagement(tank);
         TrackOffTankAggro(tank, dt);
+        TrackDispels(tank, dt);
         TrackPulls(tank);
 
         if (next.has_value() && next->mapId == tank->GetMapId())

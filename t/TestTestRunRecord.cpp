@@ -181,7 +181,7 @@ TEST(DcTestRunRecordTest, BossRosterSerializesInProgressionOrder)
               std::string::npos);
 }
 
-TEST(DcTestRunRecordTest, SchemaIsSixteen)
+TEST(DcTestRunRecordTest, SchemaIsSeventeen)
 {
     // 12: added combatHolders[].trigger, and with it a change of meaning in the
     // sibling `legitimate` field — a trigger creature now sinks the verdict.
@@ -191,7 +191,8 @@ TEST(DcTestRunRecordTest, SchemaIsSixteen)
     // 15: added gear worn before/after (gearIlvlBefore/After, itemLevelAfter,
     // itemsChanged).
     // 16: added offTank (mobs on a healer or a dps while the tank stands).
-    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":16"), std::string::npos);
+    // 17: added dispels (per dispellable debuff the party carried).
+    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":17"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"size\":"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"difficulty\":"), std::string::npos);
 }
@@ -464,4 +465,20 @@ TEST(DcTestRunRecordTest, OffTankCountsAreWritten)
     rec.offTank.dpsMobMs = 999;
     EXPECT_NE(ToJsonl(rec).find("\"offTank\":{\"healer\":7,\"dps\":3,\"healerMobS\":12,\"dpsMobS\":0}"),
               std::string::npos);
+}
+
+// The dispel table is written most-seen first, carried time in whole seconds.
+TEST(DcTestRunRecordTest, DispelsAreWrittenMostSeenFirst)
+{
+    auto rec = SampleRecord();
+    rec.dispels[24099] = {4, "Poison Bolt Volley", 3, 2, 1, 14500};
+    rec.dispels[24300] = {2, "Curse of Blood", 9, 1, 8, 61000};
+    std::string const line = ToJsonl(rec);
+    std::size_t const curse = line.find("{\"spell\":24300,\"name\":\"Curse of Blood\",\"dispel\":2,\"seen\":9,"
+                                        "\"early\":1,\"expired\":8,\"carriedS\":61}");
+    std::size_t const poison = line.find("{\"spell\":24099,\"name\":\"Poison Bolt Volley\",\"dispel\":4,\"seen\":3,"
+                                         "\"early\":2,\"expired\":1,\"carriedS\":14}");
+    ASSERT_NE(curse, std::string::npos);
+    ASSERT_NE(poison, std::string::npos);
+    EXPECT_LT(curse, poison);
 }

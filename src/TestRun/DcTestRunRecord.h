@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "TestRun/DcDiagSnapshot.h"
+#include "TestRun/DcDispelWatch.h"
 #include "TestRun/DcOffTankAggro.h"
 
 // One JSON line per completed test run, appended to dc_testruns.jsonl in the
@@ -174,7 +175,9 @@ namespace DcTestRunRecord
         //     roster run that is never regeared), and wipeRetries.
         // 16: added offTank (mobs turning onto a healer or a dps while the
         //     tank stands).
-        std::uint32_t schema = 16;
+        // 17: added dispels (per dispellable debuff a creature put on the
+        //     party: applications, removed early, expired, carried seconds).
+        std::uint32_t schema = 17;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token
@@ -211,6 +214,11 @@ namespace DcTestRunRecord
         // for Jealous #11173 ("mobs run for the healer"); the counting rule is
         // DcTestRun::FoldOffTankAggro.
         DcTestRun::OffTankAggro offTank;
+        // Dispellable debuffs the party carried (schema 17), by spell id; the
+        // counting rule is DcTestRun::FoldDispelWatch. Serialized most-seen
+        // first, capped at kDispelLog.
+        std::map<std::uint32_t, DcTestRun::DispelStat> dispels;
+        static constexpr std::size_t kDispelLog = 24;
         // Hand-picked party of real player characters (`party=`) rather than a
         // seeded draw from the addclass pool. compSeed is 0 on these runs: the
         // roster IS the comp, so there is nothing to replay from a seed.
