@@ -146,12 +146,15 @@ TEST(DcLabJson, ParsesNestedWithCommentsAndTrailingCommas)
 {
     DcLabJson::Value v;
     std::string err;
-    ASSERT_TRUE(DcLabJson::Parse(R"({
+    // Kept out of the macro: MSVC's traditional preprocessor splits a raw
+    // string holding // and # when it is a macro argument (C2017, C3688).
+    std::string const text = R"({
         // a scenario note
         "id": "museum/x", # hash comment too
         "geometry": {"map": 34, "center": [1.5, -2, 3e1],},
         "flag": true, "none": null, "s": "a,\"b\"A",
-    })", v, &err)) << err;
+    })";
+    ASSERT_TRUE(DcLabJson::Parse(text, v, &err)) << err;
     EXPECT_EQ(v["id"].AsString(), "museum/x");
     EXPECT_EQ(v["geometry"]["map"].AsU64(), 34u);
     ASSERT_EQ(v["geometry"]["center"].arr.size(), 3u);
