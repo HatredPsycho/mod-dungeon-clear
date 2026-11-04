@@ -144,6 +144,39 @@ std::uint32_t DungeonClearMath::EstimateAggroCount(std::vector<DynPullMob> const
     return count;
 }
 
+std::size_t DungeonClearMath::NearestOtherFloorMob(std::vector<DynPullMob> const& mobs,
+                                                   std::size_t targetIdx, float reach3d,
+                                                   float zTolerance)
+{
+    std::size_t const n = mobs.size();
+    if (targetIdx >= n || reach3d <= 0.0f)
+        return n;
+    DynPullMob const& t = mobs[targetIdx];
+    std::size_t best = n;
+    float bestDist = reach3d;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (i == targetIdx)
+            continue;
+        DynPullMob const& m = mobs[i];
+        // The target's own formation comes along whatever floor it stands on.
+        if (t.packId != 0 && m.packId == t.packId)
+            continue;
+        float const dz = m.z - t.z;
+        if (std::fabs(dz) <= zTolerance)
+            continue;  // same floor: the estimate already sized it
+        float const dx = m.x - t.x;
+        float const dy = m.y - t.y;
+        float const d = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (d <= bestDist)
+        {
+            bestDist = d;
+            best = i;
+        }
+    }
+    return best;
+}
+
 bool DungeonClearMath::ShouldAbortPullForCc(bool impaired, std::uint32_t ccSince,
                                             std::uint32_t now, std::uint32_t graceMs,
                                             std::uint32_t& ccSinceOut)

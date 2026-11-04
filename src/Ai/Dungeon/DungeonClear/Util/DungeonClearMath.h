@@ -260,6 +260,20 @@ namespace DungeonClearMath
                                      std::vector<std::size_t>* countedOut = nullptr,
                                      std::uint32_t* weightThirdsOut = nullptr);
 
+    // Stacked-floor guard for the same Leeroy-in-place question (pure). The
+    // estimate above drops every mob more than `zTolerance` above or below the
+    // target, which is right for PROXIMITY aggro and wrong for the fight: the
+    // camp-clearance rule (ComputeSafeCamp, 3D since 4cf13d4) rejects a fight spot
+    // within its safe radius of ANY other pack, floor or no floor, and a Leeroy
+    // fights at the target. Returns the index of the nearest mob on ANOTHER floor
+    // (|dz| > `zTolerance`) within `reach3d` of the target in 3D, the target's own
+    // atomic pack (shared non-zero `packId`) excluded; mobs.size() when there is
+    // none. `chainEligible` is deliberately ignored: the floor is what fails that
+    // gate, and the floor is exactly what this guard does not trust.
+    std::size_t NearestOtherFloorMob(std::vector<DynPullMob> const& mobs,
+                                     std::size_t targetIdx, float reach3d,
+                                     float zTolerance);
+
     // Pull CC-assist grace gate (pure). Decides whether a CC-impaired drag-back
     // should be ABORTED so the party drops passive and piles in to help the tank.
     // `impaired` is the caller's verdict that the leader tank is currently under a

@@ -661,6 +661,17 @@ TEST(DcRouteSweepRegistryTest, OnlyTheStockadeAndKarazhanSweep)
     EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(0));    // not a dungeon at all
 }
 
+// The stacked-floor guard is its own list: Shadowfang Keep earned it
+// (tr-20261104-152435-131) WITHOUT joining the sweep above.
+TEST(DcRouteSweepRegistryTest, OnlyShadowfangKeepGuardsStackedFloors)
+{
+    EXPECT_TRUE(RouteSweepRegistry::GuardsStackedFloors(33));    // Shadowfang Keep
+    EXPECT_FALSE(RouteSweepRegistry::GuardsStackedFloors(34));   // The Stockade
+    EXPECT_FALSE(RouteSweepRegistry::GuardsStackedFloors(230));  // Blackrock Depths
+    EXPECT_FALSE(RouteSweepRegistry::GuardsStackedFloors(189));  // Scarlet Monastery
+    EXPECT_FALSE(RouteSweepRegistry::GuardsStackedFloors(0));
+}
+
 // The engage handoff and direct pursuit both stand down while an anchored hop
 // between the route cursor and the boss anchor is still out of reach
 // (tr-20260923-235223-3: pursuit bee-lined past Attumen's west-mouth route).

@@ -44,6 +44,15 @@ public:
     // True when `mapId` is on the list. Pure (no game state) so it is unit
     // testable on its own. Linear scan; the table is tiny.
     static bool SweepsRoute(uint32 mapId);
+
+    // Second, independent list kept here because it is the same kind of fact (a
+    // per-dungeon pull shape earned by run data): maps whose floors STACK, so a
+    // Leeroy fought under a gallery recruits the gallery. On these the Dynamic
+    // classifier upgrades to Advanced when a hostile on another floor sits within
+    // the camp's own 3D safe radius of the target (DcPullPlanner::Classify-
+    // PullAdvanced, DungeonClearMath::NearestOtherFloorMob). Every difficulty:
+    // the floor does not get further away on mythic.
+    static bool GuardsStackedFloors(uint32 mapId);
 };
 
 #endif  // _PLAYERBOT_ROUTESWEEPREGISTRY_H
