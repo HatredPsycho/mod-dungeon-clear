@@ -214,16 +214,18 @@ TEST(PitOfSaronRouteProbe, GateStandPointsAreInsideTheirOwnSpheresAndTheLedgeIsO
         << "the arena stand point is outside half the boss's vertical leash band";
 }
 
-// The staging point the ARM state holds the party on must be clear of gate 1's
-// sphere on every bearing, or the hold is not a hold at all.
-TEST(PitOfSaronRouteProbe, TheArmStagingPointIsClearOfGateOne)
+// The ARM hold moved south of the gauntlet (DungeonEventTables.h, "THE TRADE IS
+// THAT THIS POINT IS INSIDE AREATRIGGER 5578"): it now sits ON THE RIM of gate
+// 1's sphere, inside by 0.73yd, which is safe only because the driver forges
+// the trigger and a bot has no client to fire it by walking in. Hold it to the
+// rim: a point that drifts deeper is no longer the checked trade.
+TEST(PitOfSaronRouteProbe, TheArmStagingPointStaysOnTheRimOfGateOne)
 {
     float const d = Dist3(STAGE_X, STAGE_Y, STAGE_Z, AT_WARN_1_X, AT_WARN_1_Y, AT_WARN_1_Z);
-    EXPECT_GT(d, AT_WARN_1_R + STAGE_LEASH + 20.0f)
-        << "the ARM staging point is only " << d << "yd from areatrigger " << AREATRIGGER_WARN_1
-        << " (radius " << AT_WARN_1_R
-        << "). The whole point of that state is to keep the party OUT of the ambush trigger for"
-           " the 85-100s the Krick outro needs to fly the orchestrator into position.";
+    EXPECT_GT(d, AT_WARN_1_R - 1.0f)
+        << "the ARM staging point is " << d << "yd from areatrigger " << AREATRIGGER_WARN_1
+        << "'s centre (radius " << AT_WARN_1_R
+        << "): deeper than the rim the table's comment argues is safe";
 }
 
 // Every authored anchor must be somewhere a bot can actually stand.

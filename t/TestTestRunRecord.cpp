@@ -138,10 +138,14 @@ TEST(DcTestRunRecordTest, DeathsSerializeWhoDiedAndToWhat)
     r.deaths.push_back({413, "Olanne", "Anzu", 23035, true});
 
     std::string const line = ToJsonl(r);
+    // role / manaPct / healerManaPct / healerAlive follow onBoss; left at their
+    // defaults here ("" and -1 = unknown).
     EXPECT_NE(line.find("\"deaths\":[{\"t\":410,\"name\":\"Bero\",\"opponent\":\"Anzu\","
-                        "\"opponentEntry\":23035,\"onBoss\":true},"
+                        "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
+                        "\"healerManaPct\":-1,\"healerAlive\":false},"
                         "{\"t\":413,\"name\":\"Olanne\",\"opponent\":\"Anzu\","
-                        "\"opponentEntry\":23035,\"onBoss\":true}]"),
+                        "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
+                        "\"healerManaPct\":-1,\"healerAlive\":false}]"),
               std::string::npos);
     EXPECT_EQ(Count(line, "\"name\":\"Olanne\""), 1u);
 }
