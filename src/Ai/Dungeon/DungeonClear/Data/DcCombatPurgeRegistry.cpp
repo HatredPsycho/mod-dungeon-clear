@@ -99,9 +99,20 @@ namespace
     // 0.1-17yd, two dead members never rezzed, 600s watchdog),
     // tr-20261025-192328-65 (four members held, three bunnies each). Always:
     // there is no state in which fighting a trigger is the encounter.
+    //
+    // Dire Maul West (429) — Dire Maul Crystal Totem (13916).
+    //
+    // One spawn, guid 247640 at (13.5, 277.6, 1.5) by the west Warpwood hall,
+    // unit_flags 770 (NON_ATTACKABLE | IMMUNE_TO_PC | IMMUNE_TO_NPC), no AIName,
+    // no ScriptName, no smart_scripts row: set dressing that can never be
+    // attacked, never dies and never evades. Measured on tr-20261104-102616-91
+    // (heroic): Laviah, Kalasto and Sharis held by it at 14-24yd, `100% IMMUNE
+    // reachable`, combat=3-4 for ten minutes, 4/18 and the 600s watchdog. Always,
+    // for the Vial Bunny reason.
     DcCombatPurgeRow const kRows[] =
     {
         { 33, 36530, DcCombatPurgeWhen::Always },    // Shadowfang Keep — [DND] Valentine Boss - Vial Bunny (immune holiday trigger)
+        { 429, 13916, DcCombatPurgeWhen::Always },   // Dire Maul West — Dire Maul Crystal Totem (non-attackable set dressing)
         { 578, 27638, DcCombatPurgeWhen::Always },   // The Oculus — Azure Ring Guardian (flying picket, unreachable on foot)
         { 578, 28276, DcCombatPurgeWhen::Evading },  // The Oculus — Greater Ley-Whelp (Eregos add, outlives his evade)
         { 604, 29982, DcCombatPurgeWhen::Always },   // Gundrak — Drakkari Raider (rhino passenger, ejected into the water at path point 3)
