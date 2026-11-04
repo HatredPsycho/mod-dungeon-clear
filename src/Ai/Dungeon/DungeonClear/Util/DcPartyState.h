@@ -34,9 +34,10 @@ public:
     // Returns true when the party has caught up and recovered enough to pull again:
     //  - every living party member on the bot's map has HP% >= minHpPct,
     //  - every living mana-using party member has mana% >= minMpPct,
-    //  - every living member is within maxSpread yards of the bot — or of
-    //    *spreadAnchor when given (pull mode measures against the camp the party
-    //    is held at, since it is not allowed to stand near the tank there),
+    //  - every living member is within maxSpread yards of the bot — or, when
+    //    *spreadAnchor is given (pull mode: the camp the party is held at), within
+    //    maxSpread of the camp OR of the bot (DungeonClearMath::
+    //    MemberWithinSpreadGate: the trail camp sits PullSetback behind the tank),
     //  - and, when maxTankGap > 0, every living member is ALSO within maxTankGap
     //    yards of the bot itself. Absolute backstop for the anchored case: a camp
     //    gone stale right where the party stands satisfies the anchored spread

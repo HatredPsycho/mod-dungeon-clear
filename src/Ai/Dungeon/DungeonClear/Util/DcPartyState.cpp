@@ -110,18 +110,14 @@ bool DcPartyState::IsPartyReady(Player* bot, float minHpPct, float minMpPct, flo
     // walk and the raid quorum walk below judge a member identically.
     auto const memberMeetsBars = [&](Player* member)
     {
-        if (member != bot)
-        {
-            float const spread = spreadAnchor ? member->GetDistance(*spreadAnchor)
-                                              : bot->GetDistance(member);
-            if (spread > maxSpread)
-                return false;
-            // Absolute tank<->member backstop (camp-anchored mode only): a stale
-            // camp sitting where the party stands passes the anchored spread
-            // forever while the tank glides away — cap the real gap too.
-            if (maxTankGap > 0.0f && bot->GetDistance(member) > maxTankGap)
-                return false;
-        }
+        // Camp-anchored: at the camp OR with the tank, under the maxTankGap
+        // backstop — see DungeonClearMath::MemberWithinSpreadGate.
+        if (member != bot &&
+            !DungeonClearMath::MemberWithinSpreadGate(
+                bot->GetDistance(member),
+                spreadAnchor ? member->GetDistance(*spreadAnchor) : -1.0f, maxSpread,
+                maxTankGap))
+            return false;
         if (member->GetHealthPct() < minHpPct)
             return false;
         if (member->getPowerType() == POWER_MANA)
@@ -317,16 +313,17 @@ DcPartyState::SpreadGate DcPartyState::GetSpreadGate(Player* bot, AiObjectContex
         // 23yd of it for sixteen minutes. Stranded recovery measures to the tank, so
         // it never saw them.
         //
-        // The same dead end opens earlier, with the tank between the camp spread
-        // and maxTankGap from its camp: members follow the tank, stand beside it
-        // and fail the camp spread, and the stranded recovery "rescues" them onto
-        // the tank where they already are (BRD heroic, 23/10: "Mardiir Bot out of
-        // range (0yd from the tank; 33yd from the camp / 25)" for ten minutes).
-        // Between maneuvers the tank is home: once it is outside the camp spread
-        // the camp no longer anchors anything.
+        // The earlier dead end — the tank between the camp spread and maxTankGap
+        // from its camp, members beside it failing the camp spread (BRD heroic,
+        // 23/10: "Mardiir Bot out of range (0yd from the tank; 33yd from the camp /
+        // 25)") — is answered in the gate itself: a camp-anchored member also
+        // passes standing with the tank (DungeonClearMath::MemberWithinSpreadGate).
+        // NOT by dropping the anchor once the idle tank stands outside the camp
+        // spread, as 79ade53 did: the scout trail camp sits PullSetback behind the
+        // tank (35 on heroic vs a spread of 25), so that left every camp-held member
+        // failing a tank-anchored 25 on every heroic scout leg (tr-20261104-015048-22).
         if (DungeonClearMath::CampAnchorIsStale(bot->GetExactDist2d(&pull.camp),
-                                                gate.maxTankGap) ||
-            (!bot->IsInCombat() && bot->GetExactDist2d(&pull.camp) > gate.maxSpread))
+                                                gate.maxTankGap))
         {
             gate.anchor = nullptr;
             gate.maxTankGap = 0.0f;
@@ -647,9 +644,10 @@ std::string DcPartyState::DescribePartyNotReady(Player* bot,
         // most intuitively, then health, then mana.
         std::string reason;
         if (member != bot &&
-            ((spreadAnchor ? member->GetDistance(*spreadAnchor)
-                           : bot->GetDistance(member)) > maxSpread ||
-             (maxTankGap > 0.0f && bot->GetDistance(member) > maxTankGap)))
+            !DungeonClearMath::MemberWithinSpreadGate(
+                bot->GetDistance(member),
+                spreadAnchor ? member->GetDistance(*spreadAnchor) : -1.0f, maxSpread,
+                maxTankGap))
             reason = "out of range";
         else if (member->GetHealthPct() < minHpPct)
             reason = "low HP";

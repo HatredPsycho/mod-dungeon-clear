@@ -1785,6 +1785,34 @@ namespace DungeonClearMath
         return maxTankGap > 0.0f && tankToCamp > maxTankGap;
     }
 
+    // One member against the between-pulls spread gate (DcPartyState::IsPartyReady
+    // and the "waiting on X (out of range)" line share it). toAnchor < 0 = the gate
+    // is TANK-anchored: within maxSpread of the tank, the plain catch-up test.
+    //
+    // CAMP-anchored, a member is caught up when it is set at the camp OR standing
+    // with the tank — both are places the run legitimately puts it, and the gate
+    // used to accept only one of them at a time. It accepted only the camp, and
+    // members beside the tank 33yd from the camp were held for ten minutes (BRD
+    // heroic, 23/10). 79ade53 then switched the idle tank to tank-anchored as soon
+    // as it stood outside the camp spread, which accepts only the tank — but the
+    // scout trail camp sits PullSetback behind the tank by construction (35 on
+    // heroic, against a PartyMaxSpread of 25), so every camp-held member failed it
+    // on every heroic scout leg. Live (tr-20261104-015048-22, road heroic, 0 deaths,
+    // 6822s against ~2045s normal): ~1726 "party not ready — waiting on Fynrus,
+    // Laanaam, Mythe (out of range)", 81 rescues at "25-37yd from the tank / 25;
+    // -1yd from the camp / 0", each re-anchoring the camp for the next leg to undo.
+    // maxTankGap (> 0 only alongside a camp) stays the absolute backstop: a stale
+    // camp at the party's feet still cannot let the tank glide away.
+    inline bool MemberWithinSpreadGate(float toTank, float toAnchor, float maxSpread,
+                                       float maxTankGap)
+    {
+        if (toAnchor < 0.0f)
+            return toTank <= maxSpread;
+        if (maxTankGap > 0.0f && toTank > maxTankGap)
+            return false;
+        return toAnchor <= maxSpread || toTank <= maxSpread;
+    }
+
     // A stock chase toward `target` while a room-aggro boss still sleeps and its
     // room is being pre-cleared: true when the chase ends inside the boss's wake
     // sphere (ChaseEndToBoss), i.e. inside the boss's aggro. Mobs in there "come

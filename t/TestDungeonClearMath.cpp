@@ -3836,6 +3836,27 @@ TEST(DungeonClearSpreadGateTest, ACampTheTankLeftBehindIsStale)
     EXPECT_FALSE(DungeonClearMath::CampAnchorIsStale(500.0f, 0.0f));
 }
 
+// tr-20261104-015048-22 (road heroic): the scout trail camp sits PullSetback (35)
+// behind the tank; members set at it read 25-37yd from the tank against a spread
+// of 25 and held the tank ~1726 times. BRD heroic 23/10: members beside the tank,
+// 33yd from the camp. A camp-anchored gate must pass both.
+TEST(DungeonClearPartyGateTest, CampAnchoredMemberPassesAtTheCampOrWithTheTank)
+{
+    using DungeonClearMath::MemberWithinSpreadGate;
+    float const spread = 25.0f;
+    float const gap = 25.0f + 55.0f;   // heroic: spread + max(PullSetback, PullMaxDrag)
+    EXPECT_TRUE(MemberWithinSpreadGate(35.0f, 2.0f, spread, gap));    // set at the trail camp
+    EXPECT_TRUE(MemberWithinSpreadGate(0.0f, 33.0f, spread, gap));    // standing with the tank
+    EXPECT_TRUE(MemberWithinSpreadGate(25.0f, 25.0f, spread, gap));   // both edges inclusive
+    EXPECT_FALSE(MemberWithinSpreadGate(30.0f, 26.0f, spread, gap));  // neither: still waited on
+    // The backstop wins over the camp: a stale camp at the member's feet.
+    EXPECT_FALSE(MemberWithinSpreadGate(81.0f, 0.0f, spread, gap));
+    // Tank-anchored (no camp): the plain catch-up test, unchanged.
+    EXPECT_TRUE(MemberWithinSpreadGate(25.0f, -1.0f, spread, 0.0f));
+    EXPECT_FALSE(MemberWithinSpreadGate(26.0f, -1.0f, spread, 0.0f));
+    EXPECT_FALSE(MemberWithinSpreadGate(26.0f, -1.0f, spread, gap));
+}
+
 // tr-20261018-230400-9: the fight carried the tank 22yd from a sleeping Emperor
 // (sphere 28.3) and woke the room.
 TEST(DungeonClearRoomTrashTest, NoChaseIntoASleepingBossSphere)
