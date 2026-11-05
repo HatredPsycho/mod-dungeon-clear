@@ -8,6 +8,7 @@
 #include "TestRun/DcDispelWatch.h"
 
 using DcTestRun::DebuffKey;
+using DcTestRun::DebuffLast;
 using DcTestRun::DebuffSample;
 using DcTestRun::DispelStat;
 using DcTestRun::FoldDispelWatch;
@@ -25,7 +26,7 @@ namespace
 
     struct Watch
     {
-        std::map<DebuffKey, std::int32_t> last;
+        std::map<DebuffKey, DebuffLast> last;
         std::map<std::uint32_t, DispelStat> out;
         std::unordered_set<std::uint64_t> alive{HEALER, MAGE};
         void Step(std::vector<DebuffSample> const& now) { FoldDispelWatch(last, now, alive, 1000, 500, out); }
@@ -77,4 +78,22 @@ TEST(DcDispelWatchTest, EachCarrierIsItsOwnApplication)
     w.Step({Poison(MAGE, 9000)});
     EXPECT_EQ(w.out[POISON_BOLT].seen, 2u);
     EXPECT_EQ(w.out[POISON_BOLT].early, 1u);
+}
+
+// An expiry is filed under where the carrier last stood: here, every dispeller
+// was feared on the last reading.
+TEST(DcDispelWatchTest, AnExpiryKeepsTheCarriersLastReach)
+{
+    Watch w;
+    DebuffSample s = Poison(MAGE, 3000);
+    s.reach = DcTestRun::REACH_IN_REACH;
+    w.Step({s});
+    s.remainingMs = 900;
+    s.reach = DcTestRun::REACH_DISPELLER_HELD;
+    w.Step({s});
+    w.Step({});
+    DispelStat const& st = w.out[POISON_BOLT];
+    EXPECT_EQ(st.expired, 1u);
+    EXPECT_EQ(st.expiredWhy[DcTestRun::REACH_DISPELLER_HELD], 1u);
+    EXPECT_EQ(st.expiredWhy[DcTestRun::REACH_IN_REACH], 0u);
 }

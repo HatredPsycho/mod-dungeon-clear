@@ -6,6 +6,7 @@
 #ifndef _PLAYERBOT_DCTESTRUNJOB_H
 #define _PLAYERBOT_DCTESTRUNJOB_H
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -317,6 +318,7 @@ private:
     void TrackEngagement(Player* tank);
     void TrackOffTankAggro(Player* tank, uint32 dt);
     void TrackDispels(Player* tank, uint32 dt);
+    static std::array<float, 5> DispelRanges(Player* member);
     void TrackPulls(Player* tank);
     void ClosePull(bool wipedHere = false);
     DcTestRun::Engagement DeathBlame() const;
@@ -565,7 +567,10 @@ private:
     std::unordered_map<std::uint64_t, std::uint64_t> _offTankLast;
     // Dispellable debuffs on each member at the previous sample (member, spell,
     // caster -> ms left) — DcTestRun::FoldDispelWatch.
-    std::map<DcTestRun::DebuffKey, std::int32_t> _dispelLast;
+    std::map<DcTestRun::DebuffKey, DcTestRun::DebuffLast> _dispelLast;
+    // Per member, the longest friendly range of a known spell removing each
+    // dispel type (index = SpellInfo::Dispel, 0 = cannot), read once per run.
+    std::map<std::uint64_t, std::array<float, 5>> _dispelRangeYd;
     // The engagement latched at the most recent death. The live latch clears the
     // moment the survivors drop combat, so a run that ends on a failed rez has
     // nothing left to blame; this keeps the killer alive for the post-mortem.

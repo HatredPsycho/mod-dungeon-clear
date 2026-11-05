@@ -145,7 +145,12 @@ namespace DcTestRunRecord
                 AppendEscaped(s, st.name);
                 s << ",\"dispel\":" << unsigned(st.dispelType) << ",\"seen\":" << st.seen
                   << ",\"early\":" << st.early << ",\"expired\":" << st.expired
-                  << ",\"carriedS\":" << st.carriedMs / 1000 << '}';
+                  << ",\"carriedS\":" << st.carriedMs / 1000
+                  << ",\"expiredWhy\":{\"unknown\":" << st.expiredWhy[DcTestRun::REACH_UNKNOWN]
+                  << ",\"noDispeller\":" << st.expiredWhy[DcTestRun::REACH_NO_DISPELLER]
+                  << ",\"dispellerHeld\":" << st.expiredWhy[DcTestRun::REACH_DISPELLER_HELD]
+                  << ",\"outOfReach\":" << st.expiredWhy[DcTestRun::REACH_OUT_OF_REACH]
+                  << ",\"inReach\":" << st.expiredWhy[DcTestRun::REACH_IN_REACH] << "}}";
             }
         }
         s << ']'

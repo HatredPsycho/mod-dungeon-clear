@@ -177,7 +177,8 @@ namespace DcTestRunRecord
         //     tank stands).
         // 17: added dispels (per dispellable debuff a creature put on the
         //     party: applications, removed early, expired, carried seconds).
-        std::uint32_t schema = 17;
+        // 18: dispels[].expiredWhy (expiries by DcTestRun::DispelReach).
+        std::uint32_t schema = 18;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token

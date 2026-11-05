@@ -181,7 +181,7 @@ TEST(DcTestRunRecordTest, BossRosterSerializesInProgressionOrder)
               std::string::npos);
 }
 
-TEST(DcTestRunRecordTest, SchemaIsSeventeen)
+TEST(DcTestRunRecordTest, SchemaIsEighteen)
 {
     // 12: added combatHolders[].trigger, and with it a change of meaning in the
     // sibling `legitimate` field — a trigger creature now sinks the verdict.
@@ -192,7 +192,8 @@ TEST(DcTestRunRecordTest, SchemaIsSeventeen)
     // itemsChanged).
     // 16: added offTank (mobs on a healer or a dps while the tank stands).
     // 17: added dispels (per dispellable debuff the party carried).
-    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":17"), std::string::npos);
+    // 18: added dispels[].expiredWhy (expiries by the carrier's dispel reach).
+    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":18"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"size\":"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"difficulty\":"), std::string::npos);
 }
@@ -472,12 +473,13 @@ TEST(DcTestRunRecordTest, DispelsAreWrittenMostSeenFirst)
 {
     auto rec = SampleRecord();
     rec.dispels[24099] = {4, "Poison Bolt Volley", 3, 2, 1, 14500};
-    rec.dispels[24300] = {2, "Curse of Blood", 9, 1, 8, 61000};
+    rec.dispels[24300] = {2, "Curse of Blood", 9, 1, 8, 61000, {0, 1, 5, 2, 0}};
     std::string const line = ToJsonl(rec);
     std::size_t const curse = line.find("{\"spell\":24300,\"name\":\"Curse of Blood\",\"dispel\":2,\"seen\":9,"
-                                        "\"early\":1,\"expired\":8,\"carriedS\":61}");
+                                        "\"early\":1,\"expired\":8,\"carriedS\":61,\"expiredWhy\":{\"unknown\":0,"
+                                        "\"noDispeller\":1,\"dispellerHeld\":5,\"outOfReach\":2,\"inReach\":0}}");
     std::size_t const poison = line.find("{\"spell\":24099,\"name\":\"Poison Bolt Volley\",\"dispel\":4,\"seen\":3,"
-                                         "\"early\":2,\"expired\":1,\"carriedS\":14}");
+                                         "\"early\":2,\"expired\":1,\"carriedS\":14,");
     ASSERT_NE(curse, std::string::npos);
     ASSERT_NE(poison, std::string::npos);
     EXPECT_LT(curse, poison);

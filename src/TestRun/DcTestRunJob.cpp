@@ -33,6 +33,7 @@
 #include "Map.h"
 #include "SpellAuras.h"
 #include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "StringFormat.h"
@@ -2141,6 +2142,31 @@ void DcTestRunJob::TrackOffTankAggro(Player* tank, uint32 dt)
 // magic, curse, disease and poison: what a bot healer or a class cure can take
 // off. Player-cast auras are left out — a party member's own debuff on a friend
 // (a Barbarian's self-cost, a duel leftover) is not the encounter's.
+// Longest range of an active, learned spell that removes each dispel type from
+// an ally (index = SpellInfo::Dispel). Enemy-only dispels (Purge) do not count.
+std::array<float, 5> DcTestRunJob::DispelRanges(Player* member)
+{
+    std::array<float, 5> range{};
+    for (auto const& [spellId, ps] : member->GetSpellMap())
+    {
+        if (!ps || ps->State == PLAYERSPELL_REMOVED || !ps->Active || !ps->IsInSpec(member->GetActiveSpec()))
+            continue;
+        SpellInfo const* const info = sSpellMgr->GetSpellInfo(spellId);
+        if (!info || info->IsPassive())
+            continue;
+        for (SpellEffectInfo const& eff : info->GetEffects())
+        {
+            if (eff.Effect != SPELL_EFFECT_DISPEL || eff.TargetA.GetCheckType() == TARGET_CHECK_ENEMY)
+                continue;
+            std::uint32_t const mask = SpellInfo::GetDispelMask(DispelType(eff.MiscValue));
+            for (std::uint8_t t = DISPEL_MAGIC; t <= DISPEL_POISON; ++t)
+                if (mask & (1u << t))
+                    range[t] = std::max(range[t], std::max(info->GetMaxRange(true), 1.f));
+        }
+    }
+    return range;
+}
+
 void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
 {
     if (!tank)
@@ -2148,6 +2174,7 @@ void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
 
     std::vector<DcTestRun::DebuffSample> now;
     std::unordered_set<std::uint64_t> alive;
+    std::vector<Player*> members;
     for (Slot const& slot : _slots)
     {
         Player* const member = ObjectAccessor::FindPlayer(slot.guid);
@@ -2156,6 +2183,36 @@ void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
         if (!member->IsAlive())
             continue;
         alive.insert(member->GetGUID().GetRawValue());
+        members.push_back(member);
+        auto [it, fresh] = _dispelRangeYd.try_emplace(member->GetGUID().GetRawValue());
+        if (fresh)
+            it->second = DispelRanges(member);
+    }
+
+    // The carrier's DispelReach for one dispel type: who could have taken it off.
+    auto reachOf = [&](Player* carrier, std::uint8_t type) -> std::uint8_t
+    {
+        bool any = false, free = false;
+        for (Player* d : members)
+        {
+            float const range = _dispelRangeYd[d->GetGUID().GetRawValue()][type];
+            if (range <= 0.f)
+                continue;
+            any = true;
+            if (d->HasUnitState(UNIT_STATE_FLEEING | UNIT_STATE_CONFUSED | UNIT_STATE_STUNNED) ||
+                d->HasUnitFlag(UNIT_FLAG_SILENCED))
+                continue;
+            free = true;
+            if (d == carrier || (d->IsWithinDistInMap(carrier, range) && d->IsWithinLOSInMap(carrier)))
+                return DcTestRun::REACH_IN_REACH;
+        }
+        if (!any)
+            return DcTestRun::REACH_NO_DISPELLER;
+        return free ? DcTestRun::REACH_OUT_OF_REACH : DcTestRun::REACH_DISPELLER_HELD;
+    };
+
+    for (Player* member : members)
+    {
         for (auto const& [spellId, app] : member->GetAppliedAuras())
         {
             Aura const* const aura = app ? app->GetBase() : nullptr;
@@ -2164,9 +2221,9 @@ void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
             SpellInfo const* const info = aura->GetSpellInfo();
             if (!info || info->Dispel < DISPEL_MAGIC || info->Dispel > DISPEL_POISON)
                 continue;
-            now.push_back({member->GetGUID().GetRawValue(), spellId, aura->GetCasterGUID().GetRawValue(),
-                           static_cast<std::uint8_t>(info->Dispel), aura->GetDuration(),
-                           info->SpellName[LOCALE_enUS]});
+            std::uint8_t const type = static_cast<std::uint8_t>(info->Dispel);
+            now.push_back({member->GetGUID().GetRawValue(), spellId, aura->GetCasterGUID().GetRawValue(), type,
+                           aura->GetDuration(), info->SpellName[LOCALE_enUS], reachOf(member, type)});
         }
     }
     DcTestRun::FoldDispelWatch(_dispelLast, now, alive, dt, 500u, _record.dispels);
