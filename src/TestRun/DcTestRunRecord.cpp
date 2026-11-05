@@ -233,7 +233,17 @@ namespace DcTestRunRecord
             AppendEscaped(s, d.role);
             s << ",\"manaPct\":" << d.manaPct
               << ",\"healerManaPct\":" << d.healerManaPct
-              << ",\"healerAlive\":" << (d.healerAlive ? "true" : "false") << '}';
+              << ",\"healerAlive\":" << (d.healerAlive ? "true" : "false")
+              << ",\"hpPct\":" << d.hpPct << ",\"harm\":[";
+            for (std::size_t k = 0; k < d.harm.size(); ++k)
+            {
+                if (k)
+                    s << ',';
+                s << "{\"spell\":" << d.harm[k].first << ",\"name\":";
+                AppendEscaped(s, d.harm[k].second);
+                s << '}';
+            }
+            s << "]}";
         }
         s << "],\"pulls\":[";
         for (std::size_t i = 0; i < rec.pulls.size(); ++i)

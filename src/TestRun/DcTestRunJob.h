@@ -571,6 +571,14 @@ private:
     // Per member, the longest friendly range of a known spell removing each
     // dispel type (index = SpellInfo::Dispel, 0 = cannot), read once per run.
     std::map<std::uint64_t, std::array<float, 5>> _dispelRangeYd;
+    // Per member, its health and the harmful creature auras on it at the last
+    // sample it was alive; TrackDeaths stamps them on the death (schema 19).
+    struct HarmSample
+    {
+        int32_t hpPct = -1;
+        std::vector<std::pair<std::uint32_t, std::string>> harm;
+    };
+    std::map<std::uint64_t, HarmSample> _harmLast;
     // The engagement latched at the most recent death. The live latch clears the
     // moment the survivors drop combat, so a run that ends on a failed rez has
     // nothing left to blame; this keeps the killer alive for the post-mortem.

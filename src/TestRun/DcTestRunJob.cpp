@@ -1969,6 +1969,11 @@ void DcTestRunJob::TrackDeaths(Player* tank)
                     death.healerManaPct = m->second;
             }
         }
+        if (auto h = _harmLast.find(member->GetGUID().GetRawValue()); h != _harmLast.end())
+        {
+            death.hpPct = h->second.hpPct;
+            death.harm = h->second.harm;
+        }
         _record.deaths.push_back(death);
         // Deliberately overwritten even when the latch is empty: this means
         // "what the LAST death was to", not "the last death that had a killer".
@@ -2213,12 +2218,18 @@ void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
 
     for (Player* member : members)
     {
+        HarmSample& harm = _harmLast[member->GetGUID().GetRawValue()];
+        harm.hpPct = int32(member->GetHealthPct());
+        harm.harm.clear();
         for (auto const& [spellId, app] : member->GetAppliedAuras())
         {
             Aura const* const aura = app ? app->GetBase() : nullptr;
             if (!aura || app->IsPositive() || !aura->GetCasterGUID().IsCreatureOrVehicle())
                 continue;
             SpellInfo const* const info = aura->GetSpellInfo();
+            if (info && harm.harm.size() < DcTestRunRecord::DeathEntry::kHarmLog &&
+                std::none_of(harm.harm.begin(), harm.harm.end(), [&](auto const& h) { return h.first == spellId; }))
+                harm.harm.emplace_back(spellId, info->SpellName[LOCALE_enUS]);
             if (!info || info->Dispel < DISPEL_MAGIC || info->Dispel > DISPEL_POISON)
                 continue;
             std::uint8_t const type = static_cast<std::uint8_t>(info->Dispel);

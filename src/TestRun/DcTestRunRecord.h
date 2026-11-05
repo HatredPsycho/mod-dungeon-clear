@@ -103,6 +103,12 @@ namespace DcTestRunRecord
         int32_t manaPct = -1;      // its own mana just before dying (-1: no mana)
         int32_t healerManaPct = -1;// the healer's mana at that moment (-1: unknown)
         bool healerAlive = false;
+        // What a creature had on the victim at the last sample it was alive
+        // (schema 19): ZG's Venoxis wipes killed three dps on one tick with the
+        // healer full, and the opponent alone cannot say whether a cloud did it.
+        int32_t hpPct = -1;        // its health then (-1: never sampled)
+        std::vector<std::pair<std::uint32_t, std::string>> harm;  // harmful auras, spell id + name
+        static constexpr std::size_t kHarmLog = 6;
     };
 
     // One pull the Dynamic governor took a verdict on, with what the classifier
@@ -178,7 +184,8 @@ namespace DcTestRunRecord
         // 17: added dispels (per dispellable debuff a creature put on the
         //     party: applications, removed early, expired, carried seconds).
         // 18: dispels[].expiredWhy (expiries by DcTestRun::DispelReach).
-        std::uint32_t schema = 18;
+        // 19: deaths[].hpPct and deaths[].harm (the victim's last sample).
+        std::uint32_t schema = 19;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token
