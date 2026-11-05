@@ -1373,6 +1373,41 @@ void DungeonClearAdvanceAction::FillPathObs(AdvanceState& st, DungeonClearApproa
 // swim, then stalls for the stalled-fallback / `dc skip`. Its internal branching
 // mirrors DecideApproach's unreachable ladder, so the effect and the captured
 // verdict agree.
+// Go back to the last spot a complete route was built from
+// (DungeonClearMath::ShouldReturnToRoutableGround). The party follows by the
+// stranded recovery, and the next tick rebuilds from there. `why` names the
+// failure for the log.
+bool DungeonClearAdvanceAction::TryRoutableReturn(AdvanceState& st, char const* why)
+{
+    DungeonBossInfo const* next = st.next;
+    DcApproachState& appr = *st.appr;
+    if (!DC_ALLOW_RECOVERY_MOVES || bot->GetVehicle() ||
+        !DungeonClearMath::ShouldReturnToRoutableGround(
+            appr.hasRoutableFrom, appr.lastRoutableMap == bot->GetMapId(), bot->IsInCombat(),
+            bot->GetExactDist(&appr.lastRoutableFrom), DC_ROUTABLE_RETURN_MIN,
+            appr.routableReturns, DC_ROUTABLE_RETURN_LIMIT))
+        return false;
+
+    LOG_INFO("playerbots.dungeonclear",
+             "[DC:{}] {} to {} from ({:.1f},{:.1f},{:.1f}) -> back to routable "
+             "ground at ({:.1f},{:.1f},{:.1f}), {:.1f}yd (return {}/{})",
+             bot->GetName(), why, next->name, bot->GetPositionX(), bot->GetPositionY(),
+             bot->GetPositionZ(), appr.lastRoutableFrom.GetPositionX(),
+             appr.lastRoutableFrom.GetPositionY(), appr.lastRoutableFrom.GetPositionZ(),
+             bot->GetExactDist(&appr.lastRoutableFrom), appr.routableReturns + 1,
+             DC_ROUTABLE_RETURN_LIMIT);
+    ++appr.routableReturns;
+    bot->GetMotionMaster()->Clear();
+    bot->NearTeleportTo(appr.lastRoutableFrom.GetPositionX(),
+                        appr.lastRoutableFrom.GetPositionY(),
+                        appr.lastRoutableFrom.GetPositionZ() + 0.5f, bot->GetOrientation());
+    appr.longPathExpiresMs = 0;
+    *st.follower = DungeonFollowerState{};
+    ClearStall(context);
+    SetPhase(context, "recovering");
+    return true;
+}
+
 DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoLongPathUnreachable(AdvanceState& st)
 {
     DungeonBossInfo const* next = st.next;
@@ -1425,34 +1460,9 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoLongPathUnreachable
     }
 
     // Thrown somewhere the objective no longer routes from: go back to the last
-    // spot a complete route was built from. The party follows by the stranded
-    // recovery, and the next tick rebuilds from there.
-    if (DC_ALLOW_RECOVERY_MOVES &&
-        DungeonClearMath::ShouldReturnToRoutableGround(
-            appr.hasRoutableFrom, appr.lastRoutableMap == bot->GetMapId(), bot->IsInCombat(),
-            bot->GetExactDist(&appr.lastRoutableFrom), DC_ROUTABLE_RETURN_MIN,
-            appr.routableReturns, DC_ROUTABLE_RETURN_LIMIT) &&
-        !bot->GetVehicle())
-    {
-        LOG_INFO("playerbots.dungeonclear",
-                 "[DC:{}] no route to {} from ({:.1f},{:.1f},{:.1f}) -> back to routable "
-                 "ground at ({:.1f},{:.1f},{:.1f}), {:.1f}yd (return {}/{})",
-                 bot->GetName(), next->name, bot->GetPositionX(), bot->GetPositionY(),
-                 bot->GetPositionZ(), appr.lastRoutableFrom.GetPositionX(),
-                 appr.lastRoutableFrom.GetPositionY(), appr.lastRoutableFrom.GetPositionZ(),
-                 bot->GetExactDist(&appr.lastRoutableFrom), appr.routableReturns + 1,
-                 DC_ROUTABLE_RETURN_LIMIT);
-        ++appr.routableReturns;
-        bot->GetMotionMaster()->Clear();
-        bot->NearTeleportTo(appr.lastRoutableFrom.GetPositionX(),
-                            appr.lastRoutableFrom.GetPositionY(),
-                            appr.lastRoutableFrom.GetPositionZ() + 0.5f, bot->GetOrientation());
-        appr.longPathExpiresMs = 0;
-        *st.follower = DungeonFollowerState{};
-        ClearStall(context);
-        SetPhase(context, "recovering");
+    // spot a complete route was built from.
+    if (TryRoutableReturn(st, "no route"))
         return Step::ReturnTrue;
-    }
 
     // The chunked builder couldn't produce any segment. Failure
     // reason is carried through from PathGenerator's path type
@@ -1904,6 +1914,11 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoHopDoneEscalation(
         SetPhase(context, "swimming");
         return Step::ReturnTrue;
     }
+
+    // A route that dead-ends short may be one built from a torn patch of mesh:
+    // try the last routable ground before giving the run up.
+    if (TryRoutableReturn(st, "route dead-ends short"))
+        return Step::ReturnTrue;
 
     LOG_INFO("playerbots.dungeonclear",
              "[DC:{}] {} unreachable: route dead-ends {:.0f}yd short after {} approach "

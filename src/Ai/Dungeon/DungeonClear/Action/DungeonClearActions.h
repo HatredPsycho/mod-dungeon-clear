@@ -328,6 +328,7 @@ private:
 
     Step DoStuckRecover(AdvanceState& st);
     Step DoPursue(AdvanceState& st);                 // Continue = hand off to the long-path
+    bool TryRoutableReturn(AdvanceState& st, char const* why);
     Step DoLongPathUnreachable(AdvanceState& st);    // PlanRouteWait / FarFromPoly / Swim / Stall
     Step DoOffPathRebuild(AdvanceState& st);
     Step TryReanchorStaleCursor(AdvanceState& st);   // never terminates; only re-anchors the cursor
@@ -345,6 +346,9 @@ class DungeonClearEngageTrashAction : public DungeonClearEngageActionBase
 public:
     DungeonClearEngageTrashAction(PlayerbotAI* botAI) : DungeonClearEngageActionBase(botAI, "dungeon clear engage trash") {}
     bool Execute(Event event) override;
+
+private:
+    void ShelvePackIfPullTouched(Unit* target);
 };
 
 class DungeonClearEngageBossAction : public DungeonClearEngageActionBase

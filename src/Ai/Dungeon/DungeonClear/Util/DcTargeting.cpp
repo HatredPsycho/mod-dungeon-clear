@@ -764,7 +764,16 @@ Unit* DcTargeting::FindPullTarget(PlayerbotAI* botAI, DungeonBossInfo const& nex
 
     GuidVector const& farTargets = context->GetValue<GuidVector>(DcKey::FarTargets)->Get();
     GuidVector const& possibleTargets = context->GetValue<GuidVector>(DcKey::Stock::PossibleTargets)->Get();
-    GuidVector const& candidates = farTargets.empty() ? possibleTargets : farTargets;
+    GuidVector const& scanned = farTargets.empty() ? possibleTargets : farTargets;
+    // Packs set aside for the run are not candidates at all, so the scan moves
+    // on to the next pack instead of returning one that will never come.
+    DcRunState const& run = DcRun::Of(context);
+    GuidVector unshelved;
+    if (!run.shelvedPacks.empty())
+        for (ObjectGuid const& g : scanned)
+            if (!run.IsShelved(g))
+                unshelved.push_back(g);
+    GuidVector const& candidates = run.shelvedPacks.empty() ? scanned : unshelved;
 
     Unit* trash = nullptr;
     ChunkedPathfinder::Result const& path =
@@ -799,7 +808,7 @@ Unit* DcTargeting::FindPullTarget(PlayerbotAI* botAI, DungeonBossInfo const& nex
             trash = FindBlockingTrash(bot, next, kConeRange, kConeHalfAngle, candidates);
     }
 
-    if (!trash)
+    if (!trash || run.IsShelved(trash->GetGUID()))
         return nullptr;
 
     // Never pull a boss: the dedicated at-boss path (engage-range gate, anchor
@@ -912,6 +921,8 @@ bool DcTargeting::IsStickyPullTargetValid(Player* bot, AiObjectContext* ctx, Uni
     DcPullContext const& pull =
         ctx->GetValue<DcPullContext&>(DcKey::PullContext)->Get();
     if (!pull.abortTarget.IsEmpty() && u->GetGUID() == pull.abortTarget)
+        return false;
+    if (DcRun::Of(ctx).IsShelved(u->GetGUID()))
         return false;
 
     // Same for a room-trash pack with no clean lane while a cleaner one is left:

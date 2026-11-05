@@ -1416,6 +1416,10 @@ bool DungeonClearPullTrigger::IsActive()
         return false;
     }
 
+    // A pack set aside for the run is neither pulled nor walked in on.
+    if (DcRun::Of(context).IsShelved(trash->GetGUID()))
+        return false;
+
     // Don't loop on a pack a previous pull gave up on — let engage-trash walk in.
     if (AI_VALUE(DcPullContext&, DcKey::PullContext).abortTarget == trash->GetGUID())
     {
