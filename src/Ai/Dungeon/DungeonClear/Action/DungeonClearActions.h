@@ -348,7 +348,7 @@ public:
     bool Execute(Event event) override;
 
 private:
-    void ShelvePackIfPullTouched(Unit* target);
+    bool ShelvePackIfPullTouched(Unit* target);
 };
 
 class DungeonClearEngageBossAction : public DungeonClearEngageActionBase

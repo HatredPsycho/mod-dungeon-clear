@@ -686,8 +686,9 @@ bool DungeonClearEngageActionBase::MoveToStandSkirtingRoomAggro(Unit* pack,
 // The walk-in on `target` was just given up. If the pull pipeline had already
 // worked this pack and none of it is fighting, set the whole pack aside for the
 // run (DungeonClearMath::ShouldShelvePackForRun): the pack is the target plus the
-// live, out-of-combat candidates within kShelfPackYd of it.
-void DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
+// live candidates within kShelfPackYd of it and the units of its entry the pull
+// worked. Returns whether the pack was set aside.
+bool DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
 {
     constexpr float kShelfPackYd = 12.0f;
     std::vector<Unit*> pack{target};
@@ -697,6 +698,18 @@ void DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
                 pack.push_back(u);
 
     DcPullContext const& pull = context->GetValue<DcPullContext&>(DcKey::PullContext)->Get();
+    // A pack that drifted apart (Road's Interstitial Wanderers, tr-20261105-172917-16:
+    // given up on one at 61yd while the pull worked its mates 24-56yd away) is
+    // still one pack: the units the pull worked, of the target's entry and within
+    // kShelfLinkYd, join it.
+    constexpr float kShelfLinkYd = 60.0f;
+    for (ObjectGuid const& g : {pull.abortTarget, pull.fizzleTarget, pull.pullTarget, pull.decisionTarget})
+        if (Unit* u = g.IsEmpty() ? nullptr : ObjectAccessor::GetUnit(*bot, g))
+            if (u->IsAlive() && u->GetEntry() == target->GetEntry() &&
+                u->GetExactDist(target) <= kShelfLinkYd &&
+                std::find(pack.begin(), pack.end(), u) == pack.end())
+                pack.push_back(u);
+
     bool touched = false, inCombat = false;
     for (Unit* u : pack)
     {
@@ -706,7 +719,7 @@ void DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
         inCombat = inCombat || u->IsInCombat();
     }
     if (!DungeonClearMath::ShouldShelvePackForRun(touched, inCombat))
-        return;
+        return false;
 
     DcRunState& run = DcRun::Of(context);
     for (Unit* u : pack)
@@ -717,6 +730,7 @@ void DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
              "or a walk-in -> set aside for the rest of the run",
              bot->GetName(), target->GetName(), uint32(pack.size()), kShelfPackYd,
              target->GetGUID().ToString());
+    return true;
 }
 
 bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
@@ -977,7 +991,11 @@ bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
                          nowMs - appr.engageWalkWatch.progressMs, bot->GetExactDist(target),
                          appr.engageWalkWatch.bestDist, DC_ENGAGE_WALK_GIVEN_UP_MS / 1000);
             appr.engageWalkGivenUp.Add(target->GetGUID(), nowMs, DC_ENGAGE_WALK_GIVEN_UP_MS);
-            ShelvePackIfPullTouched(target);
+            // The pack out of the way, the route gets its returns to routable
+            // ground back: the ones spent while the pack kept drawing the tank
+            // off the mesh say nothing about the route itself.
+            if (ShelvePackIfPullTouched(target))
+                appr.routableReturns = 0;
             appr.engageWalkWatchTarget.Clear();
             appr.engageWalkWatch = DungeonClearMath::WalkInWatch{};
             appr.engageWalkTarget.Clear();
