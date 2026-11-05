@@ -193,7 +193,10 @@ if (BUILD_TESTING)
         # same reason (see the C4005 note above).
         if (MSVC)
             target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES=)
-            target_compile_definitions(dungeon_clear_tests PRIVATE NOMINMAX)
+            # windows.h's min/max macros break std::max / numeric_limits::max in
+            # the test TUs: the game's PCH sets NOMINMAX, this target has no PCH.
+            # Empty value, same spelling and reason as above.
+            target_compile_options(dungeon_clear_tests PRIVATE /DNOMINMAX=)
         endif()
 
         # Link the necessary targets

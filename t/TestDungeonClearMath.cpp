@@ -3010,6 +3010,17 @@ TEST(DungeonClearMathTest, ReturnToRoutableGroundIsBoundedAndNeverInCombat)
     EXPECT_FALSE(DungeonClearMath::ShouldReturnToRoutableGround(true, true, false, 4.0f, 15.0f, 0, 2));
 }
 
+// tr-20261103-020508-1 / -022518-7: off the Vaults navmesh, every +5yd probe got a
+// Player shortcut and was walked; the tank ended ~2400yd east in the void.
+TEST(DungeonClearMathTest, NudgeOnlyLandsOnTheMesh)
+{
+    EXPECT_TRUE(DungeonClearMath::NudgeLandsOnMesh(true, 0.4f, 3.0f));
+    EXPECT_TRUE(DungeonClearMath::NudgeLandsOnMesh(true, 3.0f, 3.0f));
+    // No poly near the offset point (void, below a ledge): never a nudge.
+    EXPECT_FALSE(DungeonClearMath::NudgeLandsOnMesh(false, 0.0f, 3.0f));
+    EXPECT_FALSE(DungeonClearMath::NudgeLandsOnMesh(true, 5.5f, 3.0f));
+}
+
 // tr-20261026-123722-57: Lethtendris and Pimgib took turns as the first sphere on
 // the glide window; a one-slot latch saw each as new and halted every probe.
 TEST(DungeonClearMathTest, GlideHazardLatchHoldsTwoAlternatingSpheres)

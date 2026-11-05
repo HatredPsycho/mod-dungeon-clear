@@ -5949,6 +5949,9 @@ void RegisterKarazhanRoster(std::vector<BossRosterPatch>& t);
 // Road to De Other Side (937, CoA) — adds the Chimeric Embryo (bit 2), summoned
 // by the Quimera Portal and so without a spawn. See RoadToDeOtherSideEvents.cpp.
 void RegisterRoadToDeOtherSideRoster(std::vector<BossRosterPatch>& t);
+// Vaults of the Inquisition (936, CoA) — two drop objectives, to the lower hall
+// before Darkveil and into the pit before the Deceiver. See VaultsEvents.cpp.
+void RegisterVaultsRoster(std::vector<BossRosterPatch>& t);
 
 // --- wing layouts (one appender per split map) ---------------------------
 // Records which boss credit-entries belong to which wing of a multi-wing map;

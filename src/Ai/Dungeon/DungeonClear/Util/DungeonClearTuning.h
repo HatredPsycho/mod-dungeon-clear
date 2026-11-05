@@ -557,4 +557,13 @@ constexpr uint32 DC_MAX_NUDGE_ATTEMPTS = 2;
 // whose path exceeds this multiple of the offset; a real sidestep is ~1x.
 constexpr float DC_NUDGE_MAX_DETOUR_RATIO = 2.5f;
 
+// A nudge must LAND on the navmesh. For a Player, PathGenerator answers any probe
+// whose start or end has no poly with a straight 2-point shortcut typed NORMAL
+// (no FARFROMPOLY flag), so a bot already off the mesh "passes" every probe and
+// the first offset (+X) was walked tick after tick: Vaults of the Inquisition
+// (tr-20261103-020508-1, -022518-7) strided the tank ~2400yd east into the void
+// at (-4412, -5866, 9.9). The offset point is snapped first and the probe is
+// dropped unless a walkable poly lies within this distance (3D) of it.
+constexpr float DC_NUDGE_MESH_SNAP_MAX = 3.0f;
+
 #endif  // _DUNGEON_CLEAR_TUNING_H

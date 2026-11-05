@@ -1085,22 +1085,24 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
             continue;
         if (!bot->IsHostileTo(u))
             continue;
-        // On another floor (a pack on a ledge/ramp directly above or below): it
-        // can't aggro the camp fight, so it must not push the camp farther back.
-        // Same height gate the Dynamic decision and the corridor scans use, so
-        // placement and classification agree about what "near" means in 3D.
-        if (std::fabs(u->GetPositionZ() - target->GetPositionZ()) > DC_Z_LEVEL_TOLERANCE)
-            continue;
         if (u->GetExactDist2d(target) <= kPackRadius)
             continue;  // packmate — fought regardless of where camp sits
         others.push_back(u);
     }
 
+    // Clearance is measured in 3D, with no "other floor" exemption. The camp fight
+    // recruits through floors and walls: creature assistance (CallAssistance and its
+    // periodic re-call) is a 3D sphere with no LOS test. Gating on the TARGET's Z was
+    // also the wrong floor whenever camp and target stand at different heights.
+    // Live (tr-20261103-073207-16, Shadowfang Keep): courtyard target at Z 79.8, camp
+    // on the gate landing at Z 90.6 read "clearance 33.8yd" with a Wailing Guardsman
+    // 11yd away on the gallery above it; the gallery woke, then the floors past it,
+    // Silverlaine and Razorclaw with them. A pack truly a floor away is far in 3D too.
     auto clearanceAt = [&others](Position const& p) -> float
     {
         float nearest = std::numeric_limits<float>::max();
         for (Unit* u : others)
-            nearest = std::min(nearest, p.GetExactDist2d(u));
+            nearest = std::min(nearest, p.GetExactDist(u));
         return nearest;
     };
 
@@ -1131,6 +1133,13 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
     float bestLosClear = std::numeric_limits<float>::max();
     float bestLosDrag = 0.0f;
     float bestLosAlong = -1.0f;  // <0 => none found
+    // Past maxDrag the search goes on, up to the ranged cap, but only to ACCEPT a
+    // point that clears safeRadius: the far-and-imperfect fallback stays within
+    // maxDrag. Live (tr-20261103-130338-3, -130947-7, Shadowfang Keep): every camp
+    // inside 35yd of the courtyard sat on the gate landing, 10-16yd under the
+    // gallery's Wailing Guardsmen and Odo's floor, and was taken anyway; the
+    // corridor back toward Rethilgore clears 25yd some 45-60yd back.
+    float const reachDrag = std::max(maxDrag, DcSettings::GetFloat(bot, "PullRangedMaxDrag"));
     std::optional<Position> accepted;
     DungeonClearMath::WalkTrailBack(
         crumbs, tankPos, DungeonClearMath::TrailJumpGuard,
@@ -1158,6 +1167,17 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
             float const clear = clearanceAt(c);
             float const drag = tankPos.GetExactDist(&c);
             bool const breaks = breaksLos(c);
+            if (along > maxDrag)
+            {
+                if (clear >= safeRadius && (!losBreak || breaks))
+                {
+                    clearanceOut = clear;
+                    dragOut = drag;
+                    accepted = c;
+                    return false;
+                }
+                return along < reachDrag;
+            }
             if (along > bestAlong)  // farthest reachable back so far (fallback)
             {
                 best = c;
@@ -1181,12 +1201,29 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
                 accepted = c;
                 return false;
             }
-            if (along >= maxDrag)
-                return false;
-            return true;
+            return along < reachDrag;
         });
     if (accepted)
         return *accepted;
+
+    // A point `dist` yards back along the cleared escort route (see the
+    // route-anchored fallback below), passed through the same camp gates.
+    ChunkedPathfinder::Result const& path =
+        ctx->GetValue<ChunkedPathfinder::Result&>(DcKey::LongPath)->Get();
+    DungeonFollowerState const& follower =
+        ctx->GetValue<DungeonFollowerState&>(DcKey::FollowerState)->Get();
+    auto routeBehind = [&](float dist) -> std::optional<Position>
+    {
+        std::optional<G3D::Vector3> const back =
+            DungeonPathFollower::PointBehind(bot, path, follower, dist);
+        if (!back)
+            return std::nullopt;
+        Position cand(back->x, back->y, back->z);
+        if (campOffLimits(cand) || !IsNavReachable(bot, cand) || CampBlockedByDoor(bot, cand) ||
+            CampInHazard(bot, live, cand) || CampOverZoneLine(bot, cand))
+            return std::nullopt;
+        return cand;
+    };
 
     // Ranged pull, no point cleared every gate: take the farthest out-of-sight
     // point we did find (at least half the setback back), since forcing the rangers
@@ -1204,6 +1241,17 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
     // out-of-sight point, this is the graceful "room has no cover" fallback.)
     if (bestAlong >= setback * 0.5f)
     {
+        // A starved trail (drag-backs reset it) can end on the very ground that is
+        // too close. Before settling for it, look farther back along the route.
+        if (bestClear < safeRadius)
+            for (float d = setback; d <= reachDrag; d += 2.0f * kStep)
+                if (std::optional<Position> const cand = routeBehind(d))
+                    if (float const c = clearanceAt(*cand); c >= safeRadius)
+                    {
+                        clearanceOut = c;
+                        dragOut = tankPos.GetExactDist(&*cand);
+                        return *cand;
+                    }
         clearanceOut = bestClear;
         dragOut = bestDrag;
         return best;
@@ -1222,24 +1270,11 @@ std::optional<Position> DcPullPlanner::ComputeSafeCamp(PlayerbotAI* botAI, Unit*
     // short once a drag-back has reset the cursor, which is exactly why the
     // breadcrumb trail is preferred ABOVE; at plan time the cursor is still on
     // the forward route, so it reads true here.)
+    if (std::optional<Position> const cand = routeBehind(setback))
     {
-        ChunkedPathfinder::Result const& path =
-            ctx->GetValue<ChunkedPathfinder::Result&>(DcKey::LongPath)->Get();
-        DungeonFollowerState const& follower =
-            ctx->GetValue<DungeonFollowerState&>(DcKey::FollowerState)->Get();
-        if (std::optional<G3D::Vector3> back =
-                DungeonPathFollower::PointBehind(bot, path, follower, setback))
-        {
-            Position cand(back->x, back->y, back->z);
-            if (!campOffLimits(cand) && IsNavReachable(bot, cand) &&
-                !CampBlockedByDoor(bot, cand) && !CampInHazard(bot, live, cand) &&
-                !CampOverZoneLine(bot, cand))
-            {
-                clearanceOut = clearanceAt(cand);
-                dragOut = tankPos.GetExactDist(&cand);
-                return cand;
-            }
-        }
+        clearanceOut = clearanceAt(*cand);
+        dragOut = tankPos.GetExactDist(&*cand);
+        return *cand;
     }
 
     // --- Fallback: cleared route behind is too short (e.g. first pull) ------

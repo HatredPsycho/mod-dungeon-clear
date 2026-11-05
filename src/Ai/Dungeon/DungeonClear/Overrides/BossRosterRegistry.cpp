@@ -76,6 +76,7 @@ namespace
             RegisterOculusRoster(t);
             RegisterKarazhanRoster(t);
             RegisterRoadToDeOtherSideRoster(t);
+            RegisterVaultsRoster(t);
             return t;
         }();
         return kPatches;

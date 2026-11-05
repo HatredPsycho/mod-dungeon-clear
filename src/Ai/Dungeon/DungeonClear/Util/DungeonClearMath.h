@@ -1417,6 +1417,16 @@ namespace DungeonClearMath
         return true;
     }
 
+    // Whether a navmesh-nudge offset point really lands on the mesh: a walkable
+    // poly found near it, no farther than maxDist. Off the mesh, PathGenerator
+    // gives a Player a straight shortcut to ANY point, so its verdict alone let
+    // the Vaults tank (tr-20261103-020508-1) be nudged +5yd X for ten minutes,
+    // into the void far outside the instance.
+    inline bool NudgeLandsOnMesh(bool snapOk, float snapDist, float maxDist)
+    {
+        return snapOk && snapDist <= maxDist;
+    }
+
     // Whether a tank with NO route to its objective should be put back where the
     // last complete route was built from. A tank thrown off Stratholme's upper
     // walkway mid-pull (tr-20261026-125623-76) landed 90yd below on ground that

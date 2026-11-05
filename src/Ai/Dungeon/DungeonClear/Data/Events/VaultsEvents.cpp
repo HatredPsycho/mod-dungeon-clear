@@ -4,7 +4,9 @@
  */
 
 #include "Ai/Dungeon/DungeonClear/Data/Events/DungeonEventTables.h"
+#include "Ai/Dungeon/DungeonClear/Data/Events/DungeonRosterBuilders.h"
 
+#include <cmath>
 #include <list>
 
 #include "Creature.h"
@@ -45,6 +47,28 @@ namespace
     constexpr uint32 VAULTS_MAP = 936;
     constexpr uint32 VAULTS_EVENT_SEALS = 1;
     constexpr uint32 VAULTS_HOOK_BREAK_SEALS = 64;  // ObjectiveHookRegistry id
+    constexpr uint32 VAULTS_EVENT_LOWER_HALL = 2;
+    constexpr uint32 VAULTS_EVENT_PIT = 3;
+
+    // The balcony's east edge and the lower-hall floor under it (roster patch).
+    constexpr float VAULTS_HALL_LIP_X = -6781.9f;
+    constexpr float VAULTS_HALL_LIP_Y = -5962.9f;
+    constexpr float VAULTS_HALL_LIP_Z = 165.4f;
+    constexpr float VAULTS_HALL_LAND_X = -6772.8f;
+    constexpr float VAULTS_HALL_LAND_Y = -5958.4f;
+    constexpr float VAULTS_HALL_LAND_Z = 154.9f;
+    // Under the 10.5yd drop, so a tank still on the balcony never reads landed.
+    constexpr float VAULTS_HALL_RADIUS = 6.0f;
+
+    // The pit rim's lowest point and the pit floor below it.
+    constexpr float VAULTS_PIT_LIP_X = -6680.3f;
+    constexpr float VAULTS_PIT_LIP_Y = -6113.0f;
+    constexpr float VAULTS_PIT_LIP_Z = 154.7f;
+    constexpr float VAULTS_PIT_LAND_X = -6672.7f;
+    constexpr float VAULTS_PIT_LAND_Y = -6116.7f;
+    constexpr float VAULTS_PIT_LAND_Z = 151.1f;
+    // Rim and floor are 9yd apart (3D): 4yd tells them apart.
+    constexpr float VAULTS_PIT_RADIUS = 4.0f;
 
     constexpr uint32 VAULTS_DECEIVER = 162704;
     constexpr uint32 VAULTS_SEAL_CRYSTAL = 162705;
@@ -60,10 +84,16 @@ namespace
     // Three crystals, 3s each, ~25yd of walking between them.
     constexpr uint32 VAULTS_SEALS_TIMEOUT = 60000;
 
+    // The pit floor is flat at z 151.1, its rim 3.5yd and more above it: a
+    // leader still on the rim is not in the pit yet (event 3 drops him in).
+    constexpr float VAULTS_PIT_FLOOR_BAND = 2.0f;
+
     Creature* SealedDeceiver(Player* bot)
     {
         Creature* deceiver = bot->FindNearestCreature(VAULTS_DECEIVER, VAULTS_DECEIVER_SCAN, /*alive*/ true);
         if (!deceiver || !deceiver->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE))
+            return nullptr;
+        if (std::fabs(bot->GetPositionZ() - deceiver->GetPositionZ()) > VAULTS_PIT_FLOOR_BAND)
             return nullptr;
         return deceiver;
     }
@@ -164,4 +194,66 @@ void RegisterVaultsEvents(std::vector<DungeonEvent>& out)
                       .Custom(VAULTS_HOOK_BREAK_SEALS)
                           .Timeout(VAULTS_SEALS_TIMEOUT)
                       .Build());
+
+    // The two drops (see the roster patch below), the Slave Pens pattern: one
+    // synchronous TeleportParty each, riding a travel objective at the lip.
+    out.push_back(EventBuilder(VAULTS_MAP, VAULTS_EVENT_LOWER_HALL, "Drop down to the lower hall")
+                      .Anchored(/*orderIndex, doc-only*/ 1)
+                      .TeleportParty(VAULTS_HALL_LIP_X, VAULTS_HALL_LIP_Y, VAULTS_HALL_LIP_Z,
+                                     VAULTS_HALL_LAND_X, VAULTS_HALL_LAND_Y, VAULTS_HALL_LAND_Z,
+                                     VAULTS_HALL_RADIUS)
+                      .Build());
+    out.push_back(EventBuilder(VAULTS_MAP, VAULTS_EVENT_PIT, "Step down into the Deceiver's pit")
+                      .Anchored(/*orderIndex, doc-only*/ 2)
+                      .TeleportParty(VAULTS_PIT_LIP_X, VAULTS_PIT_LIP_Y, VAULTS_PIT_LIP_Z,
+                                     VAULTS_PIT_LAND_X, VAULTS_PIT_LAND_Y, VAULTS_PIT_LAND_Z,
+                                     VAULTS_PIT_RADIUS)
+                      .Build());
+}
+
+// --- roster patch -----------------------------------------------------------
+// The auto-roster derives the three bosses in their DBC order (Merciless Echo
+// bit 0, His Majesty Darkveil bit 1, The Deceiver's Presence bit 2), but the
+// navmesh (936 44/42-43, measured off the mmtiles) is three islands, and two
+// NUC runs on 03/11 (tr-20261103-020508-1, -022518-7) killed Echo and then sat
+// 600s on "bot off navmesh (no start poly)" heading for Darkveil, the tank
+// strided off the map to (-4412, -5866, 9.9):
+//
+//   * the upper floor (z 165-179): entrance, Echo, and the corridor south
+//     through his TowerBoss Door, ending on a balcony at (-6814..-6776,
+//     -5952..-5973, z 165). The lower hall (z 138-168: Darkveil, the Kobold
+//     Wax Door, the Deceiver's room) runs UNDER that balcony at z 153-155,
+//     and the only way down is off its east edge: (-6781.9, -5962.9, 165.4)
+//     over (-6772.8, -5958.4, 154.9), a 10.5yd drop no mesh link spans.
+//     Balcony -> lip 255yd from Echo, landing -> Darkveil 351yd, all on mesh.
+//
+//   * the Deceiver's pit: an 11-poly floor at z 151.1 round him (his three
+//     seal crystals stand on it), 3.5yd below the rim of the lower hall. The
+//     rim's lowest point is (-6680.3, -6113.0, 154.7) over (-6672.7, -6116.7,
+//     151.1); the lower hall reaches it through the Kobold Wax Door, which
+//     opens on Darkveil's death, so the pit is ordered after him.
+//
+// Each drop is a travel OBJECTIVE at its lip borrowing the next boss's bit
+// (the Objective-before-Boss tie-break sorts it ahead of him) with a
+// TeleportParty event. The pit landing is 12yd from the Deceiver, inside his
+// room, so event 1 (the seals) fires from there.
+void RegisterVaultsRoster(std::vector<BossRosterPatch>& t)
+{
+    using namespace DcRoster;
+
+    BossRosterPatch p;
+    p.mapId = VAULTS_MAP;
+    p.add = {
+        MakeObjective(OBJ(1), /*encounterIndex*/ 1, VAULTS_MAP,
+                      "Drop down to the lower hall",
+                      VAULTS_HALL_LIP_X, VAULTS_HALL_LIP_Y, VAULTS_HALL_LIP_Z,
+                      /*arriveRadius*/ 4.0f, /*gateEntry*/ 0,
+                      /*hook*/ 0, /*eventId*/ VAULTS_EVENT_LOWER_HALL),
+        MakeObjective(OBJ(2), /*encounterIndex*/ 2, VAULTS_MAP,
+                      "Step down into the Deceiver's pit",
+                      VAULTS_PIT_LIP_X, VAULTS_PIT_LIP_Y, VAULTS_PIT_LIP_Z,
+                      /*arriveRadius*/ 3.0f, /*gateEntry*/ 0,
+                      /*hook*/ 0, /*eventId*/ VAULTS_EVENT_PIT),
+    };
+    t.push_back(std::move(p));
 }

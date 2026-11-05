@@ -213,7 +213,21 @@ void DcTestRunJob::ReassertMaster()
         if (!bot)
             continue;
         PlayerbotAI* const botAI = GET_PLAYERBOT_AI(bot);
-        if (!botAI || botAI->GetMaster() == gm)
+        if (!botAI)
+            continue;
+
+        // A self-found roster is drawn from REAL random bots, and the flag below is
+        // latched by the random-bot rotation while the bot was still out questing
+        // (RandomPlayerbotMgr sets it only on an ungrouped bot, and nothing clears it).
+        // Left up, the bot's own "random bot update" action runs ProcessBot mid-run:
+        // "leave group if leader is rndbot" disbands the run's group (our leader IS a
+        // random bot), then the teleport-for-level path resets the AI and asks for its
+        // questing zone. tr-20261103-073224-17: group disbanded after Odo, the leader
+        // went dark and the travel guard refused 399 teleports to map 0 until the
+        // 600s watchdog. Holding it down for the run keeps the rotation off the party.
+        botAI->GetAiObjectContext()->GetValue<bool>("random bot update")->Set(false);
+
+        if (botAI->GetMaster() == gm)
             continue;
 
         // Name it once. WHICH member loses its master, and how far into the run,

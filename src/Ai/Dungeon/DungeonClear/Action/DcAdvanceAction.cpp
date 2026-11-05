@@ -57,6 +57,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearUtil.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonPathFollower.h"
 #include "Ai/Dungeon/DungeonClear/Util/LongRangePathfinder.h"
+#include "Ai/Dungeon/DungeonClear/Util/NavmeshSnap.h"
 #include "Ai/Dungeon/DungeonClear/Util/StridedPathfinder.h"
 #include "Ai/Dungeon/DungeonClear/Util/SwimPathfinder.h"
 #include "Ai/Dungeon/DungeonClear/Value/DungeonClearStateValues.h"
@@ -350,10 +351,23 @@ namespace
         };
         for (Offset const& o : offsets)
         {
-            float const nx = x + o.dx;
-            float const ny = y + o.dy;
+            float nx = x + o.dx;
+            float ny = y + o.dy;
             float nz = z;
             bot->UpdateAllowedPositionZ(nx, ny, nz);
+            // Land on a poly or not at all. Off the mesh a Player's probe is a
+            // straight shortcut typed NORMAL, so the checks below pass for any
+            // point, ground or not; the +X offset then repeats every tick and
+            // walks the tank out of the instance (Vaults, tr-20261103-020508-1:
+            // ~2400yd into the void). Rejecting every offset hands the tick to
+            // the return-to-routable-ground teleport, then the stall.
+            NavmeshSnap::Result const land =
+                NavmeshSnap::Snap(bot->GetMap(), nx, ny, nz, /*maxRadius*/ 1.5f, /*vertExtent*/ 3.0f);
+            if (!DungeonClearMath::NudgeLandsOnMesh(land.ok, land.distance, DC_NUDGE_MESH_SNAP_MAX))
+                continue;
+            nx = land.x;
+            ny = land.y;
+            nz = land.z;
             PathGenerator gen(bot);
             gen.CalculatePath(nx, ny, nz, /*forceDest*/ false);
             PathType const t = gen.GetPathType();
