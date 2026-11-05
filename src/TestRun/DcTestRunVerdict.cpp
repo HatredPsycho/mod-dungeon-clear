@@ -47,6 +47,14 @@ namespace DcTestRun
         if (o.partyWiped && o.wipedForMs >= l.wipeGraceMs)
             return Verdict::FailPartyWiped;
 
+        // A wipe in all but name: no healer for this long and no boss since.
+        // ZG's Venoxis killed the healer at 710 s and the rest fought on,
+        // unhealed, for 6600 s more (tr-20261105-130928-1); neither the stall
+        // nor the no-progress watchdog sees that, because people keep dying
+        // and moving.
+        if (o.noHealerForMs >= l.noHealerMs)
+            return Verdict::FailPartyWiped;
+
         if (o.paused && o.pausedForMs >= l.pauseGraceMs)
             return Verdict::FailPausedTimeout;
 

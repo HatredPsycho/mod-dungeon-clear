@@ -537,6 +537,8 @@ private:
     uint32 _pausedForMs = 0;
     uint32 _stalledForMs = 0;
     uint32 _wipedForMs = 0;
+    uint32 _noHealerForMs = 0;      // Observation::noHealerForMs
+    uint32 _noHealerBosses = 0;     // bossesKilled when it last ran; a kill resets it
     // SetRunOptions (self-found parties).
     std::vector<std::pair<std::string, double>> _runOverrides;
     uint32 _wipeRetriesLeft = 0;

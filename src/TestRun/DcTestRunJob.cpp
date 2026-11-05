@@ -2690,6 +2690,25 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         obs.partyWiped = !anyAlive;
         obs.wipedForMs = _wipedForMs;
 
+        // Healers of the comp still standing on the leader's map; reset as well
+        // by a boss kill (Classify's no-healer rung).
+        bool hadHealer = false, healerUp = false;
+        for (Slot const& slot : _slots)
+        {
+            if (std::string_view(slot.role) != "heal")
+                continue;
+            hadHealer = true;
+            if (Player* healer = ObjectAccessor::FindPlayer(slot.guid);
+                healer && healer->IsAlive() && healer->GetMapId() == tank->GetMapId())
+                healerUp = true;
+        }
+        if (!hadHealer || healerUp || _record.bossesKilled != _noHealerBosses)
+            _noHealerForMs = 0;
+        else
+            _noHealerForMs += dt;
+        _noHealerBosses = _record.bossesKilled;
+        obs.noHealerForMs = _noHealerForMs;
+
         // A stall reason left standing through a fight is not the run being
         // stuck: the fight decides, and a lost one is the wipe watchdog's. The
         // SFK tank stalled on "A gate has closed on us" while the party fought
@@ -2759,7 +2778,11 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
                 _lastAliveMember.empty() ? std::string()
                                          : " (last standing: " + _lastAliveMember + ")";
             DcTestRun::Engagement const blame = DeathBlame();
-            if (blame.Empty())
+            if (!obs.partyWiped)
+                failReason = "no healer standing for " + std::to_string(_limits.noHealerMs / 1000) +
+                             "s and no boss down since" +
+                             (blame.Empty() ? std::string() : ", last death to " + blame.name);
+            else if (blame.Empty())
                 failReason = "party wiped out of combat" + who;
             else if (blame.isBoss)
                 failReason = "party wiped on " + blame.name + who;
