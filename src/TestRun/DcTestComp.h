@@ -138,7 +138,7 @@ namespace DcTestComp
 
     // Sized form: RoleQuota(size) slots, seed-deterministic. Distinct classes
     // while the pools allow, then duplicates spread as evenly as possible (9
-    // classes — 10 with death knights — < 25 slots; 10 healers at 40 over 4 heal
+    // classes — 10 with death knights — < 25 slots; 6 healers at 26 over 4 heal
     // classes force duplicates) — the least-used class of the role pool is
     // always preferred. size is clamped to [kMinPartySize, kMaxPartySize].
     std::vector<Slot> BuildComp(std::uint32_t seed, std::size_t size, Roster roster);

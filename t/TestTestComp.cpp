@@ -194,9 +194,11 @@ TEST(DcTestComp, SizedCompIsDeterministicAndQuotaed)
 
 TEST(DcTestComp, SizedCompSpreadsDuplicatesEvenly)
 {
-    // 10 healers (40-man) over a 4-class heal pool (priest twice via disc/holy):
-    // the least-used draw spreads them, no class used far more than another.
-    auto const comp = DcTestComp::BuildComp(777u, 40, Roster::NoDeathKnights);
+    // 6 healers (a 26-man: 3 tanks, 6 healers) over a 4-class heal pool (priest
+    // twice via disc/holy): the least-used draw means no class is used 3+ times
+    // while another is unused. Not 40: there the tanks and the class use shared
+    // with them already skew the healer spread by design.
+    auto const comp = DcTestComp::BuildComp(777u, 26, Roster::NoDeathKnights);
     std::map<std::uint8_t, std::size_t> healUse;
     for (auto const& s : comp)
         if (std::string_view(s.role) == "heal")
