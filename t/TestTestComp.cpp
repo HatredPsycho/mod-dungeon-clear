@@ -144,10 +144,20 @@ TEST(DcTestComp, RoleQuotaTable)
     EXPECT_EQ(q.healers, 2u);
     EXPECT_EQ(q.dps, 6u);
 
+    q = RoleQuota(15);
+    EXPECT_EQ(q.tanks, 2u);
+    EXPECT_EQ(q.healers, 3u);
+    EXPECT_EQ(q.dps, 10u);
+
+    q = RoleQuota(20);
+    EXPECT_EQ(q.tanks, 2u);
+    EXPECT_EQ(q.healers, 3u);
+    EXPECT_EQ(q.dps, 15u);
+
     q = RoleQuota(25);
-    EXPECT_EQ(q.tanks, 3u);
-    EXPECT_EQ(q.healers, 6u);
-    EXPECT_EQ(q.dps, 16u);
+    EXPECT_EQ(q.tanks, 2u);
+    EXPECT_EQ(q.healers, 4u);
+    EXPECT_EQ(q.dps, 19u);
 
     q = RoleQuota(40);
     EXPECT_EQ(q.tanks, 4u);
@@ -177,16 +187,16 @@ TEST(DcTestComp, SizedCompIsDeterministicAndQuotaed)
         else if (std::string_view(s.role) == "heal") ++heals;
         else ++dps;
     }
-    EXPECT_EQ(tanks, 3u);
-    EXPECT_EQ(heals, 6u);
-    EXPECT_EQ(dps, 16u);
+    EXPECT_EQ(tanks, 2u);
+    EXPECT_EQ(heals, 4u);
+    EXPECT_EQ(dps, 19u);
 }
 
 TEST(DcTestComp, SizedCompSpreadsDuplicatesEvenly)
 {
-    // 6 healers over a 4-class heal pool (priest twice via disc/holy): the
-    // least-used draw means no class is used 3+ times while another is unused.
-    auto const comp = DcTestComp::BuildComp(777u, 25, Roster::NoDeathKnights);
+    // 10 healers (40-man) over a 4-class heal pool (priest twice via disc/holy):
+    // the least-used draw spreads them, no class used far more than another.
+    auto const comp = DcTestComp::BuildComp(777u, 40, Roster::NoDeathKnights);
     std::map<std::uint8_t, std::size_t> healUse;
     for (auto const& s : comp)
         if (std::string_view(s.role) == "heal")
