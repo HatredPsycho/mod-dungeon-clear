@@ -1133,6 +1133,14 @@ void DcTestRunJob::TickProvisioningRoster()
                                : PlayerbotAI::IsHeal(bot, /*bySpec*/ true) ? "heal"
                                                                           : "dps";
 
+        // A raid roster (more than a 5-man) is only positional for its first two
+        // names: party= cannot mark a second tank or a third healer, and those
+        // characters play their own spec anyway. Take the spec's role for every
+        // slot past the main tank, or the no-healer watch, the aggro stats and
+        // the death records would only ever see one healer.
+        if (_realChars && _slots.size() > 5 && &slot != &_slots.front())
+            slot.role = detected;
+
         DcTestRunRecord::CompEntry entry;
         entry.name = bot->GetName();
         entry.className = DcBotProvisioning::ClassToken(bot->getClass());
