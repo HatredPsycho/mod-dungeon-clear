@@ -81,7 +81,9 @@
 //   order. BossRosterRegistry (map 109) removes those three from their low bits
 //   and re-adds them as objective anchors ordered after their un-phase trigger,
 //   each carrying a KillCreature(engage) event (events 10/11) so the real kill
-//   still flips the real DBC bit. See that file + §9 of the plan.
+//   still flips the real DBC bit. See that file + §9 of the plan. Since core
+//   #11271 all four Sanctum dragons also stay hidden until the Avatar dies, so
+//   they follow him in the clear order (ST_MORPHAZ).
 
 namespace
 {
@@ -114,10 +116,25 @@ namespace
     // Before that core he was reached right after Hazzas and Morphaz, and on the
     // 24/10 night every normal run engaged an untargetable Shade there and wiped
     // (13/21, 4 runs of 4); the 23/10 binary, without that gate, killed him in
-    // 36-63s. The later order is valid on both cores. Two objectives come
-    // between the Avatar (18) and him: the pre-clear (19) and the muster (20).
+    // 36-63s. The later order is valid on both cores. Between the Avatar (18)
+    // and him come the four Sanctum dragons (19-21, see ST_MORPHAZ_ORDER), the
+    // pre-clear (22) and the muster (23).
     constexpr uint32 ST_ERANIKUS = 5709;
-    constexpr int32 ST_ERANIKUS_ORDER = 21;
+    constexpr int32 ST_ERANIKUS_ORDER = 24;
+
+    // The four Sanctum dragons. Since core #11271 (2.9.4) the instance keeps
+    // Weaver, Dreamscythe, Morphaz and Hazzas invisible, passive and
+    // unattackable until BOTH the Avatar of Hakkar and Jammal'an are dead.
+    // Ordered right after Jammal'an, every 2.9.4 RC1 normal run walked to an
+    // invisible Weaver and idled there until the 3h limit (3 runs of 3), so
+    // all four now follow the Avatar (18): Weaver & Dreamscythe (19), Morphaz
+    // (20), Hazzas (21). They keep their real kill-bits. On an older core they
+    // are already visible there, so the later order is valid on both.
+    constexpr uint32 ST_MORPHAZ = 5719;
+    constexpr uint32 ST_HAZZAS = 5722;
+    constexpr int32 ST_DRAGONS_ORDER = 19;
+    constexpr int32 ST_MORPHAZ_ORDER = 20;
+    constexpr int32 ST_HAZZAS_ORDER = 21;
     constexpr float ST_ERANIKUS_X = -658.4f;  // his spawn
     constexpr float ST_ERANIKUS_Y = -35.8f;
     constexpr float ST_ERANIKUS_Z = -90.8f;
@@ -654,14 +671,15 @@ void RegisterSunkenTempleEvents(std::vector<DungeonEvent>& out)
                       .Build());
 
     // --- Event 10: Weaver & Dreamscythe (required spine) -------------------
-    // Both spawn phaseMask 2 until Jammal'an dies; this objective is ordered after
-    // him so they are visible on arrival. They sit ~10yd apart and un-phase
+    // Both spawn phaseMask 2 until Jammal'an dies, and the 2.9.4 core also hides
+    // them until the Avatar of Hakkar dies; this objective is ordered after the
+    // Avatar (ST_DRAGONS_ORDER) so they are visible on arrival. They sit ~10yd apart and un-phase
     // together, so ONE objective kills both (two same-index objectives would be
     // skipped by NextDungeonBossValue's strictly-greater advance-forward). Two
     // engage steps; the real kills flip their real DBC bits. Persistent so the
     // back-to-back fights don't rewind the chain; Required (spine boss).
     out.push_back(EventBuilder(109, 10, "Weaver & Dreamscythe")
-                      .Anchored(5)
+                      .Anchored(ST_DRAGONS_ORDER)
                       .Persistent()
                       .KillCreatureEngage(ST_WEAVER, 1, ST_BOSS_SEARCH).Timeout(ST_BOSS_TIMEOUT)
                       .KillCreatureEngage(ST_DREAMSCYTHE, 1, ST_BOSS_SEARCH).Timeout(ST_BOSS_TIMEOUT)
@@ -680,7 +698,7 @@ void RegisterSunkenTempleEvents(std::vector<DungeonEvent>& out)
                       .KillCreatureEngage(ST_ATALALARION, 1, ST_BOSS_SEARCH).Timeout(ST_BOSS_TIMEOUT)
                       .Build());
 
-    // --- Event 18: the dragonkin pack east of the Shade (orderIndex 19) ------
+    // --- Event 18: the dragonkin pack east of the Shade (orderIndex 22) ------
     // Killed BEFORE the muster and the pull: the Shade's aggro zone-pulls every
     // living dragonkin in a loaded grid (see ST_EAST_PACK_*), and this pack is the
     // nearest. Dragonkin only (OnlyEntries), so the sweep never wanders onto
@@ -688,7 +706,7 @@ void RegisterSunkenTempleEvents(std::vector<DungeonEvent>& out)
     // objective; Optional + timeout so an unreachable straggler degrades to "go on"
     // rather than stalling the last boss.
     out.push_back(EventBuilder(109, 18, "Dragonkin before the Shade")
-                      .Anchored(19)
+                      .Anchored(22)
                       .Persistent()
                       .Optional()
                       .ClearRadius(ST_EAST_PACK_X, ST_EAST_PACK_Y, ST_EAST_PACK_Z,
@@ -698,12 +716,12 @@ void RegisterSunkenTempleEvents(std::vector<DungeonEvent>& out)
                       .Timeout(ST_EAST_PACK_TIMEOUT)
                       .Build());
 
-    // --- Event 19: muster before the Shade of Eranikus (orderIndex 20) -------
+    // --- Event 19: muster before the Shade of Eranikus (orderIndex 23) -------
     // Regroup and rest to full 40yd short of him (hook 63), then the ordinary
     // boss engage takes over. Optional: a muster that cannot finish only costs the
     // top-off, never the run.
     out.push_back(EventBuilder(109, 19, "Muster before the Shade of Eranikus")
-                      .Anchored(20)
+                      .Anchored(23)
                       .Optional()
                       .Custom(HOOK_ST_ERANIKUS_MUSTER)
                       .Timeout(ST_MUSTER_TIMEOUT)
@@ -731,7 +749,8 @@ void RegisterSunkenTempleRoster(std::vector<BossRosterPatch>& t)
     // the real DBC bit (objectives skip the completion-mask check, so
     // their orderIndex is a pure ordering hint that can't collide). The
     // remaining auto bosses — Jammal'an, Morphaz, Hazzas, Eranikus — keep
-    // their real bits; Eranikus alone is reordered to the end (p.reorder).
+    // their real bits; Morphaz, Hazzas and Eranikus are moved past the
+    // Avatar (p.reorder), who gates all of them on the 2.9.4 core.
     //
     // FORCEFIELD via OBJECTIVE anchors (not a conditional event). The six
     // Atal'ai defenders each stand on their OWN separate upper BALCONY
@@ -755,17 +774,17 @@ void RegisterSunkenTempleRoster(std::vector<BossRosterPatch>& t)
     //          this slot, and it is removed). Order among them is the
     //          ring-sweep insertion order; the forcefield drops once all
     //          six die regardless of which order they fall in.
-    //   5  Weaver & Dreamscythe (after Jammal'an 3, shares Morphaz's bit 5
-    //      so it is reached just before Morphaz via the same same-index
-    //      advance) — ONE merged objective (they are ~10yd apart and
-    //      un-phase together).
-    //   10..15 six statues in click order } the OPTIONAL pit wing, after
-    //   16     Atal'alarion                } Morphaz and Hazzas (5/6), so a
-    //   17     Idol of Hakkar               } pit pathing failure never
-    //   18     Avatar of Hakkar             } blocks the spine.
-    //   19     dragonkin pack east of the Shade (pre-clear, event 18)
-    //   20     muster before the Shade (event 19, hook 63)
-    //   21     Shade of Eranikus (reordered, real bit 8 kept) — LAST: on the
+    //   10..15 six statues in click order } the pit wing, after Jammal'an.
+    //   16     Atal'alarion                } Optional, but the Avatar now
+    //   17     Idol of Hakkar               } gates the four dragons and the
+    //   18     Avatar of Hakkar             } Shade (see ST_MORPHAZ).
+    //   19     Weaver & Dreamscythe — ONE merged objective (they are ~10yd
+    //          apart and appear together).
+    //   20     Morphaz (reordered, real bit 5 kept)
+    //   21     Hazzas (reordered, real bit 6 kept)
+    //   22     dragonkin pack east of the Shade (pre-clear, event 18)
+    //   23     muster before the Shade (event 19, hook 63)
+    //   24     Shade of Eranikus (reordered, real bit 8 kept) — LAST: on the
     //          CoA 2.8 core he cannot be targeted until the Avatar is dead
     //          (see ST_ERANIKUS_ORDER).
     {
@@ -775,7 +794,9 @@ void RegisterSunkenTempleRoster(std::vector<BossRosterPatch>& t)
         // objectives below. (Weaver 5720, Dreamscythe 5721, Atal'alarion
         // 8580 are auto-derived bosses at bits 2/1/0 respectively.)
         p.remove = { 5720, 5721, 8580 };
-        p.reorder = { { ST_ERANIKUS, ST_ERANIKUS_ORDER } };
+        p.reorder = { { ST_MORPHAZ, ST_MORPHAZ_ORDER },
+                      { ST_HAZZAS, ST_HAZZAS_ORDER },
+                      { ST_ERANIKUS, ST_ERANIKUS_ORDER } };
 
         // A forcefield defender anchor is finished once the instance reads all
         // six defenders dead (see ST_DATA_DEFENDER_KILLED): immediately on the
@@ -839,9 +860,10 @@ void RegisterSunkenTempleRoster(std::vector<BossRosterPatch>& t)
                           -467.0f, 95.0f, -91.0f, /*arriveRadius*/ 32.0f,
                           /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 17),
 
-            // Required spine: Weaver + Dreamscythe (un-phased by Jammal'an).
-            // One objective at their midpoint kills both via event 10.
-            MakeObjective(OBJ(1), /*orderIndex*/ 5, 109, "Weaver & Dreamscythe",
+            // Required spine: Weaver + Dreamscythe (shown once Jammal'an and
+            // the Avatar are dead, see ST_MORPHAZ). One objective at their
+            // midpoint kills both via event 10.
+            MakeObjective(OBJ(1), ST_DRAGONS_ORDER, 109, "Weaver & Dreamscythe",
                           -456.2f, 132.5f, -91.2f, /*arriveRadius*/ 30.0f,
                           /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 10),
 
@@ -880,15 +902,15 @@ void RegisterSunkenTempleRoster(std::vector<BossRosterPatch>& t)
                           -466.8f, 272.9f, -90.4f, 15.0f, /*gateEntry*/ 0,
                           0, /*eventId*/ 9),
 
-            // Before the Shade of Eranikus (reordered to 21, last): kill the
+            // Before the Shade of Eranikus (reordered to 24, last): kill the
             // dragonkin pack his pull would bring first (event 18, anchored on
             // the pack), then muster 40yd short of him (event 19, anchored on
             // his spawn so boss-nav walks the tank in and stops outside his
             // aggro).
-            MakeObjective(OBJ(18), 19, 109, "Dragonkin before the Shade",
+            MakeObjective(OBJ(18), 22, 109, "Dragonkin before the Shade",
                           ST_EAST_PACK_X, ST_EAST_PACK_Y, ST_EAST_PACK_Z,
                           ST_EAST_PACK_RADIUS, 0, 0, /*eventId*/ 18),
-            MakeObjective(OBJ(19), 20, 109, "Muster before the Shade of Eranikus",
+            MakeObjective(OBJ(19), 23, 109, "Muster before the Shade of Eranikus",
                           ST_ERANIKUS_X, ST_ERANIKUS_Y, ST_ERANIKUS_Z,
                           ST_MUSTER_ARRIVE, 0, 0, /*eventId*/ 19),
         };
