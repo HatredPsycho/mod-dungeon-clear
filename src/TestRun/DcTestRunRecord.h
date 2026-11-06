@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "TestRun/DcDiagSnapshot.h"
+#include "TestRun/DcOffTankAggro.h"
 
 // One JSON line per completed test run, appended to dc_testruns.jsonl in the
 // worldserver working directory (env override DC_TESTRUNS_FILE) — same
@@ -171,7 +172,9 @@ namespace DcTestRunRecord
         //     and the party averages gearIlvlBefore/gearIlvlAfter (item level
         //     worn, not a ceiling: gearIlvl stays the regear ceiling, 0 on a
         //     roster run that is never regeared), and wipeRetries.
-        std::uint32_t schema = 15;
+        // 16: added offTank (mobs turning onto a healer or a dps while the
+        //     tank stands).
+        std::uint32_t schema = 16;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token
@@ -204,6 +207,10 @@ namespace DcTestRunRecord
         // Full wipes the run came back from (schema 15): a self-found party may
         // be revived at the entrance and sent on again (SelfFound.WipeRetries).
         std::uint32_t wipeRetries = 0;
+        // Mobs on a non-tank while the tank was alive (schema 16), the measure
+        // for Jealous #11173 ("mobs run for the healer"); the counting rule is
+        // DcTestRun::FoldOffTankAggro.
+        DcTestRun::OffTankAggro offTank;
         // Hand-picked party of real player characters (`party=`) rather than a
         // seeded draw from the addclass pool. compSeed is 0 on these runs: the
         // roster IS the comp, so there is nothing to replay from a seed.

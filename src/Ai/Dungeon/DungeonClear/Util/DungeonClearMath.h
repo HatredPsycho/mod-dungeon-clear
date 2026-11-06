@@ -260,6 +260,20 @@ namespace DungeonClearMath
                                      std::vector<std::size_t>* countedOut = nullptr,
                                      std::uint32_t* weightThirdsOut = nullptr);
 
+    // Stacked-floor guard for the same Leeroy-in-place question (pure). The
+    // estimate above drops every mob more than `zTolerance` above or below the
+    // target, which is right for PROXIMITY aggro and wrong for the fight: the
+    // camp-clearance rule (ComputeSafeCamp, 3D since 4cf13d4) rejects a fight spot
+    // within its safe radius of ANY other pack, floor or no floor, and a Leeroy
+    // fights at the target. Returns the index of the nearest mob on ANOTHER floor
+    // (|dz| > `zTolerance`) within `reach3d` of the target in 3D, the target's own
+    // atomic pack (shared non-zero `packId`) excluded; mobs.size() when there is
+    // none. `chainEligible` is deliberately ignored: the floor is what fails that
+    // gate, and the floor is exactly what this guard does not trust.
+    std::size_t NearestOtherFloorMob(std::vector<DynPullMob> const& mobs,
+                                     std::size_t targetIdx, float reach3d,
+                                     float zTolerance);
+
     // Pull CC-assist grace gate (pure). Decides whether a CC-impaired drag-back
     // should be ABORTED so the party drops passive and piles in to help the tank.
     // `impaired` is the caller's verdict that the leader tank is currently under a
@@ -1769,6 +1783,34 @@ namespace DungeonClearMath
     inline bool CampAnchorIsStale(float tankToCamp, float maxTankGap)
     {
         return maxTankGap > 0.0f && tankToCamp > maxTankGap;
+    }
+
+    // One member against the between-pulls spread gate (DcPartyState::IsPartyReady
+    // and the "waiting on X (out of range)" line share it). toAnchor < 0 = the gate
+    // is TANK-anchored: within maxSpread of the tank, the plain catch-up test.
+    //
+    // CAMP-anchored, a member is caught up when it is set at the camp OR standing
+    // with the tank — both are places the run legitimately puts it, and the gate
+    // used to accept only one of them at a time. It accepted only the camp, and
+    // members beside the tank 33yd from the camp were held for ten minutes (BRD
+    // heroic, 23/10). 79ade53 then switched the idle tank to tank-anchored as soon
+    // as it stood outside the camp spread, which accepts only the tank — but the
+    // scout trail camp sits PullSetback behind the tank by construction (35 on
+    // heroic, against a PartyMaxSpread of 25), so every camp-held member failed it
+    // on every heroic scout leg. Live (tr-20261104-015048-22, road heroic, 0 deaths,
+    // 6822s against ~2045s normal): ~1726 "party not ready — waiting on Fynrus,
+    // Laanaam, Mythe (out of range)", 81 rescues at "25-37yd from the tank / 25;
+    // -1yd from the camp / 0", each re-anchoring the camp for the next leg to undo.
+    // maxTankGap (> 0 only alongside a camp) stays the absolute backstop: a stale
+    // camp at the party's feet still cannot let the tank glide away.
+    inline bool MemberWithinSpreadGate(float toTank, float toAnchor, float maxSpread,
+                                       float maxTankGap)
+    {
+        if (toAnchor < 0.0f)
+            return toTank <= maxSpread;
+        if (maxTankGap > 0.0f && toTank > maxTankGap)
+            return false;
+        return toAnchor <= maxSpread || toTank <= maxSpread;
     }
 
     // A stock chase toward `target` while a room-aggro boss still sleeps and its

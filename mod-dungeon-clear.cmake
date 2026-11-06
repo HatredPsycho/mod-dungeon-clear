@@ -159,6 +159,7 @@ if (BUILD_TESTING)
             "${MOD_PATH}/t/TestWatchHop.cpp"
             "${MOD_PATH}/t/TestTestRoster.cpp"
             "${MOD_PATH}/t/TestTestRunLiveJson.cpp"
+            "${MOD_PATH}/t/TestOffTankAggro.cpp"
             "${MOD_PATH}/t/TestWipeContext.cpp"
             "${MOD_PATH}/t/TestDcDiagSnapshot.cpp"
             "${MOD_PATH}/t/TestTestComp.cpp"
@@ -197,6 +198,12 @@ if (BUILD_TESTING)
             # the test TUs: the game's PCH sets NOMINMAX, this target has no PCH.
             # Empty value, same spelling and reason as above.
             target_compile_options(dungeon_clear_tests PRIVATE /DNOMINMAX=)
+            # fmt's base.h static_asserts on Unicode support unless the TU is
+            # compiled as UTF-8; the core's targets get /utf-8 by linking
+            # acore-compile-option-interface privately, so it does not reach
+            # this one. (The gcc coverage flags in the core's
+            # CMAKE_CXX_FLAGS stay: cl only warns about them, D9002.)
+            target_compile_options(dungeon_clear_tests PRIVATE /utf-8)
         endif()
 
         # Link the necessary targets

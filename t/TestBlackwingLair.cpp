@@ -785,11 +785,11 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
     // second of a freed Razorgore, and the new runner's WALK is nearly all of it.
     // Among candidates of equal rank the election therefore takes the one already
     // closest to the ledge.
-    DcRazorgore::RunnerCandidate nearRunner = Bot(90);  nearRunner.isRanged = true;  nearRunner.distToOrb = 5.0f;
+    DcRazorgore::RunnerCandidate closeRunner = Bot(90);  closeRunner.isRanged = true;  closeRunner.distToOrb = 5.0f;
     DcRazorgore::RunnerCandidate farRunner = Bot(10);   farRunner.isRanged = true;   farRunner.distToOrb = 70.0f;
-    EXPECT_EQ(DcRazorgore::SelectRunner({nearRunner, farRunner}), 0)
+    EXPECT_EQ(DcRazorgore::SelectRunner({closeRunner, farRunner}), 0)
         << "the lower GUID is 70yd away; distance decides before GUID does";
-    EXPECT_EQ(DcRazorgore::SelectRunner({farRunner, nearRunner}), 1);
+    EXPECT_EQ(DcRazorgore::SelectRunner({farRunner, closeRunner}), 1);
 
     // RANK STILL WINS OUTRIGHT. A healer standing on the orb does not displace a
     // ranged DPS across the room: losing the healer to a 90s root is how the raid

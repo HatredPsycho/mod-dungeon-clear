@@ -83,6 +83,14 @@ TEST(DcCombatPurgeRegistryTest, TheRowIsScopedToItsOwnMapAndEntry)
 // row, no spawn row, and nothing on map 604 referencing it. Rows here are claims
 // about a MECHANISM, never about a name — listing it by name-match would purge
 // combat with a creature nobody has shown can strand a party.
+// tr-20261104-102616-91: three members held for ten minutes by the
+// non-attackable Dire Maul Crystal Totem, 4/18 at the watchdog.
+TEST(DcCombatPurgeRegistryTest, DireMaulCrystalTotemMayBePurgedAndIsNeverATarget)
+{
+    EXPECT_TRUE(DcCombatPurgeRegistry::IsPurgeable(429, 13916, FIGHTING));
+    EXPECT_TRUE(DcNeverTargetRegistry::IsNeverTarget(429, 13916));
+}
+
 TEST(DcCombatPurgeRegistryTest, TheDuplicateRaiderTemplateIsNotListed)
 {
     EXPECT_FALSE(DcCombatPurgeRegistry::IsPurgeable(MAP_GUNDRAK, NPC_DRAKKARI_RAIDER_DUP, EVADING));

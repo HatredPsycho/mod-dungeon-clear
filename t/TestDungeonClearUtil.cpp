@@ -409,8 +409,10 @@ TEST_F(DungeonClearGroupTest, GroupReadyScenario)
 TEST_F(DungeonClearGroupTest, GroupNotReadyHPScenario)
 {
     members[0]->SetUInt32Value(UNIT_FIELD_HEALTH, 50); // 50% HP
+    // The fixture's members have no PlayerbotAI: they read as human players,
+    // so a low member is tagged ", player" (nothing makes a human eat).
     EXPECT_FALSE(DcPartyState::IsPartyReady(player, 90.0f, 75.0f, 30.0f));
-    EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), "Waiting on Member1 (low HP)");
+    EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), "Waiting on Member1 (low HP, player)");
 }
 
 // 3. One member has low mana
@@ -418,7 +420,7 @@ TEST_F(DungeonClearGroupTest, GroupNotReadyManaScenario)
 {
     members[1]->SetPower(POWER_MANA, 30); // 30% mana
     EXPECT_FALSE(DcPartyState::IsPartyReady(player, 90.0f, 75.0f, 30.0f));
-    EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), "Waiting on Member2 (low mana)");
+    EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), "Waiting on Member2 (low mana, player)");
 }
 
 // 4. One member is out of range
@@ -439,7 +441,7 @@ TEST_F(DungeonClearGroupTest, GroupMultipleIssuesScenario)
     EXPECT_FALSE(DcPartyState::IsPartyReady(player, 90.0f, 75.0f, 30.0f));
     
     // GroupReference iterates in LIFO order: Member3, Member2, Member1
-    std::string expected = "Waiting on Member3 (out of range), Member2 (low mana), Member1 (low HP)";
+    std::string expected = "Waiting on Member3 (out of range), Member2 (low mana, player), Member1 (low HP, player)";
     EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), expected);
 }
 
@@ -455,7 +457,7 @@ TEST_F(DungeonClearGroupTest, GroupCollapseIssuesScenario)
     EXPECT_FALSE(DcPartyState::IsPartyReady(player, 90.0f, 75.0f, 30.0f));
     
     // MAX_NAMED is 3. In LIFO order: Member4, Member3, Member2 are named, and Member1 collapses to "+1 more"
-    std::string expected = "Waiting on Member4 (low HP), Member3 (out of range), Member2 (low mana) +1 more";
+    std::string expected = "Waiting on Member4 (low HP, player), Member3 (out of range), Member2 (low mana, player) +1 more";
     EXPECT_EQ(DcPartyState::DescribePartyNotReady(player, 90.0f, 75.0f, 30.0f), expected);
 }
 

@@ -1448,6 +1448,16 @@ TEST(DungeonEventIntegrityTest, StepsOwnMovementIsConfinedToVettedEvents)
         // tank while they happen.) And Done has to yield: every island clear,
         // Varos and Urom are ground fights for the objectives and the stock engine.
         {578, 9},
+        // Sunken Temple "Awaken the Soulflayer": hook 68 walks the tank to the
+        // Sanctum centre itself (MovePoint, then a near-teleport if it stalls)
+        // and retries the altar / the egg until the encounter reads started.
+        {109, 8},
+        // Vaults of the Inquisition "Break the Deceiver's seals": the hook walks
+        // the tank seal to seal (MovePoint to the next unbroken seal).
+        {936, 1},
+        // Road to De Other Side "Offer the bodies to the Quimera Portal": the
+        // hook walks the tank body to body, then to the portal (MovePoint).
+        {937, 1},
     };
 
     for (DungeonEvent const& ev : DungeonEventRegistry::AllEvents())

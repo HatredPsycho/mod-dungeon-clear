@@ -364,6 +364,14 @@ namespace
         // matching DcCombatPurgeRegistry row).
         { 33, 36530 },  // Shadowfang Keep — [DND] Valentine Boss - Vial Bunny (immune trigger)
 
+        // --- Dire Maul West (429): the Crystal Totem --------------------------
+        //
+        // Class 1. Dire Maul Crystal Totem (13916), one spawn by the west Warpwood
+        // hall: unit_flags 770 (NON_ATTACKABLE | IMMUNE_TO_PC | IMMUNE_TO_NPC), no
+        // script. Never progress, and a fight with it cannot end (see the
+        // matching DcCombatPurgeRegistry row, tr-20261104-102616-91).
+        { 429, 13916 },  // Dire Maul West — Dire Maul Crystal Totem (non-attackable)
+
         // --- Upper Blackrock Spire (229): the Rookery Whelps ------------------
         //
         // Class 2. A Rookery Whelp (10161, level 56-57, rank 0) exists only

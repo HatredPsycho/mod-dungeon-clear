@@ -37,6 +37,33 @@ namespace
         34,     // The Stockade
         532,    // Karazhan
     };
+
+    // Stacked-floor maps (GuardsStackedFloors), measured off acore_world.creature.
+    //
+    //   33 — Shadowfang Keep. The climb from the entrance to the courtyard-door
+    //   landing (-244,2141,87) runs under the gallery: Tormented Officers 3873 at
+    //   z 97.4 over the ramp, Vile Bat 3866 / Blood Seeker 3868 / Odo the
+    //   Blindwatcher 4279 at z 100.1 and Wailing Guardsmen 3877 at z 94-95 over
+    //   the landing, and Rethilgore's hall (3914 at (-252.1,2123.1,81.2), its
+    //   Whitescalps at z 81.3) 6yd below it. The classifier read every one of them
+    //   as "another floor" and sized the landing's Whitescalp at 2 elites against
+    //   a ceiling of 2 -> LEEROY, camp none. tr-20261104-152435-131 (mythic):
+    //   fought on the landing, the gallery joined through the ceiling (LOS n,
+    //   15-22yd in 3D from the nearest member), the Guardsmen chained the keep and
+    //   Silverlaine and Razorclaw came with it — wipe on Rethilgore, 0/10 of that
+    //   series; ~3/10 of the normal series die the same way.
+    uint32 const kStackedFloorMaps[] =
+    {
+        33,     // Shadowfang Keep
+    };
+}
+
+bool RouteSweepRegistry::GuardsStackedFloors(uint32 mapId)
+{
+    for (uint32 const id : kStackedFloorMaps)
+        if (id == mapId)
+            return true;
+    return false;
 }
 
 bool RouteSweepRegistry::SweepsRoute(uint32 mapId)

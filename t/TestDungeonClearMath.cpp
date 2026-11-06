@@ -291,6 +291,54 @@ TEST(DungeonClearDynamicPullTest, DistinctFormationsDoNotUnion)
 }
 
 // ---------------------------------------------------------------------------
+// NearestOtherFloorMob — the stacked-floor guard (DcPullPlanner, map-gated by
+// RouteSweepRegistry::GuardsStackedFloors). Positions are Shadowfang Keep's
+// courtyard-door landing, off tr-20261104-152435-131; 25yd is PullCampSafeRadius.
+// ---------------------------------------------------------------------------
+namespace
+{
+    constexpr float kCampSafe = 25.0f;
+}
+
+// The landing's Whitescalp sizes as a Leeroy (the gallery is "another floor" to
+// the estimate), but the Vile Bat 13yd overhead is inside the camp radius in 3D:
+// the guard names it, and it is the nearest of the gallery mobs it could name.
+TEST(DungeonClearDynamicPullTest, StackedFloorGuardSeesTheGalleryOverTheLanding)
+{
+    std::vector<DynPullMob> mobs = {
+        {-243.0f, 2129.0f,  87.1f, false, 0u, kReach},  // 0 target: Whitescalp 3851
+        {-243.2f, 2126.9f, 100.1f, true,  0u, kReach},  // 1 Vile Bat 3866, 13.2yd
+        {-236.7f, 2146.1f, 100.1f, true,  0u, kReach},  // 2 Odo 4279, 22.4yd
+        {-252.1f, 2123.1f,  81.2f, true,  0u, kReach},  // 3 Rethilgore 3914, 12.4yd
+    };
+    EXPECT_EQ(Count(mobs, 0), 1u);  // the estimate alone: Leeroy
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 0, kCampSafe, kZTol), 3u);
+    mobs.erase(mobs.begin() + 3);
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 0, kCampSafe, kZTol), 1u);
+}
+
+// Same-floor neighbours are the estimate's business, a floor beyond the radius is
+// no threat, and the target's own formation overhead is coming anyway: none trips.
+TEST(DungeonClearDynamicPullTest, StackedFloorGuardIgnoresSameFloorFarAndPackmates)
+{
+    std::vector<DynPullMob> mobs = {
+        {0.0f,  0.0f,  0.0f, false, 7u, kReach},  // 0 target, formation 7
+        {3.0f,  0.0f,  4.0f, true,  0u, kReach},  // 1 same floor (dz 4 <= 5)
+        {0.0f, 30.0f, 12.0f, true,  0u, kReach},  // 2 another floor, 32.3yd away
+        {1.0f,  1.0f, 12.0f, true,  7u, kReach},  // 3 overhead, but formation 7
+    };
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 0, kCampSafe, kZTol),
+              mobs.size());
+    // Below counts the same as above.
+    mobs.push_back({5.0f, 0.0f, -8.0f, true, 0u, kReach});
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 0, kCampSafe, kZTol), 4u);
+    // Degenerate inputs never trip.
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 99, kCampSafe, kZTol),
+              mobs.size());
+    EXPECT_EQ(DungeonClearMath::NearestOtherFloorMob(mobs, 0, 0.0f, kZTol), mobs.size());
+}
+
+// ---------------------------------------------------------------------------
 // ShouldAbortPullForCc — the pull CC-assist grace gate.
 // ---------------------------------------------------------------------------
 using DungeonClearMath::ShouldAbortPullForCc;
@@ -3786,6 +3834,27 @@ TEST(DungeonClearSpreadGateTest, ACampTheTankLeftBehindIsStale)
     EXPECT_FALSE(DungeonClearMath::CampAnchorIsStale(maxTankGap, maxTankGap));
     // No backstop, nothing to call stale.
     EXPECT_FALSE(DungeonClearMath::CampAnchorIsStale(500.0f, 0.0f));
+}
+
+// tr-20261104-015048-22 (road heroic): the scout trail camp sits PullSetback (35)
+// behind the tank; members set at it read 25-37yd from the tank against a spread
+// of 25 and held the tank ~1726 times. BRD heroic 23/10: members beside the tank,
+// 33yd from the camp. A camp-anchored gate must pass both.
+TEST(DungeonClearPartyGateTest, CampAnchoredMemberPassesAtTheCampOrWithTheTank)
+{
+    using DungeonClearMath::MemberWithinSpreadGate;
+    float const spread = 25.0f;
+    float const gap = 25.0f + 55.0f;   // heroic: spread + max(PullSetback, PullMaxDrag)
+    EXPECT_TRUE(MemberWithinSpreadGate(35.0f, 2.0f, spread, gap));    // set at the trail camp
+    EXPECT_TRUE(MemberWithinSpreadGate(0.0f, 33.0f, spread, gap));    // standing with the tank
+    EXPECT_TRUE(MemberWithinSpreadGate(25.0f, 25.0f, spread, gap));   // both edges inclusive
+    EXPECT_FALSE(MemberWithinSpreadGate(30.0f, 26.0f, spread, gap));  // neither: still waited on
+    // The backstop wins over the camp: a stale camp at the member's feet.
+    EXPECT_FALSE(MemberWithinSpreadGate(81.0f, 0.0f, spread, gap));
+    // Tank-anchored (no camp): the plain catch-up test, unchanged.
+    EXPECT_TRUE(MemberWithinSpreadGate(25.0f, -1.0f, spread, 0.0f));
+    EXPECT_FALSE(MemberWithinSpreadGate(26.0f, -1.0f, spread, 0.0f));
+    EXPECT_FALSE(MemberWithinSpreadGate(26.0f, -1.0f, spread, gap));
 }
 
 // tr-20261018-230400-9: the fight carried the tank 22yd from a sleeping Emperor

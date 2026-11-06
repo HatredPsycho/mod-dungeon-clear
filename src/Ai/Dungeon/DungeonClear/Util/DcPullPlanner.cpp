@@ -61,6 +61,7 @@
 #include "World.h"
 #include "Ai/Dungeon/DungeonClear/Data/DungeonBossInfo.h"
 #include "Ai/Dungeon/DungeonClear/Data/RoomAggroRegistry.h"
+#include "Ai/Dungeon/DungeonClear/Data/RouteSweepRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Util/ChunkedPathfinder.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcEngageGeometry.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPullDecision.h"
@@ -525,7 +526,38 @@ bool DcPullPlanner::ClassifyPullAdvanced(PlayerbotAI* botAI, Unit* target,
     // scaled to the same thirds unit, so a room of weak normal trash no longer
     // forces a cautious Advanced pull while an elite pack still does.
     uint32 const ceilingThirds = maxLeeroy * 3;
-    bool const advanced = weightThirds > ceilingThirds;
+    bool advanced = weightThirds > ceilingThirds;
+
+    // STACKED FLOORS. The estimate drops every mob more than DC_Z_LEVEL_TOLERANCE
+    // above or below the target — right for proximity aggro, wrong for the fight:
+    // a Leeroy fights AT the target, and the camp placer (3D since 4cf13d4) would
+    // reject that very spot for a pack overhead within its safe radius. So on a
+    // stacked-floor map, a hostile on another floor inside the camp's 3D safe
+    // radius makes the in-place fight unsafe whatever the pack weighs: upgrade to
+    // Advanced and let ComputeSafeCamp drag the pack out from under the gallery.
+    // Live: tr-20261104-152435-131 (Shadowfang Keep, mythic), the landing's
+    // Whitescalp sized 2 elites vs ceiling 2 -> LEEROY, camp none; fought on the
+    // landing with Vile Bat 13yd overhead and Odo 22yd, the gallery and then the
+    // keep joined. Map-gated (RouteSweepRegistry::GuardsStackedFloors) because a
+    // global rule would force the full pull FSM on every ramp in every dungeon.
+    if (!advanced && RouteSweepRegistry::GuardsStackedFloors(bot->GetMapId()))
+    {
+        float const safeRadius = DcSettings::GetFloat(bot, "PullCampSafeRadius");
+        std::size_t const over = DungeonClearMath::NearestOtherFloorMob(
+            mobs, targetIdx, safeRadius, DC_Z_LEVEL_TOLERANCE);
+        if (over < mobs.size())
+        {
+            advanced = true;
+            Unit* const u = hostiles[over];
+            DC_PULL_DEBUG("[DC:{}] dynamic: {} (entry {}) on another floor ({:+.1f}m) "
+                          "{:.1f}yd from target {} in 3D, inside the {:.0f}yd camp "
+                          "radius -> stacked floors, no fight in place",
+                          bot->GetName(), u->GetName(), u->GetEntry(),
+                          u->GetPositionZ() - target->GetPositionZ(),
+                          target->GetExactDist(u), target->GetGUID().ToString(),
+                          safeRadius);
+        }
+    }
 
     // Patrol-wait detail (only when the caller asks for it AND a lone patroller is
     // actually present, so the second O(n^2) pass is skipped otherwise): re-run the
