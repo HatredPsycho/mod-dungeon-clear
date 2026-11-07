@@ -175,6 +175,20 @@ EventBuilder& EventBuilder::WaitTargetStill()
     return *this;
 }
 
+EventBuilder& EventBuilder::StartsEncounter()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().startsEncounter = EncounterStartFlag::Yes;
+    return *this;
+}
+
+EventBuilder& EventBuilder::NoEncounterStart()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().startsEncounter = EncounterStartFlag::No;
+    return *this;
+}
+
 EventBuilder& EventBuilder::ReportUse()
 {
     if (!_ev.steps.empty())

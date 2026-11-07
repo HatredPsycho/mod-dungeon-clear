@@ -81,7 +81,7 @@ void RegisterRazorfenDownsEvents(std::vector<DungeonEvent>& out)
                       // searchRadius must cover condition 4's ring range (30yd)
                       // so a tank parked at the far edge still finds the gong and
                       // HopTos the last yards to Use() it.
-                      .UseGO(/*gong*/ 148917, /*searchRadius*/ 35.0f)
+                      .UseGO(/*gong*/ 148917, /*searchRadius*/ 35.0f).StartsEncounter()
                       .Build());
 
     out.push_back(EventBuilder(129, 2, "Approach Tuten'kash")

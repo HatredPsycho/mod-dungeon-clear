@@ -95,7 +95,7 @@ void RegisterZulGurubEvents(std::vector<DungeonEvent>& out)
                       .Conditional(&ArlokkGongDue)
                       .Repeatable()
                       .PanelBeforeBoss(kArlokk)
-                      .UseGO(kGongOfBethekk, kGongSearch)
+                      .UseGO(kGongOfBethekk, kGongSearch).StartsEncounter()
                       .Build());
 }
 
