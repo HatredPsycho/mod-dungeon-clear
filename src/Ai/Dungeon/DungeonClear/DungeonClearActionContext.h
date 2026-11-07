@@ -12,6 +12,7 @@
 #include "Ai/Dungeon/DungeonClear/Action/DungeonClearActions.h"
 #include "Ai/Dungeon/DungeonClear/Action/DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Action/StayDeadAction.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
 class DungeonClearActionContext : public NamedObjectContext<Action>
 {
