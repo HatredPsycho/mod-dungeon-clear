@@ -80,6 +80,7 @@ if (BUILD_TESTING)
             "${MOD_PATH}/t/TestBagRoom.cpp"
             "${MOD_PATH}/t/TestRunTravelGuard.cpp"
             "${MOD_PATH}/t/TestSmartRest.cpp"
+            "${MOD_PATH}/t/TestPlayerLed.cpp"
             "${MOD_PATH}/t/TestPostCombatRez.cpp"
             "${MOD_PATH}/t/TestStrandedRecovery.cpp"
             "${MOD_PATH}/t/TestFightInPlace.cpp"

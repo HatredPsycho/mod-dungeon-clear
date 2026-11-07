@@ -18,6 +18,7 @@
 #include "Position.h"
 #include "ReachTargetActions.h"
 #include "Ai/Dungeon/DungeonClear/Data/Events/DungeonEventTables.h"
+#include "Ai/Dungeon/DungeonClear/Data/RoomAggroRegistry.h"
 #include "Ai/Dungeon/DungeonClear/DcPullContext.h"
 #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
@@ -25,6 +26,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcFlightLeg.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLyceumCloseUpDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcOculusPlan.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcSmartRest.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearUtil.h"
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
@@ -283,7 +285,28 @@ static bool ChaseWakesSleepingRoomBoss(Player* bot, AiObjectContext* context, Ac
         return false;
     PlayerbotAI* tankAI = GET_PLAYERBOT_AI(tank);
     if (!tankAI)
-        return false;  // a real-player tank runs no room clear
+    {
+        // A human Main Tank leading (player-led) runs no room clear and no run
+        // names the next boss, but the stock chasers can still carry a trash
+        // fight onto a sleeping room boss. Guard every flagged boss of the map
+        // that is alive and not yet engaged: the player wakes it when HE pulls.
+        Unit* const target = context->GetValue<Unit*>(targetName)->Get();
+        if (!target)
+            return false;
+        for (RoomAggroBoss const* row : RoomAggroRegistry::ForMap(bot->GetMapId()))
+        {
+            Creature* const boss = bot->FindNearestCreature(row->bossEntry, 150.0f, true);
+            if (!boss || boss == target || boss->IsInCombat())
+                continue;
+            float const chaseEnd = DungeonClearMath::ChaseEndToBoss(
+                bot->GetPositionX(), bot->GetPositionY(), target->GetPositionX(), target->GetPositionY(),
+                boss->GetPositionX(), boss->GetPositionY(), range);
+            if (DungeonClearMath::ChaseWakesSleepingBoss(
+                    chaseEnd, DcEngageGeometry::RoomAggroSphereRadius(bot, boss), false))
+                return true;
+        }
+        return false;
+    }
     AiObjectContext* tankCtx = tankAI->GetAiObjectContext();
     if (!DcTargeting::IsRoomClearActive(tank, tankCtx))
         return false;
@@ -342,7 +365,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // target BELOW the stock stop is honoured too. 0 = inherit, no cap.
     if (name == "food" || name == "drink")
     {
-        if (Player* tank = AI_VALUE(Player*, DcKey::PartyTank))
+        // A human leading with the Main Tank bar rests the party himself: no run,
+        // so no Smart Rest latch to wait on and no run rest target to cap at.
+        Player* tank = AI_VALUE(Player*, DcKey::PartyTank);
+        if (tank && !DcPlayerLed::IsHumanTank(tank))
         {
             // Smart Rest hysteresis: between rests eating/drinking is FULLY
             // suppressed (the stock medium-health/high-mana triggers included)
@@ -377,9 +403,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // the whole run on its mana. DC's own positioning decides where everyone
     // stands; drop the shuffle for every member of an active run (same
     // cross-bot gate as the rest cap above).
-    if (name == "move out of collision" &&
-        AI_VALUE(Player*, DcKey::PartyTank))
-        return 0.0f;
+    // Player-led: no DC pin to fight with, stock follow places the party.
+    if (name == "move out of collision")
+        if (Player* tank = AI_VALUE(Player*, DcKey::PartyTank); tank && !DcPlayerLed::IsHumanTank(tank))
+            return 0.0f;
 
     // Blink / Disengage leap a fixed distance straight away from the bot's target
     // and land it in whatever pack is behind — see DcEscapeLeap. Every member of an
@@ -489,9 +516,13 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // subsumes the tank-rubberband guard that used to live in the active branch).
     // DC's own follow-tank redirect is a DcMovementAction, not a FollowAction, so
     // this never touches it. When paused/off PartyTank is null and stock follow
-    // resumes (a paused run hands positioning back to the player).
-    if (dynamic_cast<FollowAction*>(action) && AI_VALUE(Player*, DcKey::PartyTank))
-        return 0.0f;
+    // resumes (a paused run hands positioning back to the player). Player-led
+    // (the party tank is the human Main Tank, who is also the bots' master):
+    // stock follow-master IS following the tank, and it is the only follow there
+    // is — DC's follow-tank stands down for a human — so it must stay.
+    if (dynamic_cast<FollowAction*>(action))
+        if (Player* tank = AI_VALUE(Player*, DcKey::PartyTank); tank && !DcPlayerLed::IsHumanTank(tank))
+            return 0.0f;
 
     bool const enabled = DcRun::Of(context).enabled;
     bool const paused = DcRun::Of(context).paused;

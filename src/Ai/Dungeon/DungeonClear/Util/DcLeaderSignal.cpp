@@ -9,6 +9,7 @@
 #include "DungeonClearMath.h"
 #include "DungeonClearTuning.h"
 #include "DcZoneLine.h"
+#include "DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonEventExecutor.h"
 #include <algorithm>
@@ -990,7 +991,11 @@ void DcLeaderSignal::NoteLeaderHit(Player* attacker)
         return;
     PlayerbotAI* ai = GET_PLAYERBOT_AI(attacker);
     if (!ai)
+    {
+        // A human: only a Main Tank leading (player-led) has a lead clock.
+        DcPlayerLed::NoteHit(attacker);
         return;
+    }
     DcRunState& run = DcRun::Of(ai);
     // `enabled` is leader-owned: followers never set it, so this is the leader.
     if (!run.enabled || run.paused)
@@ -1005,9 +1010,14 @@ void DcLeaderSignal::NoteLeaderHit(Player* attacker)
 
 void DcLeaderSignal::NoteLeaderEnterCombat(Player* player)
 {
-    PlayerbotAI* ai = player ? GET_PLAYERBOT_AI(player) : nullptr;
-    if (!ai)
+    if (!player)
         return;
+    PlayerbotAI* ai = GET_PLAYERBOT_AI(player);
+    if (!ai)
+    {
+        DcPlayerLed::NoteEnterCombat(player);  // no-op unless he is a Main Tank
+        return;
+    }
     DcRunState& run = DcRun::Of(ai);
     if (!run.enabled)
         return;  // leader-owned flag: only the DC leader is stamped
@@ -1021,14 +1031,29 @@ bool DcLeaderSignal::ShouldHoldDpsDamage(Player* bot)
     if (!bot || !bot->IsAlive())
         return false;
     Player* leader = FindLeaderTank(bot);
-    if (!leader || leader == bot)
-        return false;
-    PlayerbotAI* leaderAI = GET_PLAYERBOT_AI(leader);
-    if (!leaderAI)
+    PlayerbotAI* leaderAI = leader ? GET_PLAYERBOT_AI(leader) : nullptr;
+    if (!leaderAI || !DcRun::Of(leaderAI).enabled || DcRun::Of(leaderAI).paused)
+    {
+        // No run drives: a human Main Tank leading gets the same lead, measured
+        // on his own clock. Out of combat, or in combat without a hit for
+        // DC_THREAT_LEAD_NO_HIT_CAP_MS (he waits while an off-tank pulls), the
+        // DPS are released — the kernel's no-hit cap.
+        Player* human = DcPlayerLed::Leader(bot);
+        if (!human || human == bot)
+            return false;
+        uint32 since = 0;
+        uint32 firstHit = 0;
+        DcPlayerLed::CombatStamps(human, since, firstHit);
+        if (since == 0)
+            return false;
+        return DungeonClearMath::ShouldHoldThreatLead(
+            PlayerbotAI::IsTank(bot), !bot->getAttackers().empty(), since, firstHit, getMSTime(),
+            uint32(DcSettings::GetFloat(bot, "PullPlayerReleaseDelay") * 1000.0f), DC_THREAT_LEAD_NO_HIT_CAP_MS,
+            human->GetHealthPct(), DcSettings::GetFloat(bot, "PullThreatLeadPanicHp"));
+    }
+    if (leader == bot)
         return false;
     DcRunState& run = DcRun::Of(leaderAI);
-    if (!run.enabled || run.paused)
-        return false;
     uint32 const since = LeaderCombatSince(leader);
     uint32 firstHit = run.leaderFirstHitMs;
     if (firstHit != 0 && firstHit < since)

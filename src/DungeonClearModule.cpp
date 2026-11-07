@@ -74,6 +74,7 @@
 #include "DcStrategyGate.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
@@ -328,7 +329,8 @@ public:
     DungeonClearLoginPlayerScript()
         : PlayerScript("DungeonClearLoginPlayerScript", {
             PLAYERHOOK_ON_LOGIN,
-            PLAYERHOOK_ON_MAP_CHANGED
+            PLAYERHOOK_ON_MAP_CHANGED,
+            PLAYERHOOK_ON_LOGOUT
         }) {}
 
     // Both drivers go through DcStrategyGate::Reconcile, which is itself gated
@@ -343,6 +345,12 @@ public:
     {
         DcStrategyGate::Reconcile(player);
         DcStrategyGate::ApplyEntryDefaults(player);
+        DcPlayerLed::Forget(player);  // a Main Tank's lead clock belongs to the map he left
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        DcPlayerLed::Forget(player);
     }
 };
 

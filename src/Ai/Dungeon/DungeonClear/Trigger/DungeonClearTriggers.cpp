@@ -40,6 +40,8 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcNoStopZone.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPartyState.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRegroupDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRaidMuster.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRezRecovery.h"
@@ -1079,8 +1081,10 @@ bool DungeonClearFollowTankTrigger::IsActive()
     // `tank != bot` guard below excludes only the leader (it doesn't follow
     // itself); a non-leader tank follows the leader out of combat just like any
     // DPS, then peels off to help tank once it enters combat (checked above).
+    // A human Main Tank (player-led) is followed by stock follow-master instead:
+    // he is the bots' master, and his own "stay" / placement orders must hold.
     Player* tank = AI_VALUE(Player*, DcKey::PartyTank);
-    if (tank && tank != bot)
+    if (tank && tank != bot && !DcPlayerLed::IsHumanTank(tank))
     {
         // No distance gate: while DC is active on the tank, the follow-tank
         // action runs every non-combat tick. MovementAction::Follow yields a
@@ -1944,7 +1948,8 @@ bool DungeonClearBreakStuckCombatTrigger::IsActive()
     // PartyTank resolves to the elected leader (or the leader itself); null means DC
     // is off, paused, or this bot isn't in a DC party — in all three we leave the
     // core combat state alone (a paused run is a deliberate hand-off to the player).
-    if (!AI_VALUE(Player*, DcKey::PartyTank))
+    // Player-led counts as no run here: the human decides his own fights.
+    if (Player* runTank = AI_VALUE(Player*, DcKey::PartyTank); !runTank || DcPlayerLed::IsHumanTank(runTank))
     {
         stuckCombatSinceMs = 0;
         holderCloseWatch.Reset();
@@ -2035,6 +2040,11 @@ bool DungeonClearRegroupCombatTrigger::IsActive()
     // regroup on. The leader itself never regroups on anyone — it drives.
     Player* tank = AI_VALUE(Player*, DcKey::PartyTank);
     if (!tank || tank == bot || tank->GetMapId() != bot->GetMapId())
+        return standDown();
+    // Player-led: the bot tanks are the player's off-tanks and stand where his
+    // orders put them (CoaTankAction placement); never drag them to his side.
+    if (DcPlayerLed::IsHumanTank(tank) &&
+        !DcPlayerLedDecision::MayRegroupOnPlayer(PlayerbotAI::IsTank(bot)))
         return standDown();
 
     // Hand all advanced-pull camp positioning to the camp/assist actions: while
