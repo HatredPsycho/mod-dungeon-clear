@@ -13,6 +13,8 @@ using DcPlayerLedDecision::Inputs;
 using DcPlayerLedDecision::IsPlayerLed;
 using DcPlayerLedDecision::ChoosePartyTank;
 using DcPlayerLedDecision::MemberRungApplies;
+using DcPlayerLedDecision::ModuleProvide;
+using DcPlayerLedDecision::ProvideToModule;
 using DcPlayerLedDecision::PartyTankSource;
 using DcPlayerLedDecision::RungsFor;
 
@@ -158,4 +160,19 @@ TEST(DcPlayerLed, ThreatLeadReleasesWithoutAPlayerHit)
     EXPECT_FALSE(DungeonClearMath::ShouldHoldThreatLead(false, true, since, 0, since + 100, lead, cap, 100.f, 30.f));
     // The player in danger: released.
     EXPECT_FALSE(DungeonClearMath::ShouldHoldThreatLead(false, false, since, 0, since + 100, lead, cap, 20.f, 30.f));
+}
+
+// The module's provider (CoaGroupTank): DC disabled hands nothing and reads no
+// DC state at all (no values are registered then: a read would crash); a paused
+// run still counts as "in a DC run", so the module's copies of the guards DC
+// still runs stay quiet exactly as DC's own do in 2.9.4.
+TEST(DcPlayerLed, ModuleProviderNeverReadsADisabledDc)
+{
+    for (bool tank : {false, true})
+        for (bool run : {false, true})
+            EXPECT_EQ(ProvideToModule(false, tank, run), ModuleProvide::Nothing);
+    EXPECT_EQ(ProvideToModule(true, true, true), ModuleProvide::PartyTank);
+    EXPECT_EQ(ProvideToModule(true, true, false), ModuleProvide::PartyTank);
+    EXPECT_EQ(ProvideToModule(true, false, true), ModuleProvide::RunOwner);   // paused run
+    EXPECT_EQ(ProvideToModule(true, false, false), ModuleProvide::Nothing);
 }

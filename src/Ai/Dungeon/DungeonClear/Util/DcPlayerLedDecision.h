@@ -89,6 +89,27 @@ namespace DcPlayerLedDecision
         return !(tankIsHuman && botIsTank);
     }
 
+    // What DC hands the playerbots module as "the DC run leader of this member"
+    // (CoaGroupTank provider), which decides whether the module's guards that DC
+    // still runs itself stand down. DC disabled (DungeonClear.Enable = 0): never
+    // anything — DC registers no values then and must not be read at all. A run
+    // that exists counts even while PAUSED, so a pause hands the party back
+    // exactly as in 2.9.4 instead of waking the module's copy of a guard DC
+    // still runs (DC's own ground-hazard guard ignores pause).
+    enum class ModuleProvide
+    {
+        Nothing,
+        PartyTank,  // the live run's leader, or the player-led Main Tank
+        RunOwner    // a run exists but drives nothing right now (paused / leader dead)
+    };
+    constexpr ModuleProvide ProvideToModule(bool dcEnabled, bool partyTankKnown, bool runExists)
+    {
+        return !dcEnabled ? ModuleProvide::Nothing
+             : partyTankKnown ? ModuleProvide::PartyTank
+             : runExists ? ModuleProvide::RunOwner
+                         : ModuleProvide::Nothing;
+    }
+
     // Threat-lead clock on the player's side, kept per player. `combatSinceMs`
     // is the player's 0->1 combat stamp, `firstHitMs` his first damage on a
     // non-player since then (0 = none yet). Returns the first-hit stamp the

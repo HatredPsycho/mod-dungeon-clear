@@ -75,6 +75,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 
 // The combat guards that move from Dungeon Clear to the playerbots module (07/11:
 // "DC is the autorun in the dungeon, the strategies are in playerbots"). On a
@@ -1050,11 +1051,33 @@ namespace
         // The reference tank of a member in a DC run, or of a player-led party:
         // exactly what DC's party-tank value resolves (DcPlayerLed::PartyTankFor),
         // so the module's guards and DC's rungs always agree on the tank.
+        // Read from the map threads for every member the module asks about: gated
+        // on DcModule::IsEnabled() first (an atomic), because with DC disabled no
+        // DC value is registered and the run-state reads below would crash.
         CoaGroupTank::SetProvider([](Player const* member) -> Player*
-                                  { return DcPlayerLed::PartyTankFor(const_cast<Player*>(member)); });
+        {
+            Player* const m = const_cast<Player*>(member);
+            if (!DcModule::IsEnabled() || !m)
+                return nullptr;
+            Player* const tank = DcPlayerLed::PartyTankFor(m);
+            Player* const owner = tank ? nullptr : DcLeaderSignal::FindRunOwner(m);
+            switch (DcPlayerLedDecision::ProvideToModule(true, tank != nullptr, owner != nullptr))
+            {
+                case DcPlayerLedDecision::ModuleProvide::PartyTank:
+                    return tank;
+                case DcPlayerLedDecision::ModuleProvide::RunOwner:
+                    return owner;
+                default:
+                    return nullptr;
+            }
+        });
         // The NPC an event of the run is escorting, for the module's healers.
         CoaHealEscort::SetProvider([](Player const* member) -> Unit*
-                                   { return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member)); });
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return nullptr;
+            return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member));
+        });
         for (char const* guard : kGuardsStillInDungeonClear)
             CoaGroupTank::SetHandledByDungeonClear(guard, true);
 #endif
