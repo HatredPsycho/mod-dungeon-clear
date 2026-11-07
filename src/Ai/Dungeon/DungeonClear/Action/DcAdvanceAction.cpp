@@ -70,6 +70,15 @@ using namespace DcActionShared;
 
 namespace
 {
+    // The cached route was built for the anchor the run targets now. Right after an
+    // objective completes, the route still belongs to the previous one until the
+    // next rebuild (see the blocking-door value's same test); its points then say
+    // nothing about where the tank should stand.
+    bool RouteIsForCurrentTarget(DcApproachState const* appr, DungeonBossInfo const* next)
+    {
+        return appr && next && appr->longPathTargetEntry == next->entry;
+    }
+
     // MoveTo-returned-false counter. Raised from 2 to 8 because dedup
     // (IsDuplicateMove returning true while the bot is making real progress
     // on the prior move) was tripping the original threshold during normal
@@ -1991,8 +2000,16 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoOffLineRejoin(Advan
     // the rejoin would path from the hole and the next rebuild re-plans from down
     // there, on a layer under the street (Stratholme, Timmy: 65yd under the route at
     // (3603,-3333), three runs on 31/10). Same cure as the stranded-cursor case.
+    //
+    // Only on a route built for the CURRENT target. Right after a deliberate drop
+    // (Wailing Caverns' hole behind Verdan, a DropInHole step) the next objective
+    // is already the one below while the cached route still runs along the lip
+    // above: that is not a fall, it is the drop working. Teleporting "back" put
+    // the tank on the upper tier with no way down to the Disciple, the party was
+    // then rescued up to it, and the escort never started (tr-20261107-120812-102;
+    // WC's no_progress at the escort since 28/10).
     if (DungeonPathFollower::FellThroughFloor(bot->GetPositionZ(), hop.point.z) &&
-        !bot->GetVehicle() && DC_ALLOW_RECOVERY_MOVES)
+        !bot->GetVehicle() && DC_ALLOW_RECOVERY_MOVES && RouteIsForCurrentTarget(st.appr, st.next))
     {
         LOG_WARN("playerbots.dungeonclear",
                  "[DC:{}] fell through the floor: {:.1f}yd under route point "
@@ -2635,7 +2652,7 @@ bool DungeonClearAdvanceAction::Execute(Event /*event*/)
             // Put the tank back on the walked point it fell from; the stranded-member
             // recovery brings the party up to it.
             if (DungeonPathFollower::FellThroughFloor(bot->GetPositionZ(), skipped.z) &&
-                !bot->GetVehicle())
+                !bot->GetVehicle() && RouteIsForCurrentTarget(st.appr, st.next))
             {
                 LOG_WARN("playerbots.dungeonclear",
                          "[DC:{}] fell through the floor: {:.1f}yd under route point "
