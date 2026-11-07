@@ -81,9 +81,10 @@ Player* DcPlayerLed::Leader(Player* bot)
     // so these reads stay on this map's thread.
     in.playerAlive = flagged->IsAlive();
     in.playerHuman = IsHumanTank(flagged);
-    // Only the run owner ON THIS MAP is seen (FindRunOwner scans this map): a
-    // run whose bot tank left the map drives nothing here, which is what the
-    // followers already fall back from today. No cross-map read is made for it.
+    // Only the run owner IN THIS INSTANCE is seen (FindRunOwner reads members on
+    // this very Map object only): a run whose bot tank left the instance drives
+    // nothing here, which is what the followers already fall back from today.
+    // No other map's state is read for it.
     in.dcRunOwned = DcLeaderSignal::FindRunOwner(bot) != nullptr;
     return DcPlayerLedDecision::IsPlayerLed(in) ? flagged : nullptr;
 #else

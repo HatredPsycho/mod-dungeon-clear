@@ -487,8 +487,11 @@ Player* DcLeaderSignal::FindRunOwner(Player* bot)
 
     for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
     {
+        // Same Map OBJECT, not the same map id: two copies of one dungeon are two
+        // maps updated on two threads, and `owns` reads the member's AI state —
+        // only a member of this very instance may be read from this thread.
         Player* member = ref->GetSource();
-        if (!member || member->GetMapId() != bot->GetMapId())
+        if (!member || !member->IsInWorld() || member->GetMap() != bot->GetMap())
             continue;
         if (owns(member))
             return member;
