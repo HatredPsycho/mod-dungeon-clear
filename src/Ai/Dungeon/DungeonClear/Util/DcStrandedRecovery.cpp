@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "AiObjectContext.h"
+#include "GridTerrainData.h"
 #include "Group.h"
 #include "InstanceScript.h"
 #include "Log.h"
@@ -57,6 +58,15 @@ namespace
     // (Arcatraz heroic, tr-20260801-194932-20: followers parked 30yd back for 15
     // minutes, run killed by the no-progress watchdog). A real fight still blocks
     // the teleport and still counts as progress — that is what engagement means.
+    // In contact with lava or slime (the liquids that burn), as the core's own
+    // environmental-damage update reads it (Player::UpdateUnderwaterState).
+    bool InMagma(Player const* p)
+    {
+        LiquidData const& liquid = p->GetLiquidData();
+        return (liquid.Flags & (MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME)) != 0 &&
+               (liquid.Status & MAP_LIQUID_STATUS_IN_CONTACT) != 0;
+    }
+
     void BuildSnapshot(Player* anchor, Position const* camp,
                        std::vector<DcStrandedDecision::Member>& out, bool& partyEngaged)
     {
@@ -84,6 +94,7 @@ namespace
             m.isTank = member == anchor;
             m.distToTank = anchor->GetDistance(member);
             m.distToGate = camp ? member->GetDistance(*camp) : -1.0f;
+            m.inMagma = InMagma(member);
             out.push_back(m);
         }
     }
@@ -278,6 +289,7 @@ namespace DcStrandedRecovery
         in.partyEngaged = partyEngaged;
         in.maxSpread = bounds.maxSpread;
         in.gateSpread = bounds.campSpread;
+        in.anchorInMagma = InMagma(driver.anchor);
 
         return DcStrandedDecision::Decide(in, members).recover;
     }
@@ -328,8 +340,11 @@ namespace DcStrandedRecovery
                 continue;
             float const strandedDist = leader->GetDistance(member);
             float const campDist = bounds.camp ? member->GetDistance(*bounds.camp) : -1.0f;
-            if (!DcStrandedDecision::IsStranded(strandedDist, campDist, bounds.maxSpread,
-                                                bounds.campSpread))
+            // Lava: lifted whatever the distance (see DcStrandedDecision::Decide),
+            // never onto a tank that stands in it too.
+            bool const lava = InMagma(member) && !InMagma(leader);
+            if (!lava && !DcStrandedDecision::IsStranded(strandedDist, campDist, bounds.maxSpread,
+                                                         bounds.campSpread))
                 continue;                       // in range — not stranded
 
             // Fan the strays out a little around the tank so they don't stack on
@@ -346,10 +361,11 @@ namespace DcStrandedRecovery
             ++moved;
 
             LOG_INFO("playerbots.dungeonclear",
-                     "[DC:{}] stranded-recovery: no progress past the timeout with {} out of "
-                     "range ({:.0f}yd from the tank / {:.0f}; {:.0f}yd from the camp / {:.0f}) "
-                     "-> teleported to the {}",
-                     leader->GetName(), member->GetName(), strandedDist, bounds.maxSpread,
+                     "[DC:{}] stranded-recovery: {} {} ({:.0f}yd from the tank / {:.0f}; "
+                     "{:.0f}yd from the camp / {:.0f}) -> teleported to the {}",
+                     leader->GetName(), member->GetName(),
+                     lava ? "standing in lava" : "out of range past the no-progress timeout",
+                     strandedDist, bounds.maxSpread,
                      campDist, bounds.campSpread,
                      leader->isDead() ? "tank's corpse (driver " + bot->GetName() + ")"
                                       : "tank");

@@ -89,6 +89,7 @@ namespace DcStrandedDecision
         bool  isTank = false;      // the reference we teleport TO; never itself moved
         float distToTank = 0.0f;   // tank->GetDistance(member)
         float distToGate = -1.0f;  // member->GetDistance(camp) when the gate is camp-anchored; < 0 = n/a
+        bool  inMagma = false;     // standing in lava/slime (MAP_LIQUID_TYPE_MAGMA|SLIME, in contact)
     };
 
     struct Inputs
@@ -100,6 +101,7 @@ namespace DcStrandedDecision
         bool          partyEngaged = false;      // a real fight (not the bare flag)
         float         maxSpread = 25.0f;          // out-of-range threshold; see RescueSpread
         float         gateSpread = 0.0f;          // camp-anchored gate's own spread; 0 = no camp test
+        bool          anchorInMagma = false;      // the tank itself stands in lava: no safe landing
     };
 
     struct Result
@@ -166,6 +168,29 @@ namespace DcStrandedDecision
 
         if (!in.enabled || in.partyEngaged)
             return r;
+
+        // LAVA FIRST, with no clock. A bot standing in lava out of a fight dies in
+        // seconds, so the no-progress window below would only ever see its corpse.
+        // The usual case is a member resurrected where it died: Taragaman's
+        // Uppercut throws people into the Ragefire pit, the rez raises them in the
+        // lava, they die again before walking out, and the run disables itself on
+        // "keeps dying again after each resurrection" (4 of 20 RFC on the NUC,
+        // 07/11). Lift them onto the tank instead. Never when the tank is in it too:
+        // there is no safe ground to land on.
+        if (!in.anchorInMagma)
+        {
+            for (std::size_t i = 0; i < members.size(); ++i)
+            {
+                Member const& m = members[i];
+                if (!m.isTank && m.isBot && m.isAlive && m.onMap && m.inMagma)
+                    r.strandedIdx.push_back(static_cast<int>(i));
+            }
+            if (!r.strandedIdx.empty())
+            {
+                r.recover = true;
+                return r;
+            }
+        }
 
         // Clock must be armed (a run underway) and the timeout enabled.
         if (in.lastProgressMs == 0 || in.noProgressTimeoutMs == 0)

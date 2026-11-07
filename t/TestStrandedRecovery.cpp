@@ -361,3 +361,65 @@ TEST(DcStrandedRecoveryTest, TrailCampMustHoldTheRescuedMembers)
     EXPECT_TRUE(TrailCampHoldsTheRescue(40.0f, 0.0f));      // tank-anchored: no camp test
     EXPECT_TRUE(TrailCampHoldsTheRescue(40.0f, 100000.0f)); // waived gate
 }
+
+// --- lava: no clock, no distance ---------------------------------------------
+// A bot resurrected in the Ragefire pit dies again before any no-progress window
+// can elapse (RFC, 07/11: four runs disabled on "keeps dying again after each
+// resurrection"). It is lifted at once, wherever it stands.
+
+namespace
+{
+    // Clock armed and FRESH: progress a second ago, the window far from elapsed.
+    Inputs FreshInputs()
+    {
+        Inputs in = StaleInputs();
+        in.lastProgressMs = in.nowMs - 1000;
+        return in;
+    }
+}
+
+TEST(DcStrandedRecoveryTest, BotInLavaRecoversAtOnceInRange)
+{
+    std::vector<Member> party = BaseParty();
+    party[1].inMagma = true;  // healer, 5yd away, standing in the pit
+    Result const r = Decide(FreshInputs(), party);
+    ASSERT_TRUE(r.recover);
+    ASSERT_EQ(r.strandedIdx.size(), 1u);
+    EXPECT_EQ(r.strandedIdx[0], 1);
+}
+
+TEST(DcStrandedRecoveryTest, LavaNeverWhileTheTankStandsInItToo)
+{
+    std::vector<Member> party = BaseParty();
+    party[1].inMagma = true;
+    Inputs in = FreshInputs();
+    in.anchorInMagma = true;  // no safe ground to land on
+    EXPECT_FALSE(Decide(in, party).recover);
+}
+
+TEST(DcStrandedRecoveryTest, LavaNeverDuringAFight)
+{
+    std::vector<Member> party = BaseParty();
+    party[2].inMagma = true;
+    Inputs in = FreshInputs();
+    in.partyEngaged = true;  // a teleport mid-fight would yank a fighter out
+    EXPECT_FALSE(Decide(in, party).recover);
+}
+
+TEST(DcStrandedRecoveryTest, LavaOnlyLiftsLivingBots)
+{
+    std::vector<Member> party = BaseParty();
+    party[1].inMagma = true;
+    party[1].isAlive = false;  // a corpse is the rez recovery's job
+    party[2].inMagma = true;
+    party[2].isBot = false;    // a human is never relocated
+    EXPECT_FALSE(Decide(FreshInputs(), party).recover);
+}
+
+TEST(DcStrandedRecoveryTest, NoLavaKeepsTheClock)
+{
+    // Nobody in lava, window fresh: unchanged, no rescue.
+    std::vector<Member> party = BaseParty();
+    Strand(party, 2, 60.0f);
+    EXPECT_FALSE(Decide(FreshInputs(), party).recover);
+}
