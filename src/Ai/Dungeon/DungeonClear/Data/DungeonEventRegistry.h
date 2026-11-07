@@ -281,6 +281,19 @@ struct EventStep
     // failing. For a pre-clear whose leftovers the next steps can live with —
     // the step that follows is what actually does the job (Uldaman's keystone).
     bool   continueOnTimeout{false};
+
+    // KillCreature-engage only. When the creature is alive but the engage walk-in
+    // finds no route to it (it sits in water, on a ledge, behind its own scripted
+    // walk), keep HOLDING and driving the step instead of yielding the tick, so the
+    // step timeout still runs. Pair with Timeout() + ContinueOnTimeout() for an
+    // OPTIONAL kill the run must not deadlock on.
+    //
+    // Without it the objective action returns false on an unreachable target, the
+    // executor never runs (no timeout), and a started persistent event also stands
+    // Advance down ("a pull-owning event is driving"): nothing moves the run again.
+    // Live: tr-20261107-093349-42, Zul'Farrak, 7/7 bosses dead, Gahz'rilla up in the
+    // sacred pool and unreachable, the tank parked 31yd off the gong for ten minutes.
+    bool   holdIfUnreachable{false};
     uint32 hookId{0};        // Custom -> ObjectiveHookRegistry; on a garrison MoveTo,
                              // the hook to re-run each tick WHILE it holds (see
                              // EventBuilder::WhileHolding). 0 => none.
@@ -712,6 +725,12 @@ public:
     // timeout the event goes on to the next step rather than stalling.
     //   .ClearRadius(...).Timeout(120000).ContinueOnTimeout()
     EventBuilder& ContinueOnTimeout();
+
+    // Mark the LAST-added KillCreature-engage step EventStep::holdIfUnreachable:
+    // an alive but unreachable target keeps the step driven (its timeout runs)
+    // instead of yielding the tick.
+    //   .KillCreatureEngage(boss).Timeout(180000).ContinueOnTimeout().HoldIfUnreachable()
+    EventBuilder& HoldIfUnreachable();
 
     // Make the LAST-added Gossip step wait until its target NPC stops moving (has
     // finished a scripted walk) before talking to it. Chain after the step:

@@ -2369,13 +2369,23 @@ bool DcObjectiveArriveAction::Execute(Event /*event*/)
                     // engage one we can actually reach (a complete on-level route);
                     // requireDirect=false keeps a legitimately FAR seek alive, since
                     // the seek IS this objective's navigation.
-                    if (!DcEngageGeometry::IsEngageReachable(bot, target, /*requireDirect*/ false))
+                    if (DcEngageGeometry::IsEngageReachable(bot, target, /*requireDirect*/ false))
+                    {
+                        // ResolveEscortConflict cancels a launched escort glide but
+                        // leaves our own approach move intact (unlike StopBot(Hold)).
+                        DcMovement::ResolveEscortConflict(bot);
+                        SetPhase(context, "objective");
+                        return EngageDirect(target);
+                    }
+                    // Unreachable. By default yield the tick; a step marked
+                    // holdIfUnreachable falls through to the hold + Drive below so
+                    // its timeout runs (see EventStep::holdIfUnreachable).
+                    if (!step.holdIfUnreachable)
                         return false;
-                    // ResolveEscortConflict cancels a launched escort glide but
-                    // leaves our own approach move intact (unlike StopBot(Hold)).
-                    DcMovement::ResolveEscortConflict(bot);
-                    SetPhase(context, "objective");
-                    return EngageDirect(target);
+                    LOG_DEBUG("playerbots.dungeonclear",
+                              "[DC:{}] objective '{}': {} alive but unreachable -> holding, "
+                              "step timeout running",
+                              bot->GetName(), next->name, target->GetName());
                 }
             }
             // ClearRadius: a point-anchored room pre-clear. Engage the nearest

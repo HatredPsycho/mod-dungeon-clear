@@ -154,6 +154,13 @@ EventBuilder& EventBuilder::ContinueOnTimeout()
     return *this;
 }
 
+EventBuilder& EventBuilder::HoldIfUnreachable()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().holdIfUnreachable = true;
+    return *this;
+}
+
 EventBuilder& EventBuilder::SkipIfTargetMissing()
 {
     if (!_ev.steps.empty())
