@@ -20,13 +20,20 @@ class Player;
 // raid encounters stand DC down, and encounter-gated mechanics keep running.
 //
 // The signal is the server's own Main Tank flag (CoaPlayerMainTank), not a new
-// command: "tank main on" enters the mode, "tank main off" or `dc on` leaves it.
+// command: "tank main on" enters the mode, "tank main off" leaves it. `dc on`
+// is refused while a group member on the map holds the flag (2.9.5): the two
+// modes are exclusive on the server, not only in the addon.
 // See DcPlayerLedDecision for the rule.
 namespace DcPlayerLed
 {
     // The Main Tank player `bot` follows, or nullptr when the group is not
     // player-led (no flagged player on the map, not an instance, or a DC run on).
     Player* Leader(Player* bot);
+
+    // The human group member on `bot`'s map who holds the Main Tank flag, alive
+    // or not, whatever DC is doing; nullptr when nobody does. `dc on` reads it
+    // to refuse a run while the player leads.
+    Player* FlaggedHuman(Player* bot);
 
     // The party tank of `member`, as DC resolves it: the elected leader of a
     // live, unpaused run, else the Main Tank player of player-led mode, else

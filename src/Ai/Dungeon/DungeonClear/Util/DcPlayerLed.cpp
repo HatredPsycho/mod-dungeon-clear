@@ -94,6 +94,19 @@ Player* DcPlayerLed::Leader(Player* bot)
 #endif
 }
 
+Player* DcPlayerLed::FlaggedHuman(Player* bot)
+{
+#if DC_HAS_PLAYER_MAIN_TANK
+    if (!bot || !bot->GetGroup() || !bot->GetMap())
+        return nullptr;
+    Player* flagged = CoaPlayerMainTank::FlaggedInGroup(bot->GetGroup(), bot);
+    return IsHumanTank(flagged) ? flagged : nullptr;
+#else
+    (void)bot;
+    return nullptr;
+#endif
+}
+
 Player* DcPlayerLed::PartyTankFor(Player* member)
 {
     if (!member)

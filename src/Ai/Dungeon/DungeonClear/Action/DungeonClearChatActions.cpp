@@ -5,6 +5,7 @@
 
 #include "DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 
 #include <algorithm>
 #include <cctype>
@@ -341,6 +342,18 @@ bool DcOnAction::Execute(Event event)
     if (!bot->GetMap() || !bot->GetMap()->IsDungeon())
     {
         DcRefuse(botAI, bot, "Not in a dungeon.");
+        return false;
+    }
+    // Main Tank and DC are exclusive: while a player of the group holds the Main
+    // Tank flag that player leads, and a DC run would take the lead from them. The
+    // addon already keeps the two buttons apart; this is the server-side half,
+    // for the chat command and an older addon.
+    if (Player* const mainTank = DcPlayerLed::FlaggedHuman(bot))
+    {
+        std::string const why = mainTank->GetName() +
+                                " is Main Tank: DC follows their lead. Say \"tank main off\" first to let DC run the dungeon.";
+        DcStatusPublisher::SendAddonMessage(botAI, "CHAT	" + why);
+        DcRefuse(botAI, bot, why);
         return false;
     }
     // Scripted private instances (Manastorm and the like) build their own
