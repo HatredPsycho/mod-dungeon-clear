@@ -11,16 +11,21 @@
 using DcPlayerLedDecision::CurrentFirstHit;
 using DcPlayerLedDecision::Inputs;
 using DcPlayerLedDecision::IsPlayerLed;
-using DcPlayerLedDecision::MayRegroupOnPlayer;
+using DcPlayerLedDecision::ChoosePartyTank;
+using DcPlayerLedDecision::MemberRungApplies;
+using DcPlayerLedDecision::PartyTankSource;
+using DcPlayerLedDecision::RungsFor;
 
 namespace
 {
-    Inputs Make(bool inInstance, bool flagged, bool runOwned)
+    Inputs Make(bool inInstance, bool flagged, bool runOwned, bool alive = true, bool human = true)
     {
         Inputs in;
         in.inInstance = inInstance;
         in.flaggedPlayerOnMap = flagged;
         in.dcRunOwned = runOwned;
+        in.playerAlive = alive;
+        in.playerHuman = human;
         return in;
     }
 }
@@ -54,11 +59,76 @@ TEST(DcPlayerLed, OutsideInstancesNothingApplies)
     EXPECT_FALSE(IsPlayerLed(Make(false, true, false)));
 }
 
-// Bot tanks are the player's off-tanks: DC never regroups them on him.
-TEST(DcPlayerLed, OffTanksKeepTheirPlacement)
+// A dead Main Tank is no reference (healers and regroup must not aim at a
+// corpse), and a flagged player who switched to self-bot has left the mode.
+TEST(DcPlayerLed, DeadOrSelfBotMainTankIsNoLeader)
 {
-    EXPECT_FALSE(MayRegroupOnPlayer(true));
-    EXPECT_TRUE(MayRegroupOnPlayer(false));
+    EXPECT_FALSE(IsPlayerLed(Make(true, true, false, /*alive*/ false, /*human*/ true)));
+    EXPECT_FALSE(IsPlayerLed(Make(true, true, false, /*alive*/ true, /*human*/ false)));
+}
+
+// Non-regression, party tank value: a live run's leader is ALWAYS the answer
+// (the On button), whatever the Main Tank flag says; player-led is a fallback.
+TEST(DcPlayerLed, PartyTankRunLeaderAlwaysWins)
+{
+    EXPECT_EQ(ChoosePartyTank(true, false), PartyTankSource::RunLeader);
+    EXPECT_EQ(ChoosePartyTank(true, true), PartyTankSource::RunLeader);
+    EXPECT_EQ(ChoosePartyTank(false, true), PartyTankSource::MainTankPlayer);
+    EXPECT_EQ(ChoosePartyTank(false, false), PartyTankSource::None);
+}
+
+// Non-regression, driving rungs: with a bot tank (On) every rung keeps the
+// pre-player-led verdict — the old `tank && tank != bot` / `tank` gates.
+TEST(DcPlayerLed, BotTankRungsAreUnchanged)
+{
+    for (bool present : {false, true})
+        for (bool self : {false, true})
+        {
+            if (self && !present)
+                continue;
+            auto const r = RungsFor(present, self, /*human*/ false);
+            EXPECT_EQ(r.dcFollowTank, present && !self);
+            EXPECT_EQ(r.suppressStockFollow, present);
+            EXPECT_EQ(r.restCaps, present);
+            EXPECT_EQ(r.collisionBan, present);
+            EXPECT_EQ(r.breakStuckCombat, present);
+        }
+}
+
+// A human Main Tank: DC never follows him (stock follow-master does, and the
+// off-tanks' stay / placement holds), never caps rest, never breaks his combat.
+TEST(DcPlayerLed, HumanTankStandsDcDrivingDown)
+{
+    auto const r = RungsFor(true, false, /*human*/ true);
+    EXPECT_FALSE(r.dcFollowTank);
+    EXPECT_FALSE(r.suppressStockFollow);
+    EXPECT_FALSE(r.restCaps);
+    EXPECT_FALSE(r.collisionBan);
+    EXPECT_FALSE(r.breakStuckCombat);
+}
+
+// Off-tanks: never regrouped, assisted, pulled in (Lyceum, Iron Hall) or
+// chase-guarded when a human leads; with a bot tank (On) every member keeps
+// today's verdict, off-tanks included.
+TEST(DcPlayerLed, OffTanksKeepTheirOrders)
+{
+    EXPECT_FALSE(MemberRungApplies(/*human*/ true, /*botIsTank*/ true));
+    EXPECT_TRUE(MemberRungApplies(true, false));
+    EXPECT_TRUE(MemberRungApplies(false, true));
+    EXPECT_TRUE(MemberRungApplies(false, false));
+}
+
+// v1.5 assist on the player's clock: no stamp (flag set mid-fight) releases at
+// once instead of a window that restarts every call; a stamp holds a fresh DPS
+// for the lead, never a follower already in combat or a healer.
+TEST(DcPlayerLed, AssistReleaseOnThePlayersClock)
+{
+    uint32_t const lead = 1500, since = 10000;
+    EXPECT_TRUE(DungeonClearMath::ShouldReleaseFollower(false, false, 0, since + 10, lead, 100.f, 30.f));
+    EXPECT_FALSE(DungeonClearMath::ShouldReleaseFollower(false, false, since, since + 500, lead, 100.f, 30.f));
+    EXPECT_TRUE(DungeonClearMath::ShouldReleaseFollower(false, false, since, since + lead, lead, 100.f, 30.f));
+    EXPECT_TRUE(DungeonClearMath::ShouldReleaseFollower(false, true, since, since + 10, lead, 100.f, 30.f));
+    EXPECT_TRUE(DungeonClearMath::ShouldReleaseFollower(true, false, since, since + 10, lead, 100.f, 30.f));
 }
 
 TEST(DcPlayerLed, FirstHitFromAnEarlierFightIsStale)

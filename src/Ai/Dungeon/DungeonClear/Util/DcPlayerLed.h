@@ -41,7 +41,8 @@ namespace DcPlayerLed
     // Both 0 out of combat. Stale stamps from an earlier fight read as 0.
     void CombatStamps(Player const* player, uint32& combatSinceMs, uint32& firstHitMs);
 
-    // Drop everything held for this player (logout, flag off).
+    // Drop everything held for this player (logout, map change). A Main Tank
+    // who turns the flag off is dropped on the next read (CombatStamps).
     void Forget(Player const* player);
 }
 

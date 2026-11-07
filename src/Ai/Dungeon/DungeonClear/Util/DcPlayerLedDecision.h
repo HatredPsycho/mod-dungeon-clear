@@ -25,21 +25,68 @@ namespace DcPlayerLedDecision
         // not). DC driving always wins: the Main Tank bar and DC exclude each
         // other, and a run means the party follows its elected bot tank.
         bool dcRunOwned = false;
+        // The flagged player is alive. A dead Main Tank is no reference: healers
+        // and regroup must not aim at a corpse (FindLeaderTank skips the dead too).
+        bool playerAlive = false;
+        // The flagged player is driven by a human, not by a PlayerbotAI (a player
+        // who switches to self-bot leaves the mode; the server flag is not cleared
+        // by that switch).
+        bool playerHuman = false;
     };
 
     // The player leads: every DC member rung reads that player as the party tank.
     constexpr bool IsPlayerLed(Inputs const& in)
     {
-        return in.inInstance && in.flaggedPlayerOnMap && !in.dcRunOwned;
+        return in.inInstance && in.flaggedPlayerOnMap && !in.dcRunOwned && in.playerAlive && in.playerHuman;
     }
 
-    // Whether a DC member rung that trails or regroups on the party tank applies
-    // to this bot when the tank is a human. Bot tanks are the player's off-tanks:
-    // their place is the one the player gave them (CoaTankAction), never the
-    // player's side, so DC must not move them.
-    constexpr bool MayRegroupOnPlayer(bool botIsTank)
+    // Where the party tank value comes from. A live, unpaused DC run always wins
+    // (the On button: today's behaviour, untouched); player-led is only a
+    // fallback when no run drives.
+    enum class PartyTankSource
     {
-        return !botIsTank;
+        None,
+        RunLeader,
+        MainTankPlayer
+    };
+    constexpr PartyTankSource ChoosePartyTank(bool runLeaderActive, bool playerLedLeader)
+    {
+        return runLeaderActive ? PartyTankSource::RunLeader
+             : playerLedLeader ? PartyTankSource::MainTankPlayer
+                               : PartyTankSource::None;
+    }
+
+    // The DC rungs that DRIVE or read the tank's own AI, per party tank. Each one
+    // is today's verdict for a bot tank (`tankIsHuman` false) and stands down for
+    // a human Main Tank. Stock playerbots takes over: follow-master, rest, the
+    // collision shuffle, and the player's own fights.
+    struct TankRungs
+    {
+        bool dcFollowTank = false;        // DC follow-tank trails the tank
+        bool suppressStockFollow = false; // stock follow-master is zeroed
+        bool restCaps = false;            // Smart Rest latch / run rest caps
+        bool collisionBan = false;        // stock "move out of collision" zeroed
+        bool breakStuckCombat = false;    // phantom-combat breaker may clear combat
+    };
+    constexpr TankRungs RungsFor(bool tankPresent, bool tankIsSelf, bool tankIsHuman)
+    {
+        TankRungs r;
+        bool const botTank = tankPresent && !tankIsHuman;
+        r.dcFollowTank = botTank && !tankIsSelf;
+        r.suppressStockFollow = botTank;
+        r.restCaps = botTank;
+        r.collisionBan = botTank;
+        r.breakStuckCombat = botTank;
+        return r;
+    }
+
+    // Member rungs that MOVE a bot toward the tank or put it on his fight (combat
+    // regroup, DC assist, Lyceum close-up, Iron Hall hop, the room-boss chase
+    // guard): a bot tank is the player's off-tank and is left to his orders.
+    // With a bot tank driving (On), every member keeps today's verdict.
+    constexpr bool MemberRungApplies(bool tankIsHuman, bool botIsTank)
+    {
+        return !(tankIsHuman && botIsTank);
     }
 
     // Threat-lead clock on the player's side, kept per player. `combatSinceMs`

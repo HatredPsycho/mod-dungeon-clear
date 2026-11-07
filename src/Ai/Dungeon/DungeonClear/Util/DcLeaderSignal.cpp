@@ -10,6 +10,7 @@
 #include "DungeonClearTuning.h"
 #include "DcZoneLine.h"
 #include "DcPlayerLed.h"
+#include "DcPlayerLedDecision.h"
 #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonEventExecutor.h"
 #include <algorithm>
@@ -868,13 +869,14 @@ bool DcLeaderSignal::IsLeaderFightAssistWanted(Player* bot)
     // off-tanks, whose targets are his orders (CoaTankAction, HeldByPlayer).
     if (Player* human = DcPlayerLed::Leader(bot))
     {
-        if (human == bot || PlayerbotAI::IsTank(bot) || !human->IsInCombat())
+        if (human == bot || !DcPlayerLedDecision::MemberRungApplies(true, PlayerbotAI::IsTank(bot)) ||
+            !human->IsInCombat())
             return false;
         uint32 since = 0;
         uint32 firstHit = 0;
+        // No stamp (the flag went on mid-fight, the edge was missed): the kernel
+        // releases at once rather than holding on a window that never runs out.
         DcPlayerLed::CombatStamps(human, since, firstHit);
-        if (since == 0)
-            since = getMSTime();  // the combat edge not seen yet: the lead starts now
         return DungeonClearMath::ShouldReleaseFollower(
             PlayerbotAI::IsHeal(bot), bot->IsInCombat(), since, getMSTime(),
             uint32(DcSettings::GetFloat(bot, "PullPlayerReleaseDelay") * 1000.0f),
