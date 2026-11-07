@@ -454,17 +454,33 @@ bool DcPlayerLedEvents::Tick(PlayerbotAI* botAI)
                  ev->name, outcome == EventDriveOutcome::Completed ? "completed" : "left to the player",
                  stepBefore);
 
+    // The addon's "Start event" button (SquidBots Lite 2.9.5) follows these
+    // lines: MTEV\t<eventId>\t<ready|running|done|left>\t<name>. One event at a
+    // time per instance; the addon shows the last one it heard.
+    auto mtev = [&](char const* what)
+    {
+        DcStatusPublisher::SendAddonMessage(
+            botAI, "MTEV\t" + std::to_string(ev->id) + "\t" + what + "\t" + ev->name);
+    };
+
     if (announce)
     {
         if (notice == Notice::WaitForGo)
         {
             Tell(bot, mt,
                  "[DC] " + ev->name + ": ready. Stand near it, out of combat, and say \"dc go\" to start it.");
-            DcStatusPublisher::SendAddonMessage(botAI, "MTGO\t" + std::to_string(ev->id) + "\t" + ev->name);
+            mtev("ready");
         }
         else
+        {
             Tell(bot, mt, "[DC] " + ev->name + ": DC leaves the rest of this event to you.");
+            mtev("left");
+        }
     }
+    if (consumedGo && !finished)
+        mtev("running");
+    if (finished && outcome == EventDriveOutcome::Completed)
+        mtev("done");
     return true;
 }
 
