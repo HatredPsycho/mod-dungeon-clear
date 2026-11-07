@@ -862,6 +862,25 @@ bool DcLeaderSignal::IsLeaderFightAssistWanted(Player* bot)
     if (!bot || bot->isDead())
         return false;
 
+    // Player-led: a human Main Tank leads and no run is on (DcPlayerLed returns
+    // null while any run is, so a DC-driven party never reaches this). The party's
+    // non-tanks assist HIS fight, after the same threat lead; bot tanks are his
+    // off-tanks, whose targets are his orders (CoaTankAction, HeldByPlayer).
+    if (Player* human = DcPlayerLed::Leader(bot))
+    {
+        if (human == bot || PlayerbotAI::IsTank(bot) || !human->IsInCombat())
+            return false;
+        uint32 since = 0;
+        uint32 firstHit = 0;
+        DcPlayerLed::CombatStamps(human, since, firstHit);
+        if (since == 0)
+            since = getMSTime();  // the combat edge not seen yet: the lead starts now
+        return DungeonClearMath::ShouldReleaseFollower(
+            PlayerbotAI::IsHeal(bot), bot->IsInCombat(), since, getMSTime(),
+            uint32(DcSettings::GetFloat(bot, "PullPlayerReleaseDelay") * 1000.0f),
+            human->GetHealthPct(), DcSettings::GetFloat(bot, "PullThreatLeadPanicHp"));
+    }
+
     Player* leader = FindLeaderTank(bot);
     if (!leader || leader == bot)
         return false;

@@ -44,6 +44,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcEngageGeometry.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcHazard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearApproach.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearMath.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearApproachIo.h"
@@ -1361,7 +1362,12 @@ namespace
 
 bool DungeonClearAssistCampActionBase::Execute(Event /*event*/)
 {
-    Player* leader = DcLeaderSignal::FindLeaderTank(bot);
+    // Player-led: the fight to join is the human Main Tank's (never for a bot
+    // tank, which is his off-tank and takes his orders instead).
+    Player* const human = DcPlayerLed::Leader(bot);
+    if (human && PlayerbotAI::IsTank(bot))
+        return false;
+    Player* leader = human ? human : DcLeaderSignal::FindLeaderTank(bot);
     if (!leader || leader == bot)
         return false;
 
@@ -1400,7 +1406,15 @@ bool DungeonClearAssistCampActionBase::Execute(Event /*event*/)
     // attacker list populates.
     if (!target)
     {
-        target = PickPartyFightTarget(bot, context, leader);
+        // The player's own target first: "the Main Tank hits X, the DPS come onto X".
+        if (human)
+            if (Unit* victim = human->GetVictim(); victim && victim->IsAlive() &&
+                victim->GetMapId() == bot->GetMapId() && bot->IsValidAttackTarget(victim) &&
+                DcTickMemoAccess::LevelReachable(bot, context, victim) &&
+                !approach.AssistGivenUp(victim->GetGUID(), now))
+                target = victim;
+        if (!target)
+            target = PickPartyFightTarget(bot, context, leader);
         if (!target)
             return false;
 
