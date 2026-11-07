@@ -239,4 +239,33 @@ void DcFirstContact::OnCreatureEngage(Creature* creature, Unit* target)
                  nearest ? nearest->GetName() : std::string("-"), nearestDist,
                  owner->GetName(), owner->GetPositionX(), owner->GetPositionY(),
                  owner->GetPositionZ(), campText, alreadyFighting);
+
+    // FAR JOIN: nobody of the party is near it, so something else put it in the
+    // fight. Name every unit it is in combat with, and where that unit stands.
+    // Shadowfang Keep, 07/11: Baron Silverlaine, a Darksoul and a Glutton joined
+    // from their spawns 107-126yd off, out of sight, the moment a courtyard pull
+    // started, and turned four runs into a two-boss wipe. The cause is not in the
+    // instance script nor in their smart_scripts; this line is meant to show it.
+    if (nearest && nearestDist > 60.0f)
+    {
+        std::string refs;
+        for (auto const& [guid, ref] : creature->GetCombatManager().GetPvECombatRefs())
+        {
+            Unit* other = ref ? ref->GetOther(creature) : nullptr;
+            if (!other)
+                continue;
+            Unit* const owner2 = other->GetCharmerOrOwner();
+            refs += Acore::StringFormat("{}{} (entry {}{}) {:.1f}yd{}", refs.empty() ? "" : "; ",
+                                        other->GetName(),
+                                        other->IsPlayer() ? 0u : other->GetEntry(),
+                                        owner2 ? ", owner " + owner2->GetName() : std::string(),
+                                        creature->GetExactDist(other),
+                                        other->IsPlayer() ? " player" : "");
+        }
+        Unit* const victim = creature->GetVictim();
+        DC_PULL_INFO("[DC:{}] far joiner: {} (entry {}) in combat {:.1f}yd from the nearest member; "
+                     "victim {}; combat refs [{}]",
+                     bot->GetName(), creature->GetName(), creature->GetEntry(), nearestDist,
+                     victim ? victim->GetName() : std::string("-"), refs);
+    }
 }
