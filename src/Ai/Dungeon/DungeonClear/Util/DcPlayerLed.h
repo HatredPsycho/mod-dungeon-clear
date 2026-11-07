@@ -28,6 +28,13 @@ namespace DcPlayerLed
     // player-led (no flagged player on the map, not an instance, or a DC run on).
     Player* Leader(Player* bot);
 
+    // The party tank of `member`, as DC resolves it: the elected leader of a
+    // live, unpaused run, else the Main Tank player of player-led mode, else
+    // nullptr. The DC party-tank value and the module's reference-tank provider
+    // (CoaGroupTank) both read this, so the two can never disagree. Any group
+    // member may be passed, bot or human; only units on its own map are read.
+    Player* PartyTankFor(Player* member);
+
     // True when `tank` (a party-tank value) is a human leading in this mode.
     // Every DC rung that would drive or read the tank's own AI checks this.
     bool IsHumanTank(Player const* tank);

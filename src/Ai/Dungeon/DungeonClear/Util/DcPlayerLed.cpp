@@ -6,6 +6,7 @@
 #include "DcPlayerLed.h"
 #include "DcPlayerLedDecision.h"
 #include "DcLeaderSignal.h"
+#include "DcRun.h"
 
 #include <mutex>
 #include <unordered_map>
@@ -91,6 +92,35 @@ Player* DcPlayerLed::Leader(Player* bot)
     (void)bot;
     return nullptr;
 #endif
+}
+
+Player* DcPlayerLed::PartyTankFor(Player* member)
+{
+    if (!member)
+        return nullptr;
+    // The single elected leader for the whole group (party or raid): the bot
+    // itself for the leader, the tank to trail for everyone else.
+    Player* leader = DcLeaderSignal::FindLeaderTank(member);
+    PlayerbotAI* leaderAI = leader ? GET_PLAYERBOT_AI(leader) : nullptr;
+    // Expose the leader only while its clear is actively running and unpaused.
+    // A paused/disabled leader returns null so followers stop following it and
+    // revert to the player — matching the leader's own paused/off behavior.
+    bool const runLeaderActive = leaderAI && DcRun::Of(leaderAI->GetAiObjectContext()).enabled &&
+                                 !DcRun::Of(leaderAI->GetAiObjectContext()).paused;
+    // No DC run drives the party (a bot tank of a raid is elected even with DC
+    // off): a human tanking with the Main Tank bar is the party tank instead.
+    // Leader() is null while any run is on, paused included; it is only asked
+    // when no run drives, so a DC-driven party pays nothing for it.
+    Player* const human = runLeaderActive ? nullptr : Leader(member);
+    switch (DcPlayerLedDecision::ChoosePartyTank(runLeaderActive, human != nullptr))
+    {
+        case DcPlayerLedDecision::PartyTankSource::RunLeader:
+            return leader;
+        case DcPlayerLedDecision::PartyTankSource::MainTankPlayer:
+            return human;
+        default:
+            return nullptr;
+    }
 }
 
 bool DcPlayerLed::IsHumanTank(Player const* tank)

@@ -75,6 +75,17 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+
+// The combat guards that move from Dungeon Clear to the playerbots module (07/11:
+// "DC is the autorun in the dungeon, the strategies are in playerbots"). On a
+// module without them DC simply keeps every guard itself.
+#if __has_include("CoaGroupTank.h") && __has_include("CoaHealEscort.h")
+#include "CoaGroupTank.h"
+#include "CoaHealEscort.h"
+#define DC_HAS_COA_GARDES 1
+#else
+#define DC_HAS_COA_GARDES 0
+#endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
@@ -1019,8 +1030,42 @@ private:
     }
 };
 
+namespace
+{
+    // The module guards Dungeon Clear STILL runs itself, by the module's names.
+    // While a member is in a DC run (or player-led mode, which DC also covers),
+    // the module's guard of the same name stands down, so no guard acts twice.
+    // Cutting a guard out of DC drops its name here IN THE SAME CHANGE.
+    char const* const kGuardsStillInDungeonClear[] = {
+        // Builder's lot
+        "heal reposition", "top off party", "threat lead", "tank fight assist",
+        // DC's lot
+        "combat regroup", "escape leap ban", "room boss chase", "lyceum close up", "iron hall",
+        "ground hazards", "target exclusion", "boss stand down",
+    };
+
+    void WireModuleCombatGuards()
+    {
+#if DC_HAS_COA_GARDES
+        // The reference tank of a member in a DC run, or of a player-led party:
+        // exactly what DC's party-tank value resolves (DcPlayerLed::PartyTankFor),
+        // so the module's guards and DC's rungs always agree on the tank.
+        CoaGroupTank::SetProvider([](Player const* member) -> Player*
+                                  { return DcPlayerLed::PartyTankFor(const_cast<Player*>(member)); });
+        // The NPC an event of the run is escorting, for the module's healers.
+        CoaHealEscort::SetProvider([](Player const* member) -> Unit*
+                                   { return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member)); });
+        for (char const* guard : kGuardsStillInDungeonClear)
+            CoaGroupTank::SetHandledByDungeonClear(guard, true);
+#endif
+    }
+}
+
 void AddSC_dungeon_clear_module()
 {
+    // Before any map updates: the providers and the guard list are read from the
+    // map threads afterwards and never change again.
+    WireModuleCombatGuards();
     new DungeonClearRunTravelGuardScript();
     AddSC_dc_test_run_stats();
     new DungeonClearRegistrarWorldScript();
