@@ -123,4 +123,12 @@
 #define DC_MODULE_OWNS_BOSS_STAND_DOWN 0
 #endif
 
+// B1, bear form before the pull: DC's pull and engage call the module's
+// CoaTankForm::EnsureBearForm.
+#if defined(COA_COMBAT_OWNS_BEAR_FORM_BEFORE_PULL)
+#define DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL 1
+#else
+#define DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

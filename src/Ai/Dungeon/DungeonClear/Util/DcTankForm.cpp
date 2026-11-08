@@ -5,6 +5,8 @@
 
 #include "DcTankForm.h"
 
+#if !DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL
+
 #include "Log.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
@@ -83,3 +85,4 @@ namespace DcTankForm
         return true;
     }
 }
+#endif  // !DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL

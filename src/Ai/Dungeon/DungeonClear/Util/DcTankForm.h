@@ -6,6 +6,14 @@
 #ifndef _PLAYERBOT_DCTANKFORM_H
 #define _PLAYERBOT_DCTANKFORM_H
 
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
+
+// The module's CoA Combat B1 carries the shift when it has it; DC's call sites
+// name DcBearForm, which is the module's CoaTankForm or DC's own DcTankForm.
+#if DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL
+#include "CoaTankForm.h"
+namespace DcBearForm = CoaTankForm;
+#else
 class PlayerbotAI;
 
 // Pre-pull shapeshift gate for a DRUID tank. The mirror image of DcFormGate,
@@ -69,5 +77,8 @@ namespace DcTankForm
     // pull proceeds in caster form if it never lands.
     bool EnsureBearForm(PlayerbotAI* botAI);
 }
+
+namespace DcBearForm = DcTankForm;
+#endif  // DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL
 
 #endif

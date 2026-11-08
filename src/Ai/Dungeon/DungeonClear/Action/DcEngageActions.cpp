@@ -363,7 +363,7 @@ bool DungeonClearEngageActionBase::EngageDirect(Unit* target)
     // nothing can aggro it yet anyway. Inside it, the opener — the class pull
     // spell below, or the committed run-in — is the very next thing to happen.
     if (distance <= DC_PULL_START_RANGE)
-        DcTankForm::EnsureBearForm(botAI);
+        DcBearForm::EnsureBearForm(botAI);
 
     if (distance > attackRange)
     {
