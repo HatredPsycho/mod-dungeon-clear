@@ -9,6 +9,7 @@
 #include "ChatCommandTrigger.h"
 #include "NamedObjectContext.h"
 #include "Ai/Dungeon/DungeonClear/Trigger/DungeonClearTriggers.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
 class DungeonClearTriggerContext : public NamedObjectContext<Trigger>
 {
@@ -21,6 +22,7 @@ public:
         creators["dungeon clear at objective"] = &DungeonClearTriggerContext::at_objective;
         creators["dungeon clear event due"] = &DungeonClearTriggerContext::event_due;
         creators["dungeon clear event due combat"] = &DungeonClearTriggerContext::event_due_combat;
+        creators["dungeon clear player led event"] = &DungeonClearTriggerContext::player_led_event;
         creators["dungeon clear blocking trash"] = &DungeonClearTriggerContext::blocking_trash;
         creators["dungeon clear room trash"] = &DungeonClearTriggerContext::room_trash;
         creators["dungeon clear room preclear hold"] = &DungeonClearTriggerContext::room_preclear_hold;
@@ -71,6 +73,7 @@ public:
         creators["dc status"] = &DungeonClearTriggerContext::dc_status;
         creators["dc bosses"] = &DungeonClearTriggerContext::dc_bosses;
         creators["dc wing"] = &DungeonClearTriggerContext::dc_wing;
+        creators["dc go"] = &DungeonClearTriggerContext::dc_go;
         creators["dc pause"] = &DungeonClearTriggerContext::dc_pause;
         creators["dungeon clear pause"] = &DungeonClearTriggerContext::dungeon_clear_pause;
         creators["dc pull"] = &DungeonClearTriggerContext::dc_pull;
@@ -82,6 +85,8 @@ private:
     static Trigger* at_boss(PlayerbotAI* ai) { return new DungeonClearAtBossTrigger(ai); }
     static Trigger* at_objective(PlayerbotAI* ai) { return new DungeonClearAtObjectiveTrigger(ai); }
     static Trigger* event_due(PlayerbotAI* ai) { return new DungeonClearEventDueTrigger(ai); }
+    static Trigger* player_led_event(PlayerbotAI* ai) { return new DungeonClearPlayerLedEventTrigger(ai); }
+    static Trigger* dc_go(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "dc go"); }
     static Trigger* event_due_combat(PlayerbotAI* ai) { return new DungeonClearEventDueCombatTrigger(ai); }
     static Trigger* blocking_trash(PlayerbotAI* ai) { return new DungeonClearBlockingTrashTrigger(ai); }
     static Trigger* room_trash(PlayerbotAI* ai) { return new DungeonClearRoomTrashTrigger(ai); }

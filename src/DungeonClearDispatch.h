@@ -16,6 +16,7 @@
 #include "Playerbots.h"
 #include "PlayerbotAI.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearUtil.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
 namespace DungeonClearDispatch
 {
@@ -29,6 +30,17 @@ namespace DungeonClearDispatch
     {
         if (!issuer)
             return 0;
+
+        // Main Tank mode (player-led v2): a bare `dc go` (or `dc go event`) from
+        // the player leading is his go for a held encounter start. It arms his
+        // instance's event state directly: no bot needs to hear it. With a DC
+        // run on, CanOrderGo is false and `dc go <boss>` goes on as before.
+        if (action == "dc go" && (param.empty() || param == "event") &&
+            DcPlayerLedEvents::CanOrderGo(issuer))
+        {
+            DcPlayerLedEvents::OrderGo(issuer);
+            return 1;
+        }
 
         Player* leader = DcLeaderSignal::FindLeaderTank(issuer);
         if (!leader)

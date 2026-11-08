@@ -6,6 +6,7 @@
 #include "DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1078,6 +1079,12 @@ bool DcGoAction::Execute(Event event)
     if (!DcLeaderSignal::IsDungeonClearLeader(bot))
         return true;
     std::string const param = event.getParam();
+    // A bare "dc go" (or "dc go event") from the player leading in Main Tank
+    // mode is his go for a held event, handled by DcGoPlayerLedAction on the
+    // same chat trigger: no "Usage" refusal for it (the addon's Start event
+    // button sends exactly that line).
+    if ((param.empty() || param == "event") && DcPlayerLedEvents::CanOrderGo(event.getOwner()))
+        return false;
     if (param.empty())
     {
         DcRefuse(botAI, bot, "Usage: .dc go <boss name or entry>");

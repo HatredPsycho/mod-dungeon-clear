@@ -94,6 +94,13 @@ namespace DcRel
     // band (34-36, map-partitioned mid-encounter orchestration).
     inline constexpr float RezParty         = 31.5f; // elected rezzer: raise the corpse
     inline constexpr float EventDue         = 31.0f; // off-path conditional event gate due
+    // Main Tank mode (player-led v2): the elected non-tank executor runs the bot
+    // steps of the event the player has reached. Below RezParty (raise first)
+    // and above every follower rung (assist 29 / hold-at-camp 28 / follow 25),
+    // so the walk to a lever is not taken back by the follow. Never armed in a
+    // DC run (the trigger requires DcPlayerLed::Leader), so it cannot contend
+    // with the leader's EventDue / AtBoss.
+    inline constexpr float PlayerLedEvent   = 30.5f; // Main Tank mode: event executor
     inline constexpr float AtBoss           = 30.0f; // engage the next boss
     inline constexpr float AtObjective      = 30.0f; // arrive at a travel objective (anchor-kind peer)
     inline constexpr float AssistCamp       = 29.0f; // follower: pile into the leader's fight

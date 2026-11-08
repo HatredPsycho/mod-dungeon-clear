@@ -178,6 +178,20 @@ enum class EventStepKind : uint8
                              // UseItemOnGO) for the cooldown probe and the log line.
 };
 
+// Main Tank mode (player-led v2): whether a step STARTS an encounter or brings
+// mobs (a gong, a summon, a gossip that starts a boss or an escort, a walk into
+// an adds trigger). Such a step never fires on its own when a human Main Tank
+// leads: the elected bot executor waits for the player's go ("dc go", or the
+// player doing it himself). Default resolves by step kind, conservatively
+// (DcPlayerLedEventDecision::StartsEncounter); authors pin it with
+// EventBuilder::StartsEncounter / NoEncounterStart. Never read by a DC run.
+enum class EncounterStartFlag : uint8
+{
+    Default,  // resolved by kind: an action step counts as starting one
+    Yes,      // starts an encounter: wait for the player's go
+    No,       // safe (a lever that only opens a door): run automatically
+};
+
 // One typed primitive. Fields are a shared bag — only those relevant to `kind`
 // are read (see DungeonEventExecutor::RunStep). Authoring goes through the
 // fluent EventBuilder below, not by populating this directly.
@@ -273,6 +287,9 @@ struct EventStep
     // while they are still walking down). Combined with skipIfMissing, a dead NPC
     // still skips rather than waiting forever.
     bool   waitForStill{false};
+
+    // Main Tank mode only (see EncounterStartFlag). A DC run ignores it.
+    EncounterStartFlag startsEncounter{EncounterStartFlag::Default};
 
     uint32 durationMs{0};    // Wait: dwell length
     uint32 timeoutMs{0};     // 0 => EventStepTimeout config default; else per-step
@@ -736,6 +753,13 @@ public:
     // finished a scripted walk) before talking to it. Chain after the step:
     //   .Gossip(npc, 0).WaitTargetStill()
     EventBuilder& WaitTargetStill();
+
+    // Main Tank mode: mark the LAST-added step as starting an encounter (wait for
+    // the player's go) or as safe to run without it. A DC run never reads either.
+    //   .UseGO(GO_GONG, 35).StartsEncounter()
+    //   .UseGO(GO_DOOR_LEVER, 14).NoEncounterStart()
+    EventBuilder& StartsEncounter();
+    EventBuilder& NoEncounterStart();
 
     EventBuilder& MoveTo(float x, float y, float z, float radius = 0.0f);
     // Ballistic jump to (x,y,z): MotionMaster::MoveJump at run speed. Bridges a

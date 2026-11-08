@@ -215,7 +215,7 @@ void RegisterZulFarrakEvents(std::vector<DungeonEvent>& out)
     out.push_back(EventBuilder(209, 2, "Sacred Pool (Gahz'rilla)")
                       .Anchored(8)
                       .Persistent()
-                      .UseGO(ZF_GONG, ZF_GONG_SEARCH)
+                      .UseGO(ZF_GONG, ZF_GONG_SEARCH).StartsEncounter()
                       .WaitForSpawn(ZF_GAHZRILLA, /*alive*/ true)
                           .Timeout(ZF_GAHZRILLA_SPAWN_TIMEOUT)
                       // Optional boss: if he stays out of reach (back in the pool

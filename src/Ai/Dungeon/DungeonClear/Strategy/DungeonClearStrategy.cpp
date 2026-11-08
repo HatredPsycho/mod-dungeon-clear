@@ -67,6 +67,15 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         "dungeon clear event due",
         { NextAction("dungeon clear run event", DcRel::EventDue) }));
 
+    // Main Tank mode (player-led v2): the elected non-tank executor runs the bot
+    // steps of the event the player has reached, reads the gates of his own
+    // steps, and holds an encounter-starting step for his "dc go". Inert in a
+    // DC run and with nobody flagged Main Tank (DcPlayerLed::Leader). See
+    // DcPlayerLedEvents.
+    triggers.push_back(new TriggerNode(
+        "dungeon clear player led event",
+        { NextAction("dungeon clear player led event", DcRel::PlayerLedEvent) }));
+
     // Within engage range of next boss.
     triggers.push_back(new TriggerNode(
         "dungeon clear at boss",
@@ -473,6 +482,10 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("dc status",         { NextAction("dc status", chatRel) }));
     triggers.push_back(new TriggerNode("dc bosses",         { NextAction("dc bosses", chatRel) }));
     triggers.push_back(new TriggerNode("dc wing",           { NextAction("dc wing",   chatRel) }));
+    // Main Tank mode only: the player's go for a held encounter start. A
+    // separate action from `.dc go <boss>` (DcGoAction, command/addon path),
+    // and inert unless the speaker leads in Main Tank mode.
+    triggers.push_back(new TriggerNode("dc go",             { NextAction("dc go player led", chatRel) }));
 }
 
 void DungeonClearStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers)

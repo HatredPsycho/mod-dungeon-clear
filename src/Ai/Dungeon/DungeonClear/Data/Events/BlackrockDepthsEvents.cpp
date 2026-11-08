@@ -1172,9 +1172,9 @@ void RegisterBlackrockDepthsEvents(std::vector<DungeonEvent>& out)
         EventBuilder(230, 2, "Shadowforge Lock")
             .Anchored(/*orderIndex*/ 9)
             // 1. Settle at the lever inside the East Garrison.
-            .MoveTo(BRD_LOCK_X, BRD_LOCK_Y, BRD_LOCK_Z, BRD_LOCK_RADIUS)
+            .MoveTo(BRD_LOCK_X, BRD_LOCK_Y, BRD_LOCK_Z, BRD_LOCK_RADIUS).NoEncounterStart()
             // 2. Pull it.
-            .UseGO(BRD_GO_SHADOWFORGE_LOCK, /*searchRadius*/ 15.0f)
+            .UseGO(BRD_GO_SHADOWFORGE_LOCK, /*searchRadius*/ 15.0f).NoEncounterStart()
             // 3. Confirm the machine actually moved. Gating on the DOORS rather
             //    than on the lever is the point: the lever flipping only proves
             //    the click landed, while GO_STATE_READY on 157923 proves the
