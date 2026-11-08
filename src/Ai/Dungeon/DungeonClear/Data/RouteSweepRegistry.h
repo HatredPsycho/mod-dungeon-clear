@@ -45,6 +45,10 @@ public:
     // testable on its own. Linear scan; the table is tiny.
     static bool SweepsRoute(uint32 mapId);
 
+    // Subset of the list above that sweeps on the heroic tier too (CoA Mythic
+    // 5-man reads heroic tier). Only meaningful for a map SweepsRoute accepts.
+    static bool SweepsEveryTier(uint32 mapId);
+
     // Second, independent list kept here because it is the same kind of fact (a
     // per-dungeon pull shape earned by run data): maps whose floors STACK, so a
     // Leeroy fought under a gallery recruits the gallery. On these the Dynamic

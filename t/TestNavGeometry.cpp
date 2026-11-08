@@ -645,24 +645,29 @@ TEST(DcPolylineAvoidTest, StockadeSweepReachStopsAtTheDeepCellBank)
 
 #include "Ai/Dungeon/DungeonClear/Data/RouteSweepRegistry.h"
 
-TEST(DcRouteSweepRegistryTest, OnlyTheStockadeAndKarazhanSweep)
+TEST(DcRouteSweepRegistryTest, OnlyTheStockadeKarazhanAndShadowfangSweep)
 {
     EXPECT_TRUE(RouteSweepRegistry::SweepsRoute(34));    // The Stockade
     EXPECT_TRUE(RouteSweepRegistry::SweepsRoute(532));   // Karazhan (ballroom / banquet hall)
+    EXPECT_TRUE(RouteSweepRegistry::SweepsRoute(33));    // Shadowfang Keep (courtyard chain, 3.0)
+
+    // Only Shadowfang sweeps on the heroic tier (CoA Mythic) as well.
+    EXPECT_TRUE(RouteSweepRegistry::SweepsEveryTier(33));
+    EXPECT_FALSE(RouteSweepRegistry::SweepsEveryTier(34));
+    EXPECT_FALSE(RouteSweepRegistry::SweepsEveryTier(532));
 
     // Every other dungeon keeps the historical corridor-band pick AND the
     // untouched Dynamic verdict. Forcing Advanced reshapes how every fight in a
     // dungeon happens, so a map earns its row on its own run data — adding one
     // here means the evidence exists for it.
     EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(36));   // Deadmines
-    EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(33));   // Shadowfang Keep
     EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(109));  // Sunken Temple
     EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(585));  // Magisters' Terrace
     EXPECT_FALSE(RouteSweepRegistry::SweepsRoute(0));    // not a dungeon at all
 }
 
 // The stacked-floor guard is its own list: Shadowfang Keep earned it
-// (tr-20261104-152435-131) WITHOUT joining the sweep above.
+// (tr-20261104-152435-131) before it joined the sweep above (3.0).
 TEST(DcRouteSweepRegistryTest, OnlyShadowfangKeepGuardsStackedFloors)
 {
     EXPECT_TRUE(RouteSweepRegistry::GuardsStackedFloors(33));    // Shadowfang Keep
