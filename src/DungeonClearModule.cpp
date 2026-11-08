@@ -78,6 +78,7 @@
 #include "DcModuleEnable.h"
 #include "TestRun/DcSelfFoundPlanner.h"
 #include "DcStrategyGate.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPetStance.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
@@ -203,6 +204,7 @@ public:
         if (!DcModule::IsEnabled())
             return;
         DcSpectator::BeginBotAiMoverWindow(player);
+        DcPetStance::Tick(player);
     }
 };
 
