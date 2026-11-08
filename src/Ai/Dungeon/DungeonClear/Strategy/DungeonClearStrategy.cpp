@@ -99,6 +99,7 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     //    blood (the old loot>flame order starved the douse, the reported "trouble
     //    getting priority to extinguish the flames"). The flame trigger only fires
     //    when the bot already carries blood, so a bot WITHOUT blood still loots.
+#if !DC_MODULE_OWNS_HAKKAR_AVATAR  // the module's CoA Combat B5 (vanilla-st) runs them instead
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar suppressor",
         { NextAction("dungeon clear hakkar suppressor", DcRel::HakkarSuppressor) }));
@@ -108,6 +109,7 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar loot blood",
         { NextAction("dungeon clear hakkar loot blood", DcRel::HakkarLootBlood) }));
+#endif
 
     // Arrived at a travel OBJECTIVE (BossRosterRegistry, non-combat anchor).
     // Peer of at-boss (30) — mutually exclusive via the anchor-kind check in
@@ -756,6 +758,7 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // resetting suppressor / douse a flame / grab blood. Same suppressor > flame >
     // loot-blood order as the non-combat copy (flame above loot so a blood carrier
     // douses instead of hoarding). All inert outside the live Sanctum.
+#if !DC_MODULE_OWNS_HAKKAR_AVATAR  // the module's CoA Combat B5 (vanilla-st) runs them instead
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar suppressor",
         { NextAction("dungeon clear hakkar suppressor", DcRel::HakkarSuppressorCombat) }));
@@ -765,6 +768,7 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar loot blood",
         { NextAction("dungeon clear hakkar loot blood", DcRel::HakkarLootBloodCombat) }));
+#endif
 }
 
 void DungeonClearCombatStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers)

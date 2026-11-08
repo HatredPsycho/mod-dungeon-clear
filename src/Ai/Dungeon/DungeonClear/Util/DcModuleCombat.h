@@ -166,4 +166,13 @@
 #define DC_MODULE_OWNS_COMBAT_PURGE 0
 #endif
 
+// B5, Sunken Temple's Hakkar avatar (suppressor, flame, blood rungs): the
+// module's vanilla-st strategy. DC keeps the sanctum arrival and the
+// WaitForSpawn on the Avatar.
+#if defined(COA_COMBAT_OWNS_HAKKAR_AVATAR)
+#define DC_MODULE_OWNS_HAKKAR_AVATAR 1
+#else
+#define DC_MODULE_OWNS_HAKKAR_AVATAR 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
