@@ -576,10 +576,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // 60), which own positioning during an advanced-pull camp where this stands down
     // anyway. 29 ties AssistCamp (29) but that runs only in the NON-combat engine, so
     // they never contend. Inert the instant the follower can contribute again. See
-    // DungeonClearRegroupCombatTrigger + DcRegroupDecision.
+    // DungeonClearRegroupCombatTrigger + DcRegroupDecision. The module's CoA
+    // Combat A9 runs it instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_COMBAT_REGROUP
     triggers.push_back(new TriggerNode(
         "dungeon clear regroup combat",
         { NextAction("dungeon clear regroup combat", DcRel::RegroupCombat) }));
+#endif
 
     // Healer LOS reposition, COMBAT side. The real fix for the stranded-healer
     // bug: a healer whose hurt heal target (usually the tank) was dragged out of

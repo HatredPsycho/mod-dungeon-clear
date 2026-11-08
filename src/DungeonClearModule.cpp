@@ -102,7 +102,7 @@
 #if DC_HAS_COA_COMBAT
 #include "CoaCombatGroupTank.h"
 #endif
-#if DC_MODULE_OWNS_ROOM_BOSS_CHASE
+#if DC_MODULE_OWNS_ROOM_BOSS_CHASE || DC_MODULE_OWNS_COMBAT_REGROUP
 #include "CoaGardesRunHooks.h"
 #endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
@@ -1226,7 +1226,9 @@ namespace
         "tank fight assist",
 #endif
         // DC's lot
+#if !DC_MODULE_OWNS_COMBAT_REGROUP
         "combat regroup",
+#endif
 #if !DC_MODULE_OWNS_ESCAPE_LEAP
         "escape leap ban",
 #endif
@@ -1298,6 +1300,18 @@ namespace
             std::optional<DungeonBossInfo> const next =
                 ctx->GetValue<std::optional<DungeonBossInfo>>(DcKey::NextDungeonBoss)->Get();
             return next.has_value() ? DcTargeting::GetLiveBoss(tank, ctx, next->entry) : nullptr;
+        });
+#endif
+#if DC_MODULE_OWNS_COMBAT_REGROUP
+        // A9: the run holds this member passive at the leader's advanced-pull
+        // camp (Forming / Advancing / Returning); the camp owns it there.
+        CoaGardesRunHooks::SetCampHoldPassive([](Player* member) -> bool
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return false;
+            Position camp;
+            bool passive = false;
+            return DcLeaderSignal::GetLeaderCampHold(member, camp, passive) && passive;
         });
 #endif
         for (char const* guard : kGuardsStillInDungeonClear)

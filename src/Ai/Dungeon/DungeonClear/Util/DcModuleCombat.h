@@ -87,4 +87,13 @@
 #define DC_MODULE_OWNS_TOP_OFF_PARTY 0
 #endif
 
+// A9, combat regroup (a follower that cannot contribute from where it stands
+// walks to a role standoff point). DC gives the module its passive camp hold
+// through SetCampHoldPassive.
+#if defined(COA_COMBAT_OWNS_COMBAT_REGROUP)
+#define DC_MODULE_OWNS_COMBAT_REGROUP 1
+#else
+#define DC_MODULE_OWNS_COMBAT_REGROUP 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
