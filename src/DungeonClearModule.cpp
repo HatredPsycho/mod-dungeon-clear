@@ -1223,8 +1223,13 @@ namespace
 #endif
 #if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
         "room boss chase",
-#endif "lyceum close up", "iron hall",
+#endif
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
+        "lyceum close up",
+#endif
+        "iron hall",
         "ground hazards", "target exclusion", "boss stand down",
+        nullptr,  // ends the list, which is empty once the module owns every guard
     };
 
     // The reference tank of a member in a DC run, or of a player-led party:
@@ -1282,7 +1287,8 @@ namespace
         });
 #endif
         for (char const* guard : kGuardsStillInDungeonClear)
-            CoaGroupTank::SetHandledByDungeonClear(guard, true);
+            if (guard)
+                CoaGroupTank::SetHandledByDungeonClear(guard, true);
 #endif
     }
 }

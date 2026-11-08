@@ -9,6 +9,7 @@
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
 #include "Ai/Dungeon/DungeonClear/Multiplier/DungeonClearMultiplier.h"
 #include "Ai/Dungeon/DungeonClear/Strategy/DcRelevance.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Playerbots.h"
 #include "Util/DcPlayerbotsExclusionType.h"
 
@@ -625,10 +626,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // a target outside that radius) is DungeonClearCombatMultiplier's. Combat
     // only: between fights the event's pack leash and the follow own spacing.
     // Inert everywhere else: the trigger's first test is the map id. See
-    // DungeonClearLyceumCloseUpTrigger.
+    // DungeonClearLyceumCloseUpTrigger. The module's CoA Combat A3 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
     triggers.push_back(new TriggerNode(
         "dungeon clear lyceum close up",
         { NextAction("dungeon clear lyceum close up", DcRel::LyceumCloseUp) }));
+#endif
 
     // The Oculus only: the rider rung, combat side. See the non-combat copy; the
     // stand-down exempts it by name (DcBossStandDown::ClassifyAction), because the

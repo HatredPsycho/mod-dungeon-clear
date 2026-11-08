@@ -38,4 +38,12 @@
 #define DC_MODULE_OWNS_ROOM_BOSS_CHASE 0
 #endif
 
+// A3, BRD Lyceum close-up (every member but the tank stays near the tank in
+// Lyceum fights, and no stock chase away from it).
+#if defined(COA_COMBAT_OWNS_LYCEUM_CLOSE_UP)
+#define DC_MODULE_OWNS_LYCEUM_CLOSE_UP 1
+#else
+#define DC_MODULE_OWNS_LYCEUM_CLOSE_UP 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

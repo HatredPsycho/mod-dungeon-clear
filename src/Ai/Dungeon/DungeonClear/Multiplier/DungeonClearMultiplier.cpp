@@ -231,6 +231,7 @@ static bool OculusDrakeAttackUnsafe(Player* bot, PlayerbotAI* botAI, AiObjectCon
 // stand in the room. The other half of the close-up rung — see
 // DcLyceumCloseUpDecision.h. ReachTargetAction is every stock combat chase
 // (reach melee / reach spell / reach party member to heal all end in ChaseTo).
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
 static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Action* action)
 {
     if (bot->GetMapId() != DcBlackrockDepths::MAP_ID)
@@ -248,6 +249,7 @@ static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Acti
     return target && DcLyceumCloseUp::ChaseLeavesThePack(target->GetPositionX(), target->GetPositionY(),
                                                          tank->GetPositionX(), tank->GetPositionY());
 }
+#endif
 
 // ROOM-AGGRO PRE-CLEAR: no stock reach / chase toward a target standing inside the
 // sleeping boss's wake sphere, for any member, tank included. The room clear keeps
@@ -669,8 +671,10 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
 #endif
 
     // The Lyceum's close-up, chase half — see LyceumChaseLeavesThePack above.
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
     if (LyceumChaseLeavesThePack(bot, context, action))
         return 0.0f;
+#endif
 
     // The sleeping room-aggro boss's sphere — see ChaseWakesSleepingRoomBoss above.
     // A raid encounter's stand-down hands the fight to the raid strategy.
