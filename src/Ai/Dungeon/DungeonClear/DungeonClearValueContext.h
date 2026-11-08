@@ -72,7 +72,9 @@ public:
         // Decorator over the stock heal-target value: registered under the STOCK
         // name so it fronts it (last-wins merge; see the value's header). Diverts to
         // the DC escortee only while an escort is active; else returns stock verbatim.
+#if !DC_MODULE_OWNS_HEAL_REPOSITION  // the module's own value reads DC's escort provider
         creators[DcKey::Stock::PartyToHeal] = &DungeonClearValueContext::dungeon_clear_party_member_to_heal;
+#endif
         // Decorators over the two stock DPS pickers, registered under the STOCK
         // names for the same last-wins reason. They exist because both pickers
         // return the raid-icon target BEFORE the target-exclusion pass runs, which

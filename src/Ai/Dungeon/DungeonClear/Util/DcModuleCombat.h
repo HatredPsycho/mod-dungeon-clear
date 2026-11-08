@@ -105,4 +105,13 @@
 #define DC_MODULE_OWNS_TARGET_EXCLUSION 0
 #endif
 
+// A10, heal reposition (a healer walks to see a hurt member out of its LOS)
+// and the escortee healed like a member. DC's escort provider
+// (CoaHealEscort::SetProvider) is wired with the module's guards.
+#if defined(COA_COMBAT_OWNS_HEAL_REPOSITION)
+#define DC_MODULE_OWNS_HEAL_REPOSITION 1
+#else
+#define DC_MODULE_OWNS_HEAL_REPOSITION 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

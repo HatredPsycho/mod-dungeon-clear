@@ -229,9 +229,11 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // those drivers are LEADER-only — a role partition, asserted in the ladder
     // test. Same trigger as the combat side; it defers during passive camp holds.
     // See DungeonClearHealRepositionTrigger.
+#if !DC_MODULE_OWNS_HEAL_REPOSITION  // the module's CoA Combat A10 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear heal reposition",
         { NextAction("dungeon clear heal reposition", DcRel::HealReposition) }));
+#endif
 
     // Phantom-combat escape hatch, NON-COMBAT side — and this is the half that
     // matters, because the state it recovers is one the bot can only be in HERE.
@@ -597,9 +599,11 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // heals is done in the trigger (it defers to a visible hurt member), not by
     // relevance, so this never steals a tick from a real heal. See
     // DungeonClearHealRepositionTrigger.
+#if !DC_MODULE_OWNS_HEAL_REPOSITION  // the module's CoA Combat A10 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear heal reposition",
         { NextAction("dungeon clear heal reposition", DcRel::HealReposition) }));
+#endif
 
     // Survival: move out of an unfightable hazard's pulse — the Arcatraz Destroyed
     // Sentinel (21761) summoned at a Sentinel's corpse, pulsing 15yd/1s until it
