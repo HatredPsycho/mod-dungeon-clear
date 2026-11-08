@@ -275,6 +275,7 @@ static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Acti
 // pays, so the GUIDs are kept per bot for ROOM_BOSS_MEMO_MS and only resolved and
 // re-tested (alive, out of combat) on each read. thread_local: a bot is only ever
 // evaluated on its own map's thread, so no lock and no cross-map read.
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
 static std::vector<ObjectGuid> const& SleepingRoomBossesNear(Player* bot)
 {
     constexpr uint32 ROOM_BOSS_MEMO_MS = 2000;
@@ -363,6 +364,7 @@ static bool ChaseWakesSleepingRoomBoss(Player* bot, AiObjectContext* context, Ac
     return DungeonClearMath::ChaseWakesSleepingBoss(
         chaseEnd, DcEngageGeometry::RoomAggroSphereRadius(tank, boss), boss->IsInCombat());
 }
+#endif
 
 namespace
 {
@@ -672,8 +674,10 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
 
     // The sleeping room-aggro boss's sphere — see ChaseWakesSleepingRoomBoss above.
     // A raid encounter's stand-down hands the fight to the raid strategy.
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
     if (ChaseWakesSleepingRoomBoss(bot, context, action) && !DcBossStandDown::IsActive(bot))
         return 0.0f;
+#endif
 
     bool const isDcAction = name.compare(0, 13, "dungeon clear") == 0;
     if (!isDcAction && name != "drop target")

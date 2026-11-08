@@ -102,9 +102,15 @@
 #if DC_HAS_COA_COMBAT
 #include "CoaCombatGroupTank.h"
 #endif
+#if DC_MODULE_OWNS_ROOM_BOSS_CHASE
+#include "CoaGardesRunHooks.h"
+#endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
+#include "Ai/Dungeon/DungeonClear/Data/DungeonBossInfo.h"
+#include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
+#include <optional>
 #include "Group.h"
 #include "Map.h"
 #include "InstanceSaveMgr.h"
@@ -1215,7 +1221,9 @@ namespace
 #if !DC_MODULE_OWNS_ESCAPE_LEAP
         "escape leap ban",
 #endif
-        "room boss chase", "lyceum close up", "iron hall",
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
+        "room boss chase",
+#endif "lyceum close up", "iron hall",
         "ground hazards", "target exclusion", "boss stand down",
     };
 
@@ -1257,6 +1265,22 @@ namespace
                 return nullptr;
             return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member));
         });
+#if DC_MODULE_OWNS_ROOM_BOSS_CHASE
+        // A2: the sleeping room-aggro boss whose room the run's tank is clearing
+        // (the run's next boss, while its room clear is active), or nullptr.
+        CoaGardesRunHooks::SetRoomClearBoss([](Player* tank) -> Creature*
+        {
+            if (!DcModule::IsEnabled() || !tank)
+                return nullptr;
+            PlayerbotAI* const tankAI = GET_PLAYERBOT_AI(tank);
+            AiObjectContext* const ctx = tankAI ? tankAI->GetAiObjectContext() : nullptr;
+            if (!ctx || !DcTargeting::IsRoomClearActive(tank, ctx))
+                return nullptr;
+            std::optional<DungeonBossInfo> const next =
+                ctx->GetValue<std::optional<DungeonBossInfo>>(DcKey::NextDungeonBoss)->Get();
+            return next.has_value() ? DcTargeting::GetLiveBoss(tank, ctx, next->entry) : nullptr;
+        });
+#endif
         for (char const* guard : kGuardsStillInDungeonClear)
             CoaGroupTank::SetHandledByDungeonClear(guard, true);
 #endif
