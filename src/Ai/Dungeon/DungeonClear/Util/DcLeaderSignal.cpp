@@ -970,7 +970,16 @@ bool DcLeaderSignal::IsLeaderFightAssistWanted(Player* bot)
         // cost a designed, tested and merged feature that then had to be reverted.
         // The stale-ms and the latch window below are what stop the next reader
         // making the same mistake.
-        if (groupInCombat && !leaderInCombat)
+        // Throttled: unthrottled this printed ~14,500 lines per bench series, almost
+        // all of them the latch tail described above. Only the LIVE divergence is
+        // worth reading, and once per bot every 10 s is enough to see it. The map is
+        // thread_local (bots of one map update on one thread), bounded by bot count.
+        bool const groupLive = groupInCombat && !leaderInCombat && AnyGroupMemberInCombat(leader);
+        thread_local std::unordered_map<ObjectGuid::LowType, uint32> lastStallLog;
+        uint32& lastLog = lastStallLog[bot->GetGUID().GetCounter()];
+        if (groupLive && (lastLog == 0 || getMSTimeDiff(lastLog, getMSTime()) >= 10000))
+        {
+            lastLog = getMSTime();
             DC_PULL_DEBUG("[DC:{}] assist: groupmate in combat while leader reads "
                           "out-of-combat -> assisting (was the no-pull-state stall) "
                           "[leader flag=0 instant | group=1 {} | latch {:.1f}s]",
@@ -983,6 +992,7 @@ bool DcLeaderSignal::IsLeaderFightAssistWanted(Player* bot)
                                                       .partyEngagedLatchMs,
                                                   getMSTime())),
                           latchMs / 1000.0f);
+        }
         wanted = groupInCombat;
     }
 
