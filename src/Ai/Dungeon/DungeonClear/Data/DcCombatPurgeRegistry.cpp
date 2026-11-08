@@ -4,6 +4,7 @@
  */
 
 #include "DcCombatPurgeRegistry.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 
 namespace
 {
@@ -111,8 +112,10 @@ namespace
     // for the Vial Bunny reason.
     DcCombatPurgeRow const kRows[] =
     {
+#if !DC_MODULE_OWNS_COMBAT_PURGE  // the module's CoA Combat B4 purges these two
         { 33, 36530, DcCombatPurgeWhen::Always },    // Shadowfang Keep — [DND] Valentine Boss - Vial Bunny (immune holiday trigger)
         { 429, 13916, DcCombatPurgeWhen::Always },   // Dire Maul West — Dire Maul Crystal Totem (non-attackable set dressing)
+#endif
         { 578, 27638, DcCombatPurgeWhen::Always },   // The Oculus — Azure Ring Guardian (flying picket, unreachable on foot)
         { 578, 28276, DcCombatPurgeWhen::Evading },  // The Oculus — Greater Ley-Whelp (Eregos add, outlives his evade)
         { 604, 29982, DcCombatPurgeWhen::Always },   // Gundrak — Drakkari Raider (rhino passenger, ejected into the water at path point 3)

@@ -108,6 +108,9 @@
 #if DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
 #include "CoaStuckCombat.h"
 #endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION && DC_MODULE_OWNS_COMBAT_PURGE
+#include "CoaCombatPurge.h"
+#endif
 #if DC_MODULE_OWNS_BOSS_STAND_DOWN
 #include "CoaBossStandDown.h"
 #include <vector>
@@ -1342,7 +1345,14 @@ namespace
         CoaTargetExclusion::RunHooks exclusionHooks;
         exclusionHooks.purgeBarred = [](Player* bot, uint32 entry) -> bool
         {
-            return DcModule::IsEnabled() && bot && DcCombatPurge::IsBarred(bot, entry);
+            if (!DcModule::IsEnabled() || !bot)
+                return false;
+#if DC_MODULE_OWNS_COMBAT_PURGE
+            // B4: the module purges (and bars) the CoA rows; DC still the others.
+            if (CoaCombatPurge::IsBarred(bot, entry))
+                return true;
+#endif
+            return DcCombatPurge::IsBarred(bot, entry);
         };
         exclusionHooks.bossSkipped = [](Player* bot, uint32 bossEntry) -> bool
         {

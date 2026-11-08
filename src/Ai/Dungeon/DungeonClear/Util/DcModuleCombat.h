@@ -157,4 +157,13 @@
 #define DC_MODULE_OWNS_STUCK_COMBAT_BREAKER 0
 #endif
 
+// B4, combat purge for the CoA rows (Shadowfang Keep's Vial Bunny 36530, Dire
+// Maul West's Crystal Totem 13916): the module ticks them. DC keeps its other
+// rows, and its target bar reads the module's too.
+#if defined(COA_COMBAT_OWNS_COMBAT_PURGE)
+#define DC_MODULE_OWNS_COMBAT_PURGE 1
+#else
+#define DC_MODULE_OWNS_COMBAT_PURGE 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
