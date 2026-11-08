@@ -965,7 +965,7 @@ bool DungeonClearStalledTrigger::IsActive()
     // Raid boss stand-down: a stale stall reason must never drive fallback
     // maneuvers into a live encounter (the fight is the raid strategy's; DC
     // resumes at loot). Cheap for dungeons — IsActive is raid-gated.
-    if (DcBossStandDown::IsActive(bot))
+    if (DcBossStandDown::IsRaidStandDown(bot))
         return false;
 
     // ...nor into Karazhan's chess game, which owns the whole raid for its length.
@@ -1952,7 +1952,7 @@ bool DungeonClearBreakStuckCombatTrigger::IsActive()
     // Karazhan's chess game holds its controllers combat-flagged by their pieces'
     // fight with nothing a bot could or should attack: exactly the phantom shape,
     // and not one. Same stand-down as a boss encounter, clocks and all.
-    if (!map || DcBossStandDown::IsActive(bot) || DcKarazhan::ChessIsOn(bot))
+    if (!map || DcBossStandDown::IsRaidStandDown(bot) || DcKarazhan::ChessIsOn(bot))
     {
         stuckCombatSinceMs = 0;
         holderCloseWatch.Reset();

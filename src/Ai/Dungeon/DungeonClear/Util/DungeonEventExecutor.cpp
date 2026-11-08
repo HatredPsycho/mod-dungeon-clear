@@ -1731,7 +1731,7 @@ DungeonEvent const* DungeonEventExecutor::FindDueConditionalEvent(Player* bot,
     // (DungeonEvent::encounterActive — the Razorgore-orb seam). Evaluated once
     // out here, not per event: IsActive is raid-gated and leader-memoised, so
     // dungeon runs pay a single Map::IsRaid().
-    bool const standDown = DcBossStandDown::IsActive(bot);
+    bool const standDown = DcBossStandDown::IsRaidStandDown(bot);
 
     for (DungeonEvent const* ev : conditional)
     {

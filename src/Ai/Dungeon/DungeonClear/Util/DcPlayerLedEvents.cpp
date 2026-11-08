@@ -205,7 +205,7 @@ namespace
                 return ev;
         }
 
-        bool const standDown = DcBossStandDown::IsActive(bot);
+        bool const standDown = DcBossStandDown::IsRaidStandDown(bot);
         for (DungeonEvent const* ev : DungeonEventRegistry::Conditional(mapId, key))
         {
             if (state.done.count(ev->id))

@@ -296,7 +296,7 @@ namespace DcCombatPurge
             // the playerbots strategy's fight, whose own pacing this must not read
             // as a freeze. Same clock treatment as the stranded failsafe gives
             // them, so the purge re-arms clean on resume.
-            if (run.paused || DcBossStandDown::IsActive(leader) || DcKarazhan::ChessIsOn(leader))
+            if (run.paused || DcBossStandDown::IsRaidStandDown(leader) || DcKarazhan::ChessIsOn(leader))
             {
                 DcRunProgress::Stamp(run.purgeProgress, now);
                 continue;

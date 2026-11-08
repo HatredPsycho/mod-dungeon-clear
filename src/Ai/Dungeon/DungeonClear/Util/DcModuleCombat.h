@@ -114,4 +114,13 @@
 #define DC_MODULE_OWNS_HEAL_REPOSITION 0
 #endif
 
+// A12, raid boss stand-down (the raid strategy owns the encounter). DC reads
+// the module's verdict (CoaBossStandDown::IsActive) and gives it the run's boss
+// roster through SetRosterBossProvider.
+#if defined(COA_COMBAT_OWNS_BOSS_STAND_DOWN)
+#define DC_MODULE_OWNS_BOSS_STAND_DOWN 1
+#else
+#define DC_MODULE_OWNS_BOSS_STAND_DOWN 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

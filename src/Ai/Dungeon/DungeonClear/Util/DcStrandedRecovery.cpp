@@ -224,7 +224,7 @@ namespace DcStrandedRecovery
         // position (and engagement alone can't be trusted through submerge /
         // phase-flip signal gaps). Same clock treatment as a pause, so the
         // failsafe re-arms clean when the fight ends.
-        if (DcBossStandDown::IsActive(bot))
+        if (DcBossStandDown::IsRaidStandDown(bot))
         {
             DcRunProgress::Stamp(run.progress, now);
             return false;

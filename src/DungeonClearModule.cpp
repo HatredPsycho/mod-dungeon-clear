@@ -105,6 +105,10 @@
 #if DC_MODULE_OWNS_ROOM_BOSS_CHASE || DC_MODULE_OWNS_COMBAT_REGROUP
 #include "CoaGardesRunHooks.h"
 #endif
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+#include "CoaBossStandDown.h"
+#include <vector>
+#endif
 #if DC_MODULE_OWNS_TARGET_EXCLUSION
 #include "CoaTargetExclusion.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcCombatPurge.h"
@@ -1254,7 +1258,9 @@ namespace
 #if !DC_MODULE_OWNS_TARGET_EXCLUSION
         "target exclusion",
 #endif
+#if !DC_MODULE_OWNS_BOSS_STAND_DOWN
         "boss stand down",
+#endif
         nullptr,  // ends the list, which is empty once the module owns every guard
     };
 
@@ -1346,6 +1352,29 @@ namespace
             return skipped.find(bossEntry) != skipped.end();
         };
         CoaTargetExclusion::SetRunHooks(std::move(exclusionHooks));
+#endif
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+        // A12: is `entry` a boss (kind Boss) of the run's roster? Read off the
+        // run leader's roster, as DC's own no-script fallback did. A human-led
+        // party has no roster: nothing counts, the instance script decides.
+        CoaBossStandDown::SetRosterBossProvider([](Player* at, uint32 entry) -> bool
+        {
+            if (!DcModule::IsEnabled() || !at)
+                return false;
+            Player* leader = DcLeaderSignal::FindRunOwner(at);
+            if (!leader)
+                leader = DcPlayerLed::Leader(at);
+            PlayerbotAI* const leaderAI = leader ? GET_PLAYERBOT_AI(leader) : nullptr;
+            AiObjectContext* const ctx = leaderAI ? leaderAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            std::vector<DungeonBossInfo> const& bosses =
+                ctx->GetValue<std::vector<DungeonBossInfo>>(DcKey::DungeonBosses)->Get();
+            for (DungeonBossInfo const& info : bosses)
+                if (info.kind == DungeonAnchorKind::Boss && info.entry == entry)
+                    return true;
+            return false;
+        });
 #endif
         for (char const* guard : kGuardsStillInDungeonClear)
             if (guard)
