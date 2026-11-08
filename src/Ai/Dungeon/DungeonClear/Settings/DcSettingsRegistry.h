@@ -802,6 +802,11 @@ inline constexpr DcSettingDef kDcSettings[] =
     // when it is 0. SpectateSpeed is the movement speed multiplier applied to the
     // possessed camera dummy (flight and run). See Util/DcSpectator.h.
     { "SpectateEnable",        DcType::Bool,   1,   0,   1,  false },
+
+    // Run members' aggressive pets and summons held defensive between fights
+    // (Util/DcPetStance.h). Server-only: a bench sets it to 0 to measure a combat
+    // guard without the pet change in the way.
+    { "PetsDefensiveBetweenFights", DcType::Bool, 1, 0,   1,  false },
     { "SpectateSpeed",         DcType::Float, 2.5, 0.5,  8,  true  },
 
     // Test-run harness (`.dc test`). Server-only: these govern the regression

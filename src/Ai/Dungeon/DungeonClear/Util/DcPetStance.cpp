@@ -6,6 +6,7 @@
 #include "DcPetStance.h"
 
 #include "DungeonClearUtil.h"   // DC_PULL_* log macros
+#include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "CharmInfo.h"
 #include "Creature.h"
 #include "Map.h"
@@ -58,6 +59,8 @@ void DcPetStance::Tick(Player* player)
         return;
     Map* map = player->GetMap();
     if (!map || !map->IsDungeon())
+        return;
+    if (!DcSettings::GetBool(player, "PetsDefensiveBetweenFights"))
         return;
 
     std::vector<Creature*> units;
