@@ -62,6 +62,12 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+#include "GameTime.h"
+#include "Group.h"
+#include "ObjectAccessor.h"
+#include "RandomPlayerbotMgr.h"
+#include <unordered_map>
+#include <unordered_set>
 #include "PlayerScript.h"
 #include "UnitScript.h"
 
@@ -224,6 +230,93 @@ public:
         DcSpectator::EndBotAiMoverWindow(player);
         DcSpectator::Tick(player, p_time);
     }
+};
+
+// Ghost probe (2.9.5, diagnostic asked by the Pilote for bissakov's ghost fix).
+// Once a minute, on the world thread (OnUpdate runs before the map updates, so no
+// map thread touches a player while this reads it), every player that has been a
+// ghost for 10 minutes gets ONE line: who (random bot, party bot or human), where,
+// and the bot's last state; a second line when it comes back. Cheap: one pass
+// over the online players a minute, a line only past the 10 minutes.
+class DungeonClearGhostProbeWorldScript : public WorldScript
+{
+public:
+    DungeonClearGhostProbeWorldScript() : WorldScript("DungeonClearGhostProbeWorldScript") {}
+
+    void OnUpdate(uint32 diff) override
+    {
+        _elapsedMs += diff;
+        if (_elapsedMs < kTickMs)
+            return;
+        _elapsedMs = 0;
+        if (!DcModule::IsEnabled())
+            return;
+
+        time_t const now = GameTime::GetGameTime().count();
+        std::unordered_set<uint64> ghosts;
+        for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+        {
+            if (!player || !player->IsInWorld())
+                continue;
+            uint64 const key = guid.GetRawValue();
+            auto it = _since.find(key);
+            if (!player->HasPlayerFlag(PLAYER_FLAGS_GHOST))
+            {
+                if (it != _since.end())
+                {
+                    if (it->second.reported)
+                        LOG_INFO("playerbots.dungeonclear", "[GHOST] {} ({}) back after {}s as a ghost",
+                                 player->GetName(), Kind(player), now - it->second.since);
+                    _since.erase(it);
+                }
+                continue;
+            }
+            ghosts.insert(key);
+            if (it == _since.end())
+            {
+                _since.emplace(key, Entry{ now, false });
+                continue;
+            }
+            if (it->second.reported || now - it->second.since < kReportAfterS)
+                continue;
+            it->second.reported = true;
+            PlayerbotAI* ai = GET_PLAYERBOT_AI(player);
+            Player* master = ai ? ai->GetMaster() : nullptr;
+            Group* group = player->GetGroup();
+            LOG_INFO("playerbots.dungeonclear",
+                     "[GHOST] {} ({}) a ghost for {}s: map {} zone {} area {} at ({:.1f},{:.1f},{:.1f}) "
+                     "instance {} | group {} | master {} | bot state {}",
+                     player->GetName(), Kind(player), now - it->second.since, player->GetMapId(),
+                     player->GetZoneId(), player->GetAreaId(), player->GetPositionX(),
+                     player->GetPositionY(), player->GetPositionZ(), player->GetInstanceId(),
+                     group ? group->GetMembersCount() : 0u,
+                     master && master != player ? master->GetName() : std::string("-"),
+                     ai ? static_cast<int>(ai->GetState()) : -1);
+        }
+        // Logged out (or deleted) while a ghost: forget it.
+        for (auto it = _since.begin(); it != _since.end();)
+            it = ghosts.count(it->first) ? std::next(it) : _since.erase(it);
+    }
+
+private:
+    static constexpr uint32 kTickMs = 60000;
+    static constexpr time_t kReportAfterS = 600;
+
+    struct Entry
+    {
+        time_t since;
+        bool reported;
+    };
+
+    static char const* Kind(Player* player)
+    {
+        if (!GET_PLAYERBOT_AI(player))
+            return "human";
+        return sRandomPlayerbotMgr.IsRandomBot(player) ? "random bot" : "party bot";
+    }
+
+    uint32 _elapsedMs = 0;
+    std::unordered_map<uint64, Entry> _since;
 };
 
 class DungeonClearRegistrarWorldScript : public WorldScript
@@ -1092,6 +1185,7 @@ void AddSC_dungeon_clear_module()
     new DungeonClearRunTravelGuardScript();
     AddSC_dc_test_run_stats();
     new DungeonClearRegistrarWorldScript();
+    new DungeonClearGhostProbeWorldScript();
     new DungeonClearLoginPlayerScript();
     new DungeonClearPullBrakeScript();
     new DungeonClearLateJoinerScript();
