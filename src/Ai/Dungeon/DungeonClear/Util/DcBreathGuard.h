@@ -7,6 +7,14 @@
 #define _DC_BREATH_GUARD_H
 
 #include "Define.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
+
+// The module's CoA Combat B2 ticks the guard itself when it carries it; DC's
+// party gate names DcBreath, the module's CoaBreathGuard or DC's DcBreathGuard.
+#if DC_MODULE_OWNS_BREATH_GUARD
+#include "CoaBreathGuard.h"
+namespace DcBreath = CoaBreathGuard;
+#else
 
 class Player;
 
@@ -28,5 +36,8 @@ namespace DcBreathGuard
     bool AnyMemberUnderWater(Player* bot);
     void Tick(uint32 diffMs);
 }
+
+namespace DcBreath = DcBreathGuard;
+#endif  // DC_MODULE_OWNS_BREATH_GUARD
 
 #endif

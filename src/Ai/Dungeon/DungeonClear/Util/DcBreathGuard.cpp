@@ -5,6 +5,8 @@
 
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 
+#if !DC_MODULE_OWNS_BREATH_GUARD
+
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 
@@ -109,3 +111,4 @@ namespace DcBreathGuard
         }
     }
 }
+#endif  // !DC_MODULE_OWNS_BREATH_GUARD

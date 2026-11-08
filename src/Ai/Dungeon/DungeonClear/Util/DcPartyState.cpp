@@ -201,7 +201,7 @@ DcPartyState::SpreadGate DcPartyState::GetSpreadGate(Player* bot, AiObjectContex
     // with anyone in the water drowned every Blackfathom Deeps run; with a
     // member under water the gate does not hold, the tank keeps going and the
     // breath guard (DcBreathGuard) brings up whoever stays down too long.
-    if (DcBreathGuard::AnyMemberUnderWater(bot))
+    if (DcBreath::AnyMemberUnderWater(bot))
     {
         gate.maxSpread = 1000.0f;
         return gate;

@@ -839,7 +839,9 @@ public:
         _gateSweepAccumMs += diff;
         if (_gateSweepAccumMs >= DC_STRATEGY_GATE_SWEEP_MS)
         {
+#if !DC_MODULE_OWNS_BREATH_GUARD  // the module's CoA Combat B2 ticks it itself
             DcBreathGuard::Tick(_gateSweepAccumMs);
+#endif
             _gateSweepAccumMs = 0;
             DcStrategyGate::ReconcileAllBots();
         }

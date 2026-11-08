@@ -131,4 +131,12 @@
 #define DC_MODULE_OWNS_BEAR_FORM_BEFORE_PULL 0
 #endif
 
+// B2, breath guard: the module ticks it, and DC's party gate asks the
+// module's CoaBreathGuard::AnyMemberUnderWater.
+#if defined(COA_COMBAT_OWNS_BREATH_GUARD)
+#define DC_MODULE_OWNS_BREATH_GUARD 1
+#else
+#define DC_MODULE_OWNS_BREATH_GUARD 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
