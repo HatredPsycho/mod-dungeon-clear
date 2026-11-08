@@ -105,6 +105,11 @@
 #if DC_MODULE_OWNS_ROOM_BOSS_CHASE || DC_MODULE_OWNS_COMBAT_REGROUP
 #include "CoaGardesRunHooks.h"
 #endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+#include "CoaTargetExclusion.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcCombatPurge.h"
+#include <unordered_set>
+#endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
@@ -1244,7 +1249,10 @@ namespace
 #if !DC_MODULE_OWNS_GROUND_HAZARDS
         "ground hazards",
 #endif
-        "target exclusion", "boss stand down",
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
+        "target exclusion",
+#endif
+        "boss stand down",
         nullptr,  // ends the list, which is empty once the module owns every guard
     };
 
@@ -1313,6 +1321,29 @@ namespace
             bool passive = false;
             return DcLeaderSignal::GetLeaderCampHold(member, camp, passive) && passive;
         });
+#endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+        // A6: the creatures a combat purge has just barred for the run (Gundrak's
+        // raiders), and the bosses the operator skipped with `dc skip` (BWL:
+        // Broodlord skipped lifts the drake hall's bar).
+        CoaTargetExclusion::RunHooks exclusionHooks;
+        exclusionHooks.purgeBarred = [](Player* bot, uint32 entry) -> bool
+        {
+            return DcModule::IsEnabled() && bot && DcCombatPurge::IsBarred(bot, entry);
+        };
+        exclusionHooks.bossSkipped = [](Player* bot, uint32 bossEntry) -> bool
+        {
+            if (!DcModule::IsEnabled() || !bot)
+                return false;
+            PlayerbotAI* const botAI = GET_PLAYERBOT_AI(bot);
+            AiObjectContext* const ctx = botAI ? botAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            std::unordered_set<uint32> const& skipped =
+                ctx->GetValue<std::unordered_set<uint32>&>(DcKey::Skipped)->Get();
+            return skipped.find(bossEntry) != skipped.end();
+        };
+        CoaTargetExclusion::SetRunHooks(std::move(exclusionHooks));
 #endif
         for (char const* guard : kGuardsStillInDungeonClear)
             if (guard)

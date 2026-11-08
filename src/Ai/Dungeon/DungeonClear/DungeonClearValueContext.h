@@ -26,6 +26,7 @@
 #include "Ai/Dungeon/DungeonClear/Value/DungeonClearStateValues.h"
 #include "Ai/Dungeon/DungeonClear/Value/NextDungeonBossValue.h"
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 
 class DungeonClearValueContext : public NamedObjectContext<UntypedValue>
 {
@@ -76,9 +77,12 @@ public:
         // names for the same last-wins reason. They exist because both pickers
         // return the raid-icon target BEFORE the target-exclusion pass runs, which
         // pointed a whole raid at a boss it must not kill. Off a map with exclusion
-        // rows they return the stock answer verbatim. See the value's header.
+        // rows they return the stock answer verbatim. See the value's header. The
+        // module's CoA Combat A6 fronts them instead when it carries it.
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
         creators[DcKey::Stock::DpsTarget] = &DungeonClearValueContext::dungeon_clear_dps_target;
         creators[DcKey::Stock::DpsAoeTarget] = &DungeonClearValueContext::dungeon_clear_dps_aoe_target;
+#endif
         creators[DcKey::NoRti] = &DungeonClearValueContext::dungeon_clear_no_rti;
         creators[DcKey::PullSetting] = &DungeonClearValueContext::dungeon_clear_pull_setting;
         creators[DcKey::PullContext] = &DungeonClearValueContext::dungeon_clear_pull_context;

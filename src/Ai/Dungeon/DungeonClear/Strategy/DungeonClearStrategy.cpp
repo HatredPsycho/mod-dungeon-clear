@@ -410,10 +410,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // the camp is: the barred window spans combat and the gaps in it, and a bot
     // that walked out of combat still carrying the target resumes on it the moment
     // it walks back in. Inert on every map with no rows.
-    // See DungeonClearHoldFireTrigger.
+    // See DungeonClearHoldFireTrigger. The module's CoA Combat A6 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
     triggers.push_back(new TriggerNode(
         "dungeon clear hold fire",
         { NextAction("dungeon clear hold fire", DcRel::HoldFire) }));
+#endif
 
     // Rest-target override: top up to the run's chosen HP/mana before pulling.
     // Relevance 26.5 (DcRel::NeedsRest) — above advance (15) and follow-tank (25)
@@ -711,10 +714,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // the camp is: the barred window spans combat and the gaps in it, and a bot
     // that walked out of combat still carrying the target resumes on it the moment
     // it walks back in. Inert on every map with no rows.
-    // See DungeonClearHoldFireTrigger.
+    // See DungeonClearHoldFireTrigger. The module's CoA Combat A6 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
     triggers.push_back(new TriggerNode(
         "dungeon clear hold fire",
         { NextAction("dungeon clear hold fire", DcRel::HoldFire) }));
+#endif
 
     // Conditional-event driver, COMBAT side. Fires only for an event that opted in
     // with DrivesInCombat() — a continuous WAVE encounter where the party is in
@@ -764,8 +770,12 @@ void DungeonClearCombatStrategy::InitMultipliers(std::vector<Multiplier*>& multi
 
 bool DungeonClearCombatStrategy::HasTargetExclusions() const
 {
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+    return false;  // the module's CoA Combat A6 excludes them (DcModuleCombat.h)
+#else
     Player* const self = botAI ? botAI->GetBot() : nullptr;
     return self && DcTargetExclusionRegistry::HasRowsFor(self->GetMapId());
+#endif
 }
 
 void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
@@ -786,6 +796,11 @@ void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
     // starts a Blizzard, and the tank keeps counting whatever she is allowed to
     // hold. The enumerators go through DcPbExclusion because #2912 renamed them
     // and the module builds against playerbots on both sides of that change.
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+    // The module's CoA Combat A6 excludes them (DcModuleCombat.h).
+    (void)exclusions;
+    (void)type;
+#else
     Player* const self = botAI ? botAI->GetBot() : nullptr;
     if (!self)
         return;
@@ -811,4 +826,5 @@ void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
         if (unit && DcTargetExclusionRegistry::IsExcluded(self, mapId, unit->GetEntry(), forTank))
             exclusions.insert(guid);
     }
+#endif
 }

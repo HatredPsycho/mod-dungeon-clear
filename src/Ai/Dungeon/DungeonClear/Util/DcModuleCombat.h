@@ -96,4 +96,13 @@
 #define DC_MODULE_OWNS_COMBAT_REGROUP 0
 #endif
 
+// A6, target exclusion and hold fire (BWL's out-of-order bosses and
+// Razorgore). DC gives the module its combat purge bars and `dc skip` through
+// CoaTargetExclusion::SetRunHooks.
+#if defined(COA_COMBAT_OWNS_TARGET_EXCLUSION)
+#define DC_MODULE_OWNS_TARGET_EXCLUSION 1
+#else
+#define DC_MODULE_OWNS_TARGET_EXCLUSION 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
