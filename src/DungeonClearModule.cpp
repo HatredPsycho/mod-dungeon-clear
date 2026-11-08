@@ -1215,7 +1215,10 @@ namespace
     // Cutting a guard out of DC drops its name here IN THE SAME CHANGE.
     char const* const kGuardsStillInDungeonClear[] = {
         // Builder's lot
-        "heal reposition", "top off party",
+        "heal reposition",
+#if !DC_MODULE_OWNS_TOP_OFF_PARTY
+        "top off party",
+#endif
 #if !DC_MODULE_OWNS_THREAT_LEAD
         "threat lead",
 #endif

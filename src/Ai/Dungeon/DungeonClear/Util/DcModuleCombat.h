@@ -79,4 +79,12 @@
 #define DC_MODULE_OWNS_TANK_FIGHT_ASSIST 0
 #endif
 
+// A11, top off party (a healer tops the party off between pulls instead of
+// waiting for food).
+#if defined(COA_COMBAT_OWNS_TOP_OFF_PARTY)
+#define DC_MODULE_OWNS_TOP_OFF_PARTY 1
+#else
+#define DC_MODULE_OWNS_TOP_OFF_PARTY 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

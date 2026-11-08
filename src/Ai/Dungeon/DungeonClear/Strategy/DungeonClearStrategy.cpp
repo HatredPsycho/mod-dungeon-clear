@@ -433,10 +433,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // CoA healers top the party off to the same floor between pulls (loot
     // collection included): the class kit's own out-of-combat heal waits for
     // 45%. Above the rest rung so the healer heals before it sits to drink;
-    // "coa heal" stands it up anyway. See DungeonClearTopOffPartyTrigger.
+    // "coa heal" stands it up anyway. See DungeonClearTopOffPartyTrigger. The
+    // module's CoA Combat A11 runs it instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TOP_OFF_PARTY
     triggers.push_back(new TriggerNode(
         "dungeon clear top off party",
         { NextAction("coa heal", DcRel::TopOffParty) }));
+#endif
 
     // Keep the DC loot policy (quality floor / IgnoreChests) enforced for the
     // WHOLE party while the run is PAUSED — leader and followers alike. The
