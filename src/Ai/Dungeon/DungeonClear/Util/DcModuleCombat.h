@@ -148,4 +148,13 @@
 #define DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK 0
 #endif
 
+// B3, stuck combat breaker (phantom combat cleared after the timeout). DC
+// tells the module when its run allows it (CoaStuckCombat::SetRunAllows); DC's
+// run watchdog stays.
+#if defined(COA_COMBAT_OWNS_STUCK_COMBAT_BREAKER)
+#define DC_MODULE_OWNS_STUCK_COMBAT_BREAKER 1
+#else
+#define DC_MODULE_OWNS_STUCK_COMBAT_BREAKER 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

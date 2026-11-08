@@ -266,9 +266,11 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // guards (no attackers, no victim, no legitimate holder, sustained
     // StuckCombatTimeout, never in a raid) live in the trigger, so registering it here
     // only widens WHERE it can see, not WHEN it fires.
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER  // the module's CoA Combat B3 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear break stuck combat",
         { NextAction("dungeon clear break stuck combat", DcRel::BreakStuckCombat) }));
+#endif
 
     // Pull maneuver, NON-combat side — a LIVENESS NET, not a second driver.
     //
@@ -518,9 +520,11 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // recovery always wins the tick when it legitimately fires; it is inert whenever
     // anything is fightable, so it never contends with a real fight or a scripted
     // wave. See DungeonClearBreakStuckCombatTrigger.
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER  // the module's CoA Combat B3 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear break stuck combat",
         { NextAction("dungeon clear break stuck combat", DcRel::BreakStuckCombat) }));
+#endif
 
     // The in-combat half of the advanced pull: once the tank aggros, run it back
     // to the camp before releasing the party. Relevance above the stock combat

@@ -105,6 +105,9 @@
 #if DC_MODULE_OWNS_ROOM_BOSS_CHASE || DC_MODULE_OWNS_COMBAT_REGROUP
 #include "CoaGardesRunHooks.h"
 #endif
+#if DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
+#include "CoaStuckCombat.h"
+#endif
 #if DC_MODULE_OWNS_BOSS_STAND_DOWN
 #include "CoaBossStandDown.h"
 #include <vector>
@@ -1354,6 +1357,25 @@ namespace
             return skipped.find(bossEntry) != skipped.end();
         };
         CoaTargetExclusion::SetRunHooks(std::move(exclusionHooks));
+#endif
+#if DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
+        // B3: the breaker may clear this member's combat only in a live, unpaused
+        // run led by a bot tank (RungsFor(...).breakStuckCombat; a paused run has
+        // no party tank) and never during Karazhan's chess game.
+        CoaStuckCombat::SetRunAllows([](Player* member) -> bool
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return false;
+            PlayerbotAI* const memberAI = GET_PLAYERBOT_AI(member);
+            AiObjectContext* const ctx = memberAI ? memberAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            Player* const runTank = ctx->GetValue<Player*>(DcKey::PartyTank)->Get();
+            if (!DcPlayerLedDecision::RungsFor(runTank != nullptr, runTank == member,
+                                               DcPlayerLed::IsHumanTank(runTank)).breakStuckCombat)
+                return false;
+            return !DcKarazhan::ChessIsOn(member);
+        });
 #endif
 #if DC_MODULE_OWNS_BOSS_STAND_DOWN
         // A12: is `entry` a boss (kind Boss) of the run's roster? Read off the
