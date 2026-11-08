@@ -54,4 +54,12 @@
 #define DC_MODULE_OWNS_IRON_HALL 0
 #endif
 
+// A5, ground hazards (walk out of an unfightable hazard's pulse). The route
+// half (camps and regroup points kept off the hazards) stays in DC.
+#if defined(COA_COMBAT_OWNS_GROUND_HAZARDS)
+#define DC_MODULE_OWNS_GROUND_HAZARDS 1
+#else
+#define DC_MODULE_OWNS_GROUND_HAZARDS 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

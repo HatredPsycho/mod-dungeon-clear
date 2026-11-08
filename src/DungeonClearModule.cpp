@@ -1230,7 +1230,10 @@ namespace
 #if !DC_MODULE_OWNS_IRON_HALL
         "iron hall",
 #endif
-        "ground hazards", "target exclusion", "boss stand down",
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
+        "ground hazards",
+#endif
+        "target exclusion", "boss stand down",
         nullptr,  // ends the list, which is empty once the module owns every guard
     };
 

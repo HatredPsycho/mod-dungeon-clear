@@ -310,10 +310,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // the whole non-combat driving ladder (advance 15, rest, loot, follow) so the
     // bot leaves before it loots/regroups on the death spot. Same node runs in the
     // combat strategy for the case combat is still up. See
-    // DungeonClearHazardVacateTrigger.
+    // DungeonClearHazardVacateTrigger. The module's CoA Combat A5 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
     triggers.push_back(new TriggerNode(
         "dungeon clear hazard vacate",
         { NextAction("dungeon clear hazard vacate", DcRel::HazardVacate) }));
+#endif
 
     // Halls of Reflection only: while the escape is running, step FORWARD out of
     // the Lich King's ring rather than radially away from it. Registered in BOTH
@@ -597,10 +600,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // owns the tick, below the camp owners (60) and Hakkar (62-64) which never
     // contend. Also registered in the NON-combat strategy, because the summon
     // ticks after the kill once combat has dropped. See
-    // DungeonClearHazardVacateTrigger.
+    // DungeonClearHazardVacateTrigger. The module's CoA Combat A5 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
     triggers.push_back(new TriggerNode(
         "dungeon clear hazard vacate",
         { NextAction("dungeon clear hazard vacate", DcRel::HazardVacate) }));
+#endif
 
     // Halls of Reflection only: while the escape is running, step FORWARD out of
     // the Lich King's ring rather than radially away from it. Registered in BOTH
