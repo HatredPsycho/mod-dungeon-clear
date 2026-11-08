@@ -70,4 +70,13 @@
 #define DC_MODULE_OWNS_THREAT_LEAD 0
 #endif
 
+// A8, tank fight assist (a DPS the tank's fight never reached is put on it).
+// Only the ordinary fight leaves DC: the scripted camp fight's seed and the
+// leader's LOS-break drag guard stay here.
+#if defined(COA_COMBAT_OWNS_TANK_FIGHT_ASSIST)
+#define DC_MODULE_OWNS_TANK_FIGHT_ASSIST 1
+#else
+#define DC_MODULE_OWNS_TANK_FIGHT_ASSIST 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H

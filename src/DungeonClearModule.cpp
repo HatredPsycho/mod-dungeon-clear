@@ -1219,7 +1219,9 @@ namespace
 #if !DC_MODULE_OWNS_THREAT_LEAD
         "threat lead",
 #endif
+#if !DC_MODULE_OWNS_TANK_FIGHT_ASSIST
         "tank fight assist",
+#endif
         // DC's lot
         "combat regroup",
 #if !DC_MODULE_OWNS_ESCAPE_LEAP

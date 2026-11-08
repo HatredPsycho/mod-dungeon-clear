@@ -5,6 +5,7 @@
 
 #include "DungeonClearTriggers.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 
 #include <algorithm>
@@ -1607,6 +1608,7 @@ namespace
         return false;
     }
 
+#if !DC_MODULE_OWNS_TANK_FIGHT_ASSIST
     // Gate for the COMBAT-side fight assist: this follower's leader is mid
     // fight AND the bot currently has NO line-of-sight target of its own. The
     // empty-attackers test is what makes the combat assist self-limiting: the
@@ -1698,6 +1700,7 @@ namespace
         }
         return true;  // nothing engageable from here — reposition to the fight
     }
+#endif
 }
 
 bool DungeonClearAssistCampTrigger::IsActive()
@@ -1733,6 +1736,12 @@ bool DungeonClearAssistCampTrigger::IsActive()
     // target, not the pack); keep assist for DPS that must be driven into the fight.
     if (PlayerbotAI::IsHeal(bot))
         return false;
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The module's CoA Combat A8 assists every ordinary fight of the tank; DC
+    // keeps only the scripted camp fight's seed below.
+    if (!DcLeaderSignal::IsLeaderScriptedCampFight(bot))
+        return false;
+#endif
     // A scripted camp fight owns its followers — but only the WALK, which is the
     // one thing the plan forbids. This half of the action does not walk: it seeds
     // `current target`, SetInCombatWith()s the bot and flips it to the combat
@@ -1770,9 +1779,15 @@ bool DungeonClearAssistCampCombatTrigger::IsActive()
     // Combat side: a follower dragged into combat (group combat / stray hit) but
     // with the pack around a corner has an empty LOS attacker list and so idles
     // in the combat engine. Drive it into sight so stock combat can engage.
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The module's CoA Combat A8 owns it: this side never runs in a scripted camp
+    // fight (ShouldAssistCampFight), so nothing of it stays in DC.
+    return false;
+#else
     if (!bot || bot->isDead() || !bot->IsInCombat())
         return false;
     return ShouldAssistCampFight(botAI, bot);
+#endif
 }
 
 bool DungeonClearLeaderAssistTrigger::IsActive()

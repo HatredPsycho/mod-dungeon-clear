@@ -764,9 +764,16 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
                         pull.phase == DcPullPhase::Returning);
     }
 
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The follower case belongs to the module's CoA Combat A8, whose strategy
+    // neutralises drop target during its own assist; the leader's drag stays here.
+    if (!losBreakDrag)
+        return 1.0f;
+#else
     if (!losBreakDrag &&
         (PlayerbotAI::IsHeal(bot) || !DcLeaderSignal::IsLeaderFightAssistWanted(bot)))
         return 1.0f;
+#endif
 
     Unit* tgt = AI_VALUE(Unit*, DcKey::Stock::CurrentTarget);
     if (tgt && tgt->IsAlive() && tgt->GetMapId() == bot->GetMapId() &&
