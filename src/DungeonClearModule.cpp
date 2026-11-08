@@ -66,6 +66,10 @@
 #include "Group.h"
 #include "ObjectAccessor.h"
 #include "RandomPlayerbotMgr.h"
+#include "Spell.h"
+#include "SpellInfo.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 #include "PlayerScript.h"
@@ -497,6 +501,70 @@ public:
     }
 };
 
+// Bench probe for the escape leap ban (3.0, CoA Combat A1): every Blink or
+// Disengage a run member casts is counted on the run record (extras
+// `escapeLeaps`), and every creature that engages that member within 6 s of the
+// leap is counted too (`escapeLeapJoins`, the packs a leap lands in). Matched by
+// spell name so CoA's own ranks and twins count. Map thread only: the member,
+// its run owner and the creature all live on one map.
+namespace DcEscapeLeapProbe
+{
+    constexpr uint32 kJoinWindowMs = 6000;
+    thread_local std::unordered_map<ObjectGuid::LowType, uint32> lastLeap;
+
+    DcRunState* RunOf(Player* member)
+    {
+        Player* owner = member ? DcLeaderSignal::FindRunOwner(member) : nullptr;
+        PlayerbotAI* ai = owner ? GET_PLAYERBOT_AI(owner) : nullptr;
+        if (!ai)
+            return nullptr;
+        DcRunState& st = DcRun::Of(ai->GetAiObjectContext());
+        return st.enabled ? &st : nullptr;
+    }
+
+    void OnCast(Player* player, Spell* spell)
+    {
+        SpellInfo const* info = spell ? spell->GetSpellInfo() : nullptr;
+        char const* name = info ? info->SpellName[0] : nullptr;
+        if (!name || (std::strcmp(name, "Blink") != 0 && std::strcmp(name, "Disengage") != 0))
+            return;
+        DcRunState* st = RunOf(player);
+        if (!st)
+            return;
+        st->AddTestExtra("escapeLeaps");
+        lastLeap[player->GetGUID().GetCounter()] = getMSTime();
+        DC_PULL_INFO("[DC:{}] escape leap cast: {} ({})", player->GetName(), name, info->Id);
+    }
+
+    void OnEngage(Unit* victim)
+    {
+        Player* player = victim ? victim->ToPlayer() : nullptr;
+        if (!player)
+            return;
+        auto it = lastLeap.find(player->GetGUID().GetCounter());
+        if (it == lastLeap.end() || getMSTimeDiff(it->second, getMSTime()) > kJoinWindowMs)
+            return;
+        if (DcRunState* st = RunOf(player))
+            st->AddTestExtra("escapeLeapJoins");
+    }
+}
+
+class DungeonClearEscapeLeapProbeScript : public PlayerScript
+{
+public:
+    DungeonClearEscapeLeapProbeScript()
+        : PlayerScript("DungeonClearEscapeLeapProbeScript", {
+            PLAYERHOOK_ON_SPELL_CAST
+        }) {}
+
+    void OnPlayerSpellCast(Player* player, Spell* spell, bool /*skipCheck*/) override
+    {
+        if (!DcModule::IsEnabled())
+            return;
+        DcEscapeLeapProbe::OnCast(player, spell);
+    }
+};
+
 // A creature engaging a run member mid-fight. The player-side hook above only
 // fires on a player's 0->1 transition, so an add joining a running fight is
 // otherwise unrecorded. See DcFirstContact::OnCreatureEngage.
@@ -513,7 +581,10 @@ public:
         if (!DcModule::IsEnabled())
             return;
         if (Creature* creature = unit ? unit->ToCreature() : nullptr)
+        {
             DcFirstContact::OnCreatureEngage(creature, victim);
+            DcEscapeLeapProbe::OnEngage(victim);
+        }
     }
 };
 
@@ -1204,6 +1275,7 @@ void AddSC_dungeon_clear_module()
     new DungeonClearLoginPlayerScript();
     new DungeonClearPullBrakeScript();
     new DungeonClearLateJoinerScript();
+    new DungeonClearEscapeLeapProbeScript();
     // Opening half only — the End script registers on the first world tick so
     // it sorts after playerbots' AI-update hook (see the ordering contract).
     new DungeonClearSpectatorMoverBeginScript();
