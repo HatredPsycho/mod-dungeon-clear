@@ -1227,7 +1227,9 @@ namespace
 #if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
         "lyceum close up",
 #endif
+#if !DC_MODULE_OWNS_IRON_HALL
         "iron hall",
+#endif
         "ground hazards", "target exclusion", "boss stand down",
         nullptr,  // ends the list, which is empty once the module owns every guard
     };

@@ -331,10 +331,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // non-combat engine, Magmus the combat one, and a combat-flagged bot with no
     // attackers (the blind window) idles on the non-combat one. Inert
     // everywhere else: the trigger's first test is the map id. See
-    // DungeonClearIronHallSafeSpotTrigger.
+    // DungeonClearIronHallSafeSpotTrigger. The module's CoA Combat A4 runs it
+    // instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_IRON_HALL
     triggers.push_back(new TriggerNode(
         "dungeon clear iron hall safe spot",
         { NextAction("dungeon clear iron hall safe spot", DcRel::IronHallSafeSpot) }));
+#endif
 
     // The Oculus only: the rider rung. Registered in BOTH engines — a rider never
     // reaches the combat engine (the drake seat has no CAN_ATTACK), and a member
@@ -615,10 +618,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // non-combat engine, Magmus the combat one, and a combat-flagged bot with no
     // attackers (the blind window) idles on the non-combat one. Inert
     // everywhere else: the trigger's first test is the map id. See
-    // DungeonClearIronHallSafeSpotTrigger.
+    // DungeonClearIronHallSafeSpotTrigger. The module's CoA Combat A4 runs it
+    // instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_IRON_HALL
     triggers.push_back(new TriggerNode(
         "dungeon clear iron hall safe spot",
         { NextAction("dungeon clear iron hall safe spot", DcRel::IronHallSafeSpot) }));
+#endif
 
     // Blackrock Depths' Lyceum only, combat engine: in a fight inside the room,
     // every member but the tank stays within 15yd of the tank — how a real group

@@ -46,4 +46,12 @@
 #define DC_MODULE_OWNS_LYCEUM_CLOSE_UP 0
 #endif
 
+// A4, BRD Iron Hall (never stop in the Ironhand Guardians' fire: hop to the
+// next fire-free stop).
+#if defined(COA_COMBAT_OWNS_IRON_HALL)
+#define DC_MODULE_OWNS_IRON_HALL 1
+#else
+#define DC_MODULE_OWNS_IRON_HALL 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
