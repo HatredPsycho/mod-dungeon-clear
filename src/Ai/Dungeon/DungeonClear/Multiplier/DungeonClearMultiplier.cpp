@@ -98,12 +98,14 @@ static bool PeelsAMobOffTheParty(Player* bot, PlayerbotAI* botAI, Action* action
 }
 #endif
 
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK  // the module's CoA Combat B6 clamps it
 static float RazorgorePossessionClamp(Player* bot, std::string const& name)
 {
     if (!DcBlackwingLair::HoldsThePossession(bot))
         return 1.0f;
     return name == "dungeon clear razorgore orb" ? 1.0f : 0.0f;
 }
+#endif
 
 // KARAZHAN, the chess game: while this bot is held by the game, NOTHING but the
 // chess rung is worth doing — the Razorgore-possession shape, for the whole raid.
@@ -383,8 +385,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
 
     std::string const& name = action->getName();
 
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK
     if (float const clamp = RazorgorePossessionClamp(bot, name); clamp != 1.0f)
         return clamp;
+#endif
 
     if (float const clamp = KaraChessClamp(bot, botAI, name); clamp != 1.0f)
         return clamp;
@@ -629,8 +633,10 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
     // The possession clamp, first and unconditional — see its definition above.
     // The runner is IN COMBAT for most of its window (the adds are on it), so the
     // combat engine is where this actually has to bite.
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK
     if (float const clamp = RazorgorePossessionClamp(bot, name); clamp != 1.0f)
         return clamp;
+#endif
 
     // The chess clamp, for the same reason and in the same place: a controller is
     // combat-flagged by its piece's fight half the time.

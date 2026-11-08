@@ -139,4 +139,13 @@
 #define DC_MODULE_OWNS_BREATH_GUARD 0
 #endif
 
+// B6, Razorgore possession lock (the orb runner does nothing but hold the
+// channel). Only the clamp leaves: the runner election, orb walk, click, camp
+// and controller stay in DC.
+#if defined(COA_COMBAT_OWNS_RAZORGORE_POSSESSION_LOCK)
+#define DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK 1
+#else
+#define DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
