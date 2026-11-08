@@ -13,7 +13,10 @@ PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 
-This module is a derivative work of and links against mod-playerbots, which is
-licensed under the GNU Affero General Public License v3.0. It is therefore
-distributed under the same AGPL-3.0-or-later terms. The full license text is
-available at <https://www.gnu.org/licenses/agpl-3.0.txt>.
+This module links against mod-playerbots. mod-playerbots moved from the GNU
+Affero General Public License v3.0 to the GNU General Public License v2.0 on
+26 June 2026 (mod-playerbots #2504, "either version 2 of the License, or (at
+your option) any later version"); code written for it before that date stays
+under its original terms until its contributors approve the change. This module
+itself remains under AGPL-3.0-or-later. The full license text is available at
+<https://www.gnu.org/licenses/agpl-3.0.txt>.
