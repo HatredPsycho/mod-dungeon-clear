@@ -58,6 +58,7 @@
 // Free everywhere else — HoldsThePossession rejects on a map compare, and it reads
 // this bot's own charm field rather than any cross-bot signal, so no stale stamp
 // can drop the guard while the channel is still up.
+#if !DC_MODULE_OWNS_THREAT_LEAD
 // Does `action` deal damage? Melee/attack actions, the stock target picker that
 // starts them, and any HARMFUL spell — judged by the spell itself, not by its
 // target: Frost Nova, Arcane Explosion, Consecration and the like are cast on
@@ -95,6 +96,7 @@ static bool PeelsAMobOffTheParty(Player* bot, PlayerbotAI* botAI, Action* action
     Player* p = victim ? victim->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
     return p && p != bot && p->IsInSameRaidWith(bot) && !PlayerbotAI::IsTank(p);
 }
+#endif
 
 static float RazorgorePossessionClamp(Player* bot, std::string const& name)
 {
@@ -539,9 +541,11 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // tank below the panic HP and the tank itself are never held (a healer's heals
     // are not damaging actions, its damage spells wait like a DPS's). Only
     // damaging actions pay for the leader lookup.
+#if !DC_MODULE_OWNS_THREAT_LEAD
     if (IsDamagingAction(botAI, action, name) && DcLeaderSignal::ShouldHoldDpsDamage(bot) &&
         !PeelsAMobOffTheParty(bot, botAI, action))
         return 0.0f;
+#endif
 
     // Stock follow-master (FollowAction, relevance ~1) points a bot at its MASTER —
     // the human party leader — NOT the dungeon-clear tank. While a DC run is active
@@ -616,9 +620,11 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
     // touched a bot that was already in combat — the Pull Lab still caught a
     // mage's Frost Nova 0.9s after the tank's first hit with the non-combat
     // gate in place (lb-20261003-165604-1). Same rule, same exemptions.
+#if !DC_MODULE_OWNS_THREAT_LEAD
     if (IsDamagingAction(botAI, action, name) && DcLeaderSignal::ShouldHoldDpsDamage(bot) &&
         !PeelsAMobOffTheParty(bot, botAI, action))
         return 0.0f;
+#endif
 
     // The possession clamp, first and unconditional — see its definition above.
     // The runner is IN COMBAT for most of its window (the adds are on it), so the

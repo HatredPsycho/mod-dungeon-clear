@@ -62,4 +62,12 @@
 #define DC_MODULE_OWNS_GROUND_HAZARDS 0
 #endif
 
+// A7, threat lead (no DPS or healer damage before the lead after the tank's
+// first hit).
+#if defined(COA_COMBAT_OWNS_THREAT_LEAD)
+#define DC_MODULE_OWNS_THREAT_LEAD 1
+#else
+#define DC_MODULE_OWNS_THREAT_LEAD 0
+#endif
+
 #endif  // _DC_MODULE_COMBAT_H
