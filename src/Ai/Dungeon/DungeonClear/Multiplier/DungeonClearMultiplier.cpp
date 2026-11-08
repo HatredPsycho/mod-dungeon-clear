@@ -27,6 +27,7 @@
 #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcEscapeLeap.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcFlightLeg.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLyceumCloseUpDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcOculusPlan.h"
@@ -450,8 +451,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // Blink / Disengage leap a fixed distance straight away from the bot's target
     // and land it in whatever pack is behind — see DcEscapeLeap. Every member of an
     // active run, same cross-bot gate as above.
+#if !DC_MODULE_OWNS_ESCAPE_LEAP
     if (DcEscapeLeap::IsBanned(name) && AI_VALUE(Player*, DcKey::PartyTank))
         return 0.0f;
+#endif
 
     // Wander-style autonomous navigation (grind / rpg / travel). This is what
     // drives the bot around the world on its own.
@@ -657,9 +660,11 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
     // place, and 29 landed the leaper on a fresh Reservist within six seconds.
     // Above the fast path (both are stock actions). A raid encounter's stand-down
     // hands the fight to the playerbots raid strategy, which rules on its own leaps.
+#if !DC_MODULE_OWNS_ESCAPE_LEAP
     if (DcEscapeLeap::IsBanned(name) && AI_VALUE(Player*, DcKey::PartyTank) &&
         !DcBossStandDown::IsActive(bot))
         return 0.0f;
+#endif
 
     // The Lyceum's close-up, chase half — see LyceumChaseLeavesThePack above.
     if (LyceumChaseLeavesThePack(bot, context, action))
