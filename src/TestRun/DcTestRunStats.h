@@ -33,6 +33,12 @@ namespace DcTestRunStats
         std::string attackerTarget;   // whom the attacker was fighting then ("" if none)
         uint32 amount = 0;            // damage before the core's final absorb/resist
         uint32 hpBefore = 0;          // the member's health when it landed
+        // Where it happened (map x/y), and the attacker's live ground markers from
+        // kMarkerSpells (Targorr's Berserker Leap, 09/11: the impact 2102737 killed
+        // ranged bots the marker 2102735 never covered; Combat needs the three spots).
+        float victimX = 0.0f, victimY = 0.0f;
+        float attackerX = 0.0f, attackerY = 0.0f;
+        std::vector<std::pair<float, float>> markers;
     };
     static constexpr std::size_t kHitLog = 3;
 

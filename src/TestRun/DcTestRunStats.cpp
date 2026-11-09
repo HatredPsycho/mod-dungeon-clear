@@ -1,5 +1,6 @@
 #include "TestRun/DcTestRunStats.h"
 
+#include "DynamicObject.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
@@ -40,6 +41,16 @@ namespace
             hit.attackerTarget = victim->GetName();
         hit.amount = damage;
         hit.hpBefore = target->GetHealth();
+        hit.victimX = target->GetPositionX();
+        hit.victimY = target->GetPositionY();
+        hit.attackerX = attacker->GetPositionX();
+        hit.attackerY = attacker->GetPositionY();
+        // Ground markers the attacker owns right now. A short fixed list: the
+        // core exposes a unit's dynamic objects by spell id only.
+        static constexpr uint32 kMarkerSpells[] = { 2102735 };  // Berserker Leap Dest Area
+        for (uint32 const markerSpell : kMarkerSpells)
+            if (DynamicObject* marker = attacker->GetDynObject(markerSpell))
+                hit.markers.emplace_back(marker->GetPositionX(), marker->GetPositionY());
         std::deque<DcTestRunStats::Hit>& log = g_hits[low];
         log.push_back(std::move(hit));
         while (log.size() > DcTestRunStats::kHitLog)

@@ -255,7 +255,12 @@ namespace DcTestRunRecord
                 AppendEscaped(s, h.attacker);
                 s << ",\"attackerTarget\":";
                 AppendEscaped(s, h.attackerTarget);
-                s << ",\"amount\":" << h.amount << ",\"hpBefore\":" << h.hpBefore << '}';
+                s << ",\"amount\":" << h.amount << ",\"hpBefore\":" << h.hpBefore
+                  << ",\"victimPos\":[" << h.victimX << ',' << h.victimY << ']'
+                  << ",\"attackerPos\":[" << h.attackerX << ',' << h.attackerY << "],\"markers\":[";
+                for (std::size_t m = 0; m < h.markers.size(); ++m)
+                    s << (m ? "," : "") << '[' << h.markers[m].first << ',' << h.markers[m].second << ']';
+                s << "]}";
             }
             s << "]}";
         }

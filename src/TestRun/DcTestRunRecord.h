@@ -122,6 +122,9 @@ namespace DcTestRunRecord
             std::string attackerTarget;    // whom the attacker was fighting
             std::uint32_t amount = 0;
             std::uint32_t hpBefore = 0;
+            float victimX = 0.0f, victimY = 0.0f;
+            float attackerX = 0.0f, attackerY = 0.0f;
+            std::vector<std::pair<float, float>> markers;  // the attacker's ground markers then
         };
         std::vector<Hit> hits;
     };

@@ -1994,6 +1994,11 @@ void DcTestRunJob::TrackDeaths(Player* tank)
             h.attackerTarget = hit.attackerTarget;
             h.amount = hit.amount;
             h.hpBefore = hit.hpBefore;
+            h.victimX = hit.victimX;
+            h.victimY = hit.victimY;
+            h.attackerX = hit.attackerX;
+            h.attackerY = hit.attackerY;
+            h.markers = hit.markers;
             death.hits.push_back(std::move(h));
         }
         _record.deaths.push_back(death);
