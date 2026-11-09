@@ -1012,6 +1012,8 @@ namespace DungeonClearMath
         std::uint32_t lastRemaining = 0;  // count at the last progress (0 = none yet)
         std::uint32_t idleMs = 0;         // observed ready time since that progress
         std::uint32_t lastTickMs = 0;     // when the clock last ran (0 = never)
+        std::uint32_t lowRemaining = 0;   // lowest count since the last re-arm
+        bool foughtSinceChange = false;   // a busy tick since the count last changed
     };
 
     // The longest gap between two evaluations that still counts as observed. The
@@ -1042,19 +1044,37 @@ namespace DungeonClearMath
         if (remaining == 0)
         {
             c.lastRemaining = 0;
+            c.lowRemaining = 0;
+            c.foughtSinceChange = false;
             c.idleMs = 0;
             return false;
         }
-        if (!inRoom || c.lastRemaining == 0 || remaining < c.lastRemaining)
+        // Progress: a count below the lowest seen, or a drop that came after a fight
+        // (a kill). A drop with no fight in between is a patroller walking back OUT
+        // of the radius, not progress: MC 09/11 (tr-20261109-183659-4), a Core Hound
+        // and a Lava Elemental drifting across Shazzrah's 50yd row flipped the count
+        // 2 <-> 3 for ten minutes, every 3 -> 2 re-armed the clock, and the tank held
+        // at the standoff until the run's no-progress watchdog.
+        bool const drop = remaining < c.lastRemaining;
+        if (!inRoom || c.lastRemaining == 0 || remaining < c.lowRemaining ||
+            (drop && c.foughtSinceChange))
         {
             c.lastRemaining = remaining;
+            c.lowRemaining = remaining;
+            c.foughtSinceChange = false;
             c.idleMs = 0;
             return false;
         }
-        // A patroller walking into the radius raises the count. Track the new high
-        // so that killing it reads as progress, but leave the idle time alone.
-        if (remaining > c.lastRemaining)
+        // A patroller walking into the radius raises the count, and walking out
+        // lowers it again: track the count so killing it (a drop after a fight)
+        // reads as progress, but leave the idle time alone either way.
+        if (remaining != c.lastRemaining)
+        {
             c.lastRemaining = remaining;
+            c.foughtSinceChange = false;
+        }
+        if (busy)
+            c.foughtSinceChange = true;
 
         // `now >= prevTick` guards the unsigned subtraction against a clock wrap.
         std::uint32_t const elapsed = (prevTick && now >= prevTick) ? now - prevTick : 0;
