@@ -277,7 +277,50 @@ namespace DcTestRunRecord
                       << "],\"msBefore\":" << h.lastMarkerMsBefore << '}';
                 s << '}';
             }
-            s << "]}";
+            s << ']';
+            if (d.marker.has)
+            {
+                DeathEntry::MarkerEpisode const& m = d.marker;
+                auto point = [&s](char const* key, DeathEntry::MarkerPoint const& p, bool withMs)
+                {
+                    s << ",\"" << key << "\":";
+                    if (!p.has)
+                    {
+                        s << "null";
+                        return;
+                    }
+                    s << "{\"pos\":[" << p.x << ',' << p.y << "],\"dist\":" << p.dist;
+                    if (withMs)
+                        s << ",\"ms\":" << p.ms;
+                };
+                s << ",\"marker\":{\"markerSpell\":" << m.markerSpell << ",\"markerMsBefore\":" << m.markerMsBefore
+                  << ",\"markerPos\":[" << m.markerX << ',' << m.markerY << ']';
+                point("atAppear", m.atAppear, false);
+                if (m.atAppear.has)
+                {
+                    s << ",\"hasAura\":" << (m.hasAura ? "true" : "false") << ",\"casting\":" << m.casting
+                      << ",\"castingName\":";
+                    AppendEscaped(s, m.castingName);
+                    s << '}';
+                }
+                point("at1s", m.at1s, true);
+                if (m.at1s.has)
+                    s << '}';
+                point("at2s", m.at2s, true);
+                if (m.at2s.has)
+                    s << '}';
+                s << ",\"lastAction\":";
+                AppendEscaped(s, m.lastAction);
+                s << ",\"actions\":[";
+                for (std::size_t k = 0; k < m.actions.size(); ++k)
+                {
+                    s << (k ? "," : "") << "{\"a\":";
+                    AppendEscaped(s, m.actions[k].first);
+                    s << ",\"msBefore\":" << m.actions[k].second << '}';
+                }
+                s << "]}";
+            }
+            s << '}';
         }
         s << "],\"pulls\":[";
         for (std::size_t i = 0; i < rec.pulls.size(); ++i)

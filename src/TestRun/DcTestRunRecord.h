@@ -131,7 +131,72 @@ namespace DcTestRunRecord
             std::int32_t lastMarkerMsBefore = 0;           // ms between that sighting and the hit
         };
         std::vector<Hit> hits;
+
+        // The ground-marker episode behind a marker-linked killing blow (schema
+        // 20, 09/11): Targorr's impact 2102737 killed bots 1-2 m from the center
+        // of his marker 2102735 while Combat's guard should have walked them out.
+        // Where each member stood when the marker appeared, then 1 s and 2 s
+        // later, says whether the exit never started or something walked it back.
+        struct MarkerPoint
+        {
+            bool has = false;
+            float x = 0.0f, y = 0.0f;
+            float dist = 0.0f;           // 2D, to the marker's center
+            std::int32_t ms = 0;         // real delay after the marker appeared
+        };
+        struct MarkerEpisode
+        {
+            bool has = false;            // false: no "marker" key at all
+            std::uint32_t markerSpell = 0;
+            std::int32_t markerMsBefore = 0;  // marker first seen -> killing blow
+            float markerX = 0.0f, markerY = 0.0f;
+            MarkerPoint atAppear;
+            bool hasAura = false;        // the member carried the marker's aura then
+            std::uint32_t casting = 0;   // its generic, else channeled, spell then (0: none)
+            std::string castingName;
+            MarkerPoint at1s, at2s;      // !has: it died (or left) before that sample
+            // The playerbots actions it executed last while alive, oldest first,
+            // with the ms between each and the killing blow; lastAction is the
+            // newest name ("" when the run had no listener on its engines).
+            std::string lastAction;
+            std::vector<std::pair<std::string, std::int32_t>> actions;
+            static constexpr std::size_t kActionLog = 6;
+        };
+        MarkerEpisode marker;
     };
+
+    // The ground marker a damage spell lands on (0: none). Kept short and
+    // explicit: a marker is only worth tracking once a death has been traced to it.
+    inline std::uint32_t MarkerForImpact(std::uint32_t impactSpell)
+    {
+        switch (impactSpell)
+        {
+            case 2102737: return 2102735;  // Targorr the Dread: Berserker Leap impact -> Dest Area
+            default: return 0;
+        }
+    }
+    // The ground markers the test-run job watches for episodes (DcTestRunJob::
+    // TrackMarkers); every MarkerForImpact value must be in here.
+    inline constexpr std::uint32_t kMarkerSpells[] = { 2102735 };  // Berserker Leap Dest Area
+    static constexpr std::int32_t kMarkerEpisodeWindowMs = 5000;
+    // Which of a member's marker episodes explains a killing blow: the most
+    // recent one of `markerSpell` that appeared 0..kMarkerEpisodeWindowMs before
+    // it. `episodes` holds (marker spell, ms from appearance to the blow); a
+    // negative delay is an episode that started after the blow. -1: none.
+    inline int PickMarkerEpisode(std::vector<std::pair<std::uint32_t, std::int32_t>> const& episodes,
+                                 std::uint32_t markerSpell)
+    {
+        int best = -1;
+        for (std::size_t i = 0; i < episodes.size(); ++i)
+        {
+            auto const& [spell, msBefore] = episodes[i];
+            if (!markerSpell || spell != markerSpell || msBefore < 0 || msBefore > kMarkerEpisodeWindowMs)
+                continue;
+            if (best < 0 || msBefore < episodes[best].second)
+                best = static_cast<int>(i);
+        }
+        return best;
+    }
 
     // One pull the Dynamic governor took a verdict on, with what the classifier
     // PREDICTED would come and how many mobs actually turned up.
