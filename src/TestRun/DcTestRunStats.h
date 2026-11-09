@@ -39,6 +39,12 @@ namespace DcTestRunStats
         float victimX = 0.0f, victimY = 0.0f;
         float attackerX = 0.0f, attackerY = 0.0f;
         std::vector<std::pair<float, float>> markers;
+        // The attacker's last marker seen on ANY tracked hit, even if gone since:
+        // 2102735 lives 3.5 s and the impact lands after a 3 s cast plus the
+        // missile's flight, so the live list is often empty when it hits.
+        bool hasLastMarker = false;
+        float lastMarkerX = 0.0f, lastMarkerY = 0.0f;
+        uint32 lastMarkerMs = 0;      // getMSTime() it was last seen
     };
     static constexpr std::size_t kHitLog = 3;
 

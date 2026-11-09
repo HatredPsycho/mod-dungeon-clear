@@ -20,6 +20,8 @@ namespace
     std::mutex g_mutex;
     std::unordered_map<uint32, DcTestRunStats::Counters> g_tracked;
     std::unordered_map<uint32, std::deque<DcTestRunStats::Hit>> g_hits;  // tracked members only
+    struct SeenMarker { float x; float y; uint32 ms; };
+    std::unordered_map<uint64, SeenMarker> g_lastMarker;  // attacker raw guid -> last marker seen
 
     // A creature's hit on a tracked member, kept as one of its last kHitLog.
     void NoteHit(Unit* target, Unit* attacker, uint32 damage, SpellInfo const* spellInfo)
@@ -51,6 +53,21 @@ namespace
         for (uint32 const markerSpell : kMarkerSpells)
             if (DynamicObject* marker = attacker->GetDynObject(markerSpell))
                 hit.markers.emplace_back(marker->GetPositionX(), marker->GetPositionY());
+        uint64 const attackerKey = attacker->GetGUID().GetRawValue();
+        if (!hit.markers.empty())
+            g_lastMarker[attackerKey] = SeenMarker{ hit.markers.back().first, hit.markers.back().second, hit.msTime };
+        if (auto seen = g_lastMarker.find(attackerKey); seen != g_lastMarker.end())
+        {
+            if (getMSTimeDiff(seen->second.ms, hit.msTime) > 60000)
+                g_lastMarker.erase(seen);  // stale: another pull, not this leap
+            else
+            {
+                hit.hasLastMarker = true;
+                hit.lastMarkerX = seen->second.x;
+                hit.lastMarkerY = seen->second.y;
+                hit.lastMarkerMs = seen->second.ms;
+            }
+        }
         std::deque<DcTestRunStats::Hit>& log = g_hits[low];
         log.push_back(std::move(hit));
         while (log.size() > DcTestRunStats::kHitLog)

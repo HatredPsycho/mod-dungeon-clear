@@ -260,7 +260,11 @@ namespace DcTestRunRecord
                   << ",\"attackerPos\":[" << h.attackerX << ',' << h.attackerY << "],\"markers\":[";
                 for (std::size_t m = 0; m < h.markers.size(); ++m)
                     s << (m ? "," : "") << '[' << h.markers[m].first << ',' << h.markers[m].second << ']';
-                s << "]}";
+                s << ']';
+                if (h.hasLastMarker)
+                    s << ",\"lastMarker\":{\"pos\":[" << h.lastMarkerX << ',' << h.lastMarkerY
+                      << "],\"msBefore\":" << h.lastMarkerMsBefore << '}';
+                s << '}';
             }
             s << "]}";
         }

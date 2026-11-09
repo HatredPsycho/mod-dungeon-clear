@@ -1999,6 +1999,10 @@ void DcTestRunJob::TrackDeaths(Player* tank)
             h.attackerX = hit.attackerX;
             h.attackerY = hit.attackerY;
             h.markers = hit.markers;
+            h.hasLastMarker = hit.hasLastMarker;
+            h.lastMarkerX = hit.lastMarkerX;
+            h.lastMarkerY = hit.lastMarkerY;
+            h.lastMarkerMsBefore = hit.hasLastMarker ? int32(getMSTimeDiff(hit.lastMarkerMs, hit.msTime)) : 0;
             death.hits.push_back(std::move(h));
         }
         _record.deaths.push_back(death);

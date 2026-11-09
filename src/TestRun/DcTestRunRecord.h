@@ -125,6 +125,9 @@ namespace DcTestRunRecord
             float victimX = 0.0f, victimY = 0.0f;
             float attackerX = 0.0f, attackerY = 0.0f;
             std::vector<std::pair<float, float>> markers;  // the attacker's ground markers then
+            bool hasLastMarker = false;                    // its last marker seen, even if gone
+            float lastMarkerX = 0.0f, lastMarkerY = 0.0f;
+            std::int32_t lastMarkerMsBefore = 0;           // ms between that sighting and the hit
         };
         std::vector<Hit> hits;
     };
