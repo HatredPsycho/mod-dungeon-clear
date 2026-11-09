@@ -875,6 +875,11 @@ bool DungeonClearPartyDiedTrigger::IsActive()
     // Disable runs the classic funnel; Regroup is the raid wipe verdict — the
     // same action routes it to the entrance regroup instead (the run continues).
     DcRezDecision::Outcome const outcome = DcRezRecovery::Evaluate(bot).verdict.outcome;
+    // The combat strategy carries this trigger too, for the raid regroup only (see
+    // DungeonClearCombatStrategy::InitTriggers): a survivor still fighting must not
+    // run the classic disable funnel mid-fight.
+    if (bot->IsInCombat())
+        return outcome == DcRezDecision::Outcome::Regroup;
     return outcome == DcRezDecision::Outcome::Disable ||
            outcome == DcRezDecision::Outcome::Regroup;
 }

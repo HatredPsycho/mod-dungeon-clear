@@ -514,6 +514,18 @@ void DungeonClearStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers
 
 void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
+    // Raid regroup from INSIDE a fight. With the tank dead, the terminal driver is
+    // the first living member (DcLeaderSignal::FindTerminalDriver), and in a raid
+    // that survivor is usually still fighting: the non-combat copy of this trigger
+    // never ran, so the owner-down regroup (DcRezDecision) could not fire.
+    // MC, 09/11 (tr-20261109-153107-4): 18 of 20 dead on Shazzrah, the two
+    // survivors fighting 90yd away, the encounter IN_PROGRESS, no_progress at 600s.
+    // In combat the trigger answers ONLY a Regroup verdict (see its IsActive), so
+    // every other death outcome keeps waiting for the fight to end.
+    triggers.push_back(new TriggerNode(
+        "dungeon clear party died",
+        { NextAction("dungeon clear disable on death", DcRel::PartyDied) }));
+
     // Phantom-combat escape hatch (ANY member). A bot left flagged in combat by a
     // mob that spawned far away / behind a gate — nothing meleeing it, no victim, no
     // reachable holder — force-clears its combat after DungeonClear.StuckCombatTimeout
