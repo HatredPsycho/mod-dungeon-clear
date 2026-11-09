@@ -122,6 +122,7 @@ namespace DcTestRunRecord
             std::string attackerTarget;    // whom the attacker was fighting
             std::uint32_t amount = 0;
             std::uint32_t hpBefore = 0;
+            std::uint32_t dealt = 0;       // after CoA scaling (amount is before); 0 = unmatched
             float victimX = 0.0f, victimY = 0.0f;
             float attackerX = 0.0f, attackerY = 0.0f;
             std::vector<std::pair<float, float>> markers;  // the attacker's ground markers then
@@ -251,6 +252,17 @@ namespace DcTestRunRecord
         // first, capped at kDispelLog.
         std::map<std::uint32_t, DcTestRun::DispelStat> dispels;
         static constexpr std::size_t kDispelLog = 24;
+        // Boss casts finished / interrupted, per boss and spell (schema 20).
+        struct BossCast
+        {
+            std::uint32_t entry = 0;
+            std::string boss;
+            std::uint32_t spell = 0;
+            std::string name;
+            std::uint32_t cast = 0;
+            std::uint32_t interrupted = 0;
+        };
+        std::vector<BossCast> bossCasts;
         // Hand-picked party of real player characters (`party=`) rather than a
         // seeded draw from the addclass pool. compSeed is 0 on these runs: the
         // roster IS the comp, so there is nothing to replay from a seed.

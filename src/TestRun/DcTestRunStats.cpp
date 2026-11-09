@@ -1,6 +1,9 @@
 #include "TestRun/DcTestRunStats.h"
 
+#include "AllSpellScript.h"
+#include "Creature.h"
 #include "DynamicObject.h"
+#include "Spell.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
@@ -20,6 +23,32 @@ namespace
     std::mutex g_mutex;
     std::unordered_map<uint32, DcTestRunStats::Counters> g_tracked;
     std::unordered_map<uint32, std::deque<DcTestRunStats::Hit>> g_hits;  // tracked members only
+    // instanceId -> (entry << 32 | spell) -> counts; only watched instances.
+    std::unordered_map<uint32, std::unordered_map<uint64, DcTestRunStats::BossCast>> g_bossCasts;
+
+    void NoteBossCast(Unit* caster, SpellInfo const* spellInfo, bool interrupted)
+    {
+        if (!caster || !spellInfo)
+            return;
+        Creature* boss = caster->ToCreature();
+        if (!boss || (!boss->IsDungeonBoss() && !boss->isWorldBoss()) || !boss->GetMap())
+            return;
+        uint32 const instanceId = boss->GetMap()->GetInstanceId();
+        std::lock_guard<std::mutex> lock(g_mutex);
+        auto inst = g_bossCasts.find(instanceId);
+        if (inst == g_bossCasts.end())
+            return;
+        uint64 const key = (uint64(boss->GetEntry()) << 32) | spellInfo->Id;
+        DcTestRunStats::BossCast& c = inst->second[key];
+        if (!c.entry)
+        {
+            c.entry = boss->GetEntry();
+            c.boss = boss->GetName();
+            c.spellId = spellInfo->Id;
+            c.spellName = spellInfo->SpellName[LOCALE_enUS];
+        }
+        ++(interrupted ? c.interrupted : c.cast);
+    }
     struct SeenMarker { float x; float y; uint32 ms; };
     std::unordered_map<uint64, SeenMarker> g_lastMarker;  // attacker raw guid -> last marker seen
 
@@ -118,6 +147,25 @@ namespace
 
 namespace DcTestRunStats
 {
+    void WatchInstance(uint32 instanceId)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_bossCasts[instanceId].clear();
+    }
+
+    std::vector<BossCast> ReleaseInstance(uint32 instanceId)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        std::vector<BossCast> out;
+        if (auto itr = g_bossCasts.find(instanceId); itr != g_bossCasts.end())
+        {
+            for (auto const& [key, c] : itr->second)
+                out.push_back(c);
+            g_bossCasts.erase(itr);
+        }
+        return out;
+    }
+
     void Track(uint32 guidLow)
     {
         std::lock_guard<std::mutex> lock(g_mutex);
@@ -169,6 +217,16 @@ public:
             std::lock_guard<std::mutex> lock(g_mutex);
             if (auto itr = g_tracked.find(victim->GetGUID().GetCounter()); itr != g_tracked.end())
                 itr->second.damageTaken += dealt;
+            // The final amount of the hit just logged by a Modify hook: same
+            // attacker, same moment. The Modify value is pre-CoA-scaling and
+            // under-read the real blows (a "602" Burning Ground killed 5306 HP).
+            if (auto log = g_hits.find(victim->GetGUID().GetCounter()); log != g_hits.end() && !log->second.empty())
+            {
+                DcTestRunStats::Hit& last = log->second.back();
+                if (!last.dealt && last.attackerEntry == attacker->GetEntry() &&
+                    getMSTimeDiff(last.msTime, getMSTime()) <= 50)
+                    last.dealt = damage;
+            }
             return;
         }
         uint32 const guid = OwnerGuidLow(attacker);
@@ -256,7 +314,27 @@ public:
     }
 };
 
+// A boss's cast that finished, or that someone else cancelled (an interrupt):
+// OnSpellCastCancel reports bySelf=false when the caster did not stop it itself.
+class DcTestRunBossCastScript : public AllSpellScript
+{
+public:
+    DcTestRunBossCastScript() : AllSpellScript("DcTestRunBossCastScript", { ALLSPELLHOOK_ON_CAST, ALLSPELLHOOK_ON_CAST_CANCEL }) { }
+
+    void OnSpellCast(Spell* /*spell*/, Unit* caster, SpellInfo const* spellInfo, bool /*skipCheck*/) override
+    {
+        NoteBossCast(caster, spellInfo, false);
+    }
+
+    void OnSpellCastCancel(Spell* /*spell*/, Unit* caster, SpellInfo const* spellInfo, bool bySelf) override
+    {
+        if (!bySelf)
+            NoteBossCast(caster, spellInfo, true);
+    }
+};
+
 void AddSC_dc_test_run_stats()
 {
     new DcTestRunStatsScript();
+    new DcTestRunBossCastScript();
 }

@@ -31,7 +31,8 @@ namespace DcTestRunStats
         uint32 attackerEntry = 0;
         std::string attackerName;
         std::string attackerTarget;   // whom the attacker was fighting then ("" if none)
-        uint32 amount = 0;            // damage before the core's final absorb/resist
+        uint32 amount = 0;            // damage at the Modify hook, BEFORE CoA scaling (coa_spell_damage_info)
+        uint32 dealt = 0;             // what OnDamage then reported for it (after scaling); 0 = not matched
         uint32 hpBefore = 0;          // the member's health when it landed
         // Where it happened (map x/y), and the attacker's live ground markers from
         // kMarkerSpells (Targorr's Berserker Leap, 09/11: the impact 2102737 killed
@@ -47,6 +48,22 @@ namespace DcTestRunStats
         uint32 lastMarkerMs = 0;      // getMSTime() it was last seen
     };
     static constexpr std::size_t kHitLog = 3;
+
+    // Boss casts in a watched instance (schema 20): finished casts and casts a
+    // member interrupted, per (boss entry, spell). Combat asked how many of
+    // Shazzrah's Arcane Force Novas went off against how many were kicked.
+    struct BossCast
+    {
+        uint32 entry = 0;
+        std::string boss;
+        uint32 spellId = 0;
+        std::string spellName;
+        uint32 cast = 0;
+        uint32 interrupted = 0;
+    };
+    void WatchInstance(uint32 instanceId);
+    // Hands back the instance's boss casts and stops watching it.
+    std::vector<BossCast> ReleaseInstance(uint32 instanceId);
 
     void Track(uint32 guidLow);
     // The last kHitLog creature hits on the member, oldest first.

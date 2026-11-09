@@ -1754,6 +1754,7 @@ void DcTestRunJob::TickStarting()
     if (!_dcOnIssued)
     {
         _record.instanceId = tank->GetMap()->GetInstanceId();
+        DcTestRunStats::WatchInstance(_record.instanceId);
         _roster.clear();
         for (DungeonBossInfo const& b : bosses)
         {
@@ -1994,6 +1995,7 @@ void DcTestRunJob::TrackDeaths(Player* tank)
             h.attackerTarget = hit.attackerTarget;
             h.amount = hit.amount;
             h.hpBefore = hit.hpBefore;
+            h.dealt = hit.dealt;
             h.victimX = hit.victimX;
             h.victimY = hit.victimY;
             h.attackerX = hit.attackerX;
@@ -3273,6 +3275,18 @@ void DcTestRunJob::Teardown()
         c.absorbDone = done.absorbDone;
         c.combatS = _combatMs[low] / 1000;
     }
+    if (_record.instanceId)
+        for (DcTestRunStats::BossCast const& b : DcTestRunStats::ReleaseInstance(_record.instanceId))
+        {
+            DcTestRunRecord::Record::BossCast r;
+            r.entry = b.entry;
+            r.boss = b.boss;
+            r.spell = b.spellId;
+            r.name = b.spellName;
+            r.cast = b.cast;
+            r.interrupted = b.interrupted;
+            _record.bossCasts.push_back(std::move(r));
+        }
     _record.endedAtMs = NowUnixMs();
     _record.durationS = static_cast<uint32>((_record.endedAtMs - _record.startedAtMs) / 1000);
     // A Lab party's runs are recorded by the Lab (dc_labruns.jsonl); the host

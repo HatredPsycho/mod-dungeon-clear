@@ -127,6 +127,17 @@ namespace DcTestRunRecord
           << ",\"dps\":" << rec.offTank.dpsSwitches
           << ",\"healerMobS\":" << rec.offTank.healerMobMs / 1000
           << ",\"dpsMobS\":" << rec.offTank.dpsMobMs / 1000 << '}';
+        s << ",\"bossCasts\":[";
+        for (std::size_t i = 0; i < rec.bossCasts.size(); ++i)
+        {
+            Record::BossCast const& b = rec.bossCasts[i];
+            s << (i ? "," : "") << "{\"entry\":" << b.entry << ",\"boss\":";
+            AppendEscaped(s, b.boss);
+            s << ",\"spell\":" << b.spell << ",\"name\":";
+            AppendEscaped(s, b.name);
+            s << ",\"cast\":" << b.cast << ",\"interrupted\":" << b.interrupted << '}';
+        }
+        s << ']';
         s << ",\"dispels\":[";
         {
             std::vector<std::pair<std::uint32_t, DcTestRun::DispelStat const*>> order;
@@ -255,7 +266,7 @@ namespace DcTestRunRecord
                 AppendEscaped(s, h.attacker);
                 s << ",\"attackerTarget\":";
                 AppendEscaped(s, h.attackerTarget);
-                s << ",\"amount\":" << h.amount << ",\"hpBefore\":" << h.hpBefore
+                s << ",\"amount\":" << h.amount << ",\"dealt\":" << h.dealt << ",\"hpBefore\":" << h.hpBefore
                   << ",\"victimPos\":[" << h.victimX << ',' << h.victimY << ']'
                   << ",\"attackerPos\":[" << h.attackerX << ',' << h.attackerY << "],\"markers\":[";
                 for (std::size_t m = 0; m < h.markers.size(); ++m)
