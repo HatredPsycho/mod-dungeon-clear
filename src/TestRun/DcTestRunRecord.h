@@ -110,6 +110,20 @@ namespace DcTestRunRecord
         int32_t hpPct = -1;        // its health then (-1: never sampled)
         std::vector<std::pair<std::uint32_t, std::string>> harm;  // harmful auras, spell id + name
         static constexpr std::size_t kHarmLog = 6;
+        // The last creature hits it took, oldest first (schema 20). Unlike harm,
+        // these are damage events: the last one is the killing blow.
+        struct Hit
+        {
+            std::int32_t msBefore = 0;     // ms before the death was seen
+            std::uint32_t spell = 0;       // 0 = melee
+            std::string name;
+            std::uint32_t attackerEntry = 0;
+            std::string attacker;
+            std::string attackerTarget;    // whom the attacker was fighting
+            std::uint32_t amount = 0;
+            std::uint32_t hpBefore = 0;
+        };
+        std::vector<Hit> hits;
     };
 
     // One pull the Dynamic governor took a verdict on, with what the classifier
@@ -186,7 +200,10 @@ namespace DcTestRunRecord
         //     party: applications, removed early, expired, carried seconds).
         // 18: dispels[].expiredWhy (expiries by DcTestRun::DispelReach).
         // 19: deaths[].hpPct and deaths[].harm (the victim's last sample).
-        std::uint32_t schema = 19;
+        // 20: deaths[].hits (the last creature hits, the killing blow last):
+        //     harm is the harmful AURAS present, and a dummy marker read as the
+        //     killer (Targorr's 2102735, 09/11).
+        std::uint32_t schema = 20;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token

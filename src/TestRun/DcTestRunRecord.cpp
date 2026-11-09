@@ -243,6 +243,20 @@ namespace DcTestRunRecord
                 AppendEscaped(s, d.harm[k].second);
                 s << '}';
             }
+            s << "],\"hits\":[";
+            for (std::size_t k = 0; k < d.hits.size(); ++k)
+            {
+                DcTestRunRecord::DeathEntry::Hit const& h = d.hits[k];
+                if (k)
+                    s << ',';
+                s << "{\"msBefore\":" << h.msBefore << ",\"spell\":" << h.spell << ",\"name\":";
+                AppendEscaped(s, h.name);
+                s << ",\"attackerEntry\":" << h.attackerEntry << ",\"attacker\":";
+                AppendEscaped(s, h.attacker);
+                s << ",\"attackerTarget\":";
+                AppendEscaped(s, h.attackerTarget);
+                s << ",\"amount\":" << h.amount << ",\"hpBefore\":" << h.hpBefore << '}';
+            }
             s << "]}";
         }
         s << "],\"pulls\":[";

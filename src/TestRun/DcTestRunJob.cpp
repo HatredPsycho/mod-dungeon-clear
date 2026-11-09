@@ -1982,6 +1982,20 @@ void DcTestRunJob::TrackDeaths(Player* tank)
             death.hpPct = h->second.hpPct;
             death.harm = h->second.harm;
         }
+        uint32 const nowMs = getMSTime();
+        for (DcTestRunStats::Hit const& hit : DcTestRunStats::LastHits(member->GetGUID().GetCounter()))
+        {
+            DcTestRunRecord::DeathEntry::Hit h;
+            h.msBefore = int32(getMSTimeDiff(hit.msTime, nowMs));
+            h.spell = hit.spellId;
+            h.name = hit.spellName;
+            h.attackerEntry = hit.attackerEntry;
+            h.attacker = hit.attackerName;
+            h.attackerTarget = hit.attackerTarget;
+            h.amount = hit.amount;
+            h.hpBefore = hit.hpBefore;
+            death.hits.push_back(std::move(h));
+        }
         _record.deaths.push_back(death);
         // Deliberately overwritten even when the latch is empty: this means
         // "what the LAST death was to", not "the last death that had a killer".

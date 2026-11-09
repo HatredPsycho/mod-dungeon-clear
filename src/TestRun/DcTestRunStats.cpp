@@ -4,10 +4,13 @@
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
+#include "SpellInfo.h"
+#include "Timer.h"
 #include "Unit.h"
 #include "UnitScript.h"
 
 #include <algorithm>
+#include <deque>
 #include <mutex>
 #include <unordered_map>
 
@@ -15,6 +18,33 @@ namespace
 {
     std::mutex g_mutex;
     std::unordered_map<uint32, DcTestRunStats::Counters> g_tracked;
+    std::unordered_map<uint32, std::deque<DcTestRunStats::Hit>> g_hits;  // tracked members only
+
+    // A creature's hit on a tracked member, kept as one of its last kHitLog.
+    void NoteHit(Unit* target, Unit* attacker, uint32 damage, SpellInfo const* spellInfo)
+    {
+        if (!damage || !target || !target->IsPlayer() || !attacker ||
+            attacker->GetCharmerOrOwnerPlayerOrPlayerItself())
+            return;
+        uint32 const low = target->GetGUID().GetCounter();
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (g_tracked.find(low) == g_tracked.end())
+            return;
+        DcTestRunStats::Hit hit;
+        hit.msTime = getMSTime();
+        hit.spellId = spellInfo ? spellInfo->Id : 0;
+        hit.spellName = spellInfo ? spellInfo->SpellName[LOCALE_enUS] : "melee";
+        hit.attackerEntry = attacker->GetEntry();
+        hit.attackerName = attacker->GetName();
+        if (Unit* victim = attacker->GetVictim())
+            hit.attackerTarget = victim->GetName();
+        hit.amount = damage;
+        hit.hpBefore = target->GetHealth();
+        std::deque<DcTestRunStats::Hit>& log = g_hits[low];
+        log.push_back(std::move(hit));
+        while (log.size() > DcTestRunStats::kHitLog)
+            log.pop_front();
+    }
 
     // Absorb shields cast by a tracked member: the core has no absorb hook, so
     // the soaked part is read off the shield's amount, which the core lowers as
@@ -64,6 +94,16 @@ namespace DcTestRunStats
     {
         std::lock_guard<std::mutex> lock(g_mutex);
         g_tracked[guidLow] = Counters{};
+        g_hits.erase(guidLow);
+    }
+
+    std::vector<Hit> LastHits(uint32 guidLow)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        auto itr = g_hits.find(guidLow);
+        if (itr == g_hits.end())
+            return {};
+        return std::vector<Hit>(itr->second.begin(), itr->second.end());
     }
 
     Counters Release(uint32 guidLow)
@@ -74,6 +114,7 @@ namespace DcTestRunStats
             return {};
         Counters const out = itr->second;
         g_tracked.erase(itr);
+        g_hits.erase(guidLow);
         for (auto shield = g_shields.begin(); shield != g_shields.end();)
             shield = shield->second.caster == guidLow ? g_shields.erase(shield) : std::next(shield);
         return out;
@@ -84,6 +125,7 @@ class DcTestRunStatsScript : public UnitScript
 {
 public:
     DcTestRunStatsScript() : UnitScript("DcTestRunStatsScript", true, { UNITHOOK_ON_DAMAGE, UNITHOOK_ON_HEAL,
+        UNITHOOK_MODIFY_PERIODIC_DAMAGE_AURAS_TICK, UNITHOOK_MODIFY_MELEE_DAMAGE, UNITHOOK_MODIFY_SPELL_DAMAGE_TAKEN,
         UNITHOOK_ON_AFTER_AURA_EFFECT_CALCULATE_AMOUNT, UNITHOOK_ON_AURA_APPLY, UNITHOOK_ON_AURA_REMOVE }) { }
 
     void OnDamage(Unit* attacker, Unit* victim, uint32& damage) override
@@ -107,6 +149,22 @@ public:
         std::lock_guard<std::mutex> lock(g_mutex);
         if (auto itr = g_tracked.find(guid); itr != g_tracked.end())
             itr->second.damageDone += dealt;
+    }
+
+    void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* spellInfo) override
+    {
+        NoteHit(target, attacker, damage, spellInfo);
+    }
+
+    void ModifyMeleeDamage(Unit* target, Unit* attacker, uint32& damage) override
+    {
+        NoteHit(target, attacker, damage, nullptr);
+    }
+
+    void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* spellInfo) override
+    {
+        if (damage > 0)
+            NoteHit(target, attacker, uint32(damage), spellInfo);
     }
 
     void OnHeal(Unit* healer, Unit* reciever, uint32& gain) override
