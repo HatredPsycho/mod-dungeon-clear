@@ -14,6 +14,7 @@
 #include "UnitScript.h"
 
 #include <algorithm>
+#include <atomic>
 #include <deque>
 #include <mutex>
 #include <unordered_map>
@@ -25,10 +26,14 @@ namespace
     std::unordered_map<uint32, std::deque<DcTestRunStats::Hit>> g_hits;  // tracked members only
     // instanceId -> (entry << 32 | spell) -> counts; only watched instances.
     std::unordered_map<uint32, std::unordered_map<uint64, DcTestRunStats::BossCast>> g_bossCasts;
+    // Watched instances, readable without the lock: the cast hooks fire for every
+    // spell of every unit (tens of thousands a second at 3000 bots) and must cost
+    // one relaxed load when no test run is live.
+    std::atomic<uint32> g_watchedInstances{0};
 
     void NoteBossCast(Unit* caster, SpellInfo const* spellInfo, bool interrupted)
     {
-        if (!caster || !spellInfo)
+        if (g_watchedInstances.load(std::memory_order_relaxed) == 0 || !caster || !spellInfo)
             return;
         Creature* boss = caster->ToCreature();
         if (!boss || (!boss->IsDungeonBoss() && !boss->isWorldBoss()) || !boss->GetMap())
@@ -150,7 +155,10 @@ namespace DcTestRunStats
     void WatchInstance(uint32 instanceId)
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        g_bossCasts[instanceId].clear();
+        auto [itr, added] = g_bossCasts.try_emplace(instanceId);
+        itr->second.clear();
+        if (added)
+            g_watchedInstances.fetch_add(1, std::memory_order_relaxed);
     }
 
     std::vector<BossCast> ReleaseInstance(uint32 instanceId)
@@ -162,6 +170,7 @@ namespace DcTestRunStats
             for (auto const& [key, c] : itr->second)
                 out.push_back(c);
             g_bossCasts.erase(itr);
+            g_watchedInstances.fetch_sub(1, std::memory_order_relaxed);
         }
         return out;
     }
