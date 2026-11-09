@@ -9,9 +9,11 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "TestRun/DcDiagSnapshot.h"
+#include "TestRun/DcDispelWatch.h"
 #include "TestRun/DcOffTankAggro.h"
 
 // One JSON line per completed test run, appended to dc_testruns.jsonl in the
@@ -102,6 +104,12 @@ namespace DcTestRunRecord
         int32_t manaPct = -1;      // its own mana just before dying (-1: no mana)
         int32_t healerManaPct = -1;// the healer's mana at that moment (-1: unknown)
         bool healerAlive = false;
+        // What a creature had on the victim at the last sample it was alive
+        // (schema 19): ZG's Venoxis wipes killed three dps on one tick with the
+        // healer full, and the opponent alone cannot say whether a cloud did it.
+        int32_t hpPct = -1;        // its health then (-1: never sampled)
+        std::vector<std::pair<std::uint32_t, std::string>> harm;  // harmful auras, spell id + name
+        static constexpr std::size_t kHarmLog = 6;
     };
 
     // One pull the Dynamic governor took a verdict on, with what the classifier
@@ -174,7 +182,11 @@ namespace DcTestRunRecord
         //     roster run that is never regeared), and wipeRetries.
         // 16: added offTank (mobs turning onto a healer or a dps while the
         //     tank stands).
-        std::uint32_t schema = 16;
+        // 17: added dispels (per dispellable debuff a creature put on the
+        //     party: applications, removed early, expired, carried seconds).
+        // 18: dispels[].expiredWhy (expiries by DcTestRun::DispelReach).
+        // 19: deaths[].hpPct and deaths[].harm (the victim's last sample).
+        std::uint32_t schema = 19;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs
         std::string dungeon;      // registry token
@@ -211,6 +223,11 @@ namespace DcTestRunRecord
         // for Jealous #11173 ("mobs run for the healer"); the counting rule is
         // DcTestRun::FoldOffTankAggro.
         DcTestRun::OffTankAggro offTank;
+        // Dispellable debuffs the party carried (schema 17), by spell id; the
+        // counting rule is DcTestRun::FoldDispelWatch. Serialized most-seen
+        // first, capped at kDispelLog.
+        std::map<std::uint32_t, DcTestRun::DispelStat> dispels;
+        static constexpr std::size_t kDispelLog = 24;
         // Hand-picked party of real player characters (`party=`) rather than a
         // seeded draw from the addclass pool. compSeed is 0 on these runs: the
         // roster IS the comp, so there is nothing to replay from a seed.

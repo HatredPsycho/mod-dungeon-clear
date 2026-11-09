@@ -114,7 +114,7 @@ void RegisterDireMaulEvents(std::vector<DungeonEvent>& out)
     // an event whose anchor boss isn't in it is hidden). See DungeonClearChatActions.
     out.push_back(EventBuilder(429, 2, "Open the Gordok Courtyard Door")
                       .Conditional(&GordokCourtyardDoor)
-                      .UseGO(/*Gordok Courtyard Door*/ 177219, /*searchRadius*/ 25.0f)
+                      .UseGO(/*Gordok Courtyard Door*/ 177219, /*searchRadius*/ 25.0f).NoEncounterStart()
                       .WaitForGOState(177219, /*GO_STATE_ACTIVE*/ 0,
                                       /*timeout*/ 30000, /*searchRadius*/ 25.0f)
                       .PanelAfterBoss(/*Guard Fengus*/ 14321)
@@ -123,7 +123,7 @@ void RegisterDireMaulEvents(std::vector<DungeonEvent>& out)
 
     out.push_back(EventBuilder(429, 3, "Open the Gordok Inner Door")
                       .Conditional(&GordokInnerDoor)
-                      .UseGO(/*Gordok Inner Door*/ 177217, /*searchRadius*/ 25.0f)
+                      .UseGO(/*Gordok Inner Door*/ 177217, /*searchRadius*/ 25.0f).NoEncounterStart()
                       .WaitForGOState(177217, /*GO_STATE_ACTIVE*/ 0,
                                       /*timeout*/ 30000, /*searchRadius*/ 25.0f)
                       .PanelAfterBoss(/*Guard Slip'kik*/ 14323)
@@ -273,7 +273,7 @@ void RegisterDireMaulEvents(std::vector<DungeonEvent>& out)
     // door, 179549 at the entrance, is off the West boss path and is ignored.)
     out.push_back(EventBuilder(429, 9, "Open the Crescent Key Door (lower)")
                       .Conditional(&CrescentDoorLower)
-                      .UseGO(/*after Tendris*/ 177221, /*searchRadius*/ 25.0f)
+                      .UseGO(/*after Tendris*/ 177221, /*searchRadius*/ 25.0f).NoEncounterStart()
                       .WaitForGOState(177221, /*GO_STATE_ACTIVE*/ 0,
                                       /*timeout*/ 30000, /*searchRadius*/ 25.0f)
                       .PanelAfterBoss(/*Tendris Warpwood*/ 11489)
@@ -282,7 +282,7 @@ void RegisterDireMaulEvents(std::vector<DungeonEvent>& out)
 
     out.push_back(EventBuilder(429, 10, "Open the Crescent Key Door (upper)")
                       .Conditional(&CrescentDoorUpper)
-                      .UseGO(/*before Immol'thar*/ 179550, /*searchRadius*/ 25.0f)
+                      .UseGO(/*before Immol'thar*/ 179550, /*searchRadius*/ 25.0f).NoEncounterStart()
                       .WaitForGOState(179550, /*GO_STATE_ACTIVE*/ 0,
                                       /*timeout*/ 30000, /*searchRadius*/ 25.0f)
                       .PanelAfterBoss(/*Magister Kalendris*/ 11487)

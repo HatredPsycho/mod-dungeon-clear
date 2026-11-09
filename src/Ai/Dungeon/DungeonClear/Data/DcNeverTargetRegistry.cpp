@@ -355,6 +355,19 @@ namespace
         // summons (also 8901) are fought wherever he calls them.
         { 230, 8901, 1275.0f, 1480.0f, -560.0f, -305.0f },  // Blackrock Depths — Anvilrage Reservist, Lyceum only
 
+        // --- Road to De Other Side (937): the Wanderers by the mesh hole ------
+        //
+        // Class 2, until the 937 tile (31,32) is rebuilt. The first trash pack past
+        // the entrance, three Interstitial Wanderers (162783) around (415,-285,181),
+        // stands at the edge of a hole in the navmesh: the floor north of it has no
+        // polys. A pull flags them but they cannot walk to the tank, the walk-in
+        // that goes for them leaves the mesh, and the route to Muzah has no start
+        // poly from there (Mythic 0/3 three times in 2.9.4i, tr-20261105-185923-7).
+        // Not progress — Muzah does not need them. Wanderers that aggro are still
+        // fought. BOXED to that pack (x 380..445, y -310..-255); Wanderers elsewhere
+        // on the map stay targets.
+        { 937, 162783, 380.0f, 445.0f, -310.0f, -255.0f },  // Road to De Other Side — Interstitial Wanderer, mesh-hole pack only
+
         // --- Shadowfang Keep (33): the Love is in the Air vial bunnies --------
         //
         // Class 1. The Crown Chemical Co. event leaves its [DND] Valentine Boss -

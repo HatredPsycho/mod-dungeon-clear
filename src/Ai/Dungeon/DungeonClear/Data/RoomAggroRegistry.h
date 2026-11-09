@@ -138,6 +138,10 @@ public:
     // not a room-aggro boss. Linear scan — the table is small.
     static RoomAggroBoss const* Find(uint32 mapId, uint32 bossEntry);
 
+    // Every flagged room-aggro boss of `mapId`, in table order (none -> empty).
+    // For the player-led chase guard, which has no run to name the next boss.
+    static std::vector<RoomAggroBoss const*> ForMap(uint32 mapId);
+
     // The per-boss skirt override (yd) for (mapId, bossEntry), or 0 when the boss
     // is not flagged or carries no override. Callers widen their computed avoid
     // sphere to at least this. Pure — unit-testable.

@@ -752,9 +752,10 @@ TEST(BossRosterRegistryTest, DireMaulWestPylonsAndOrder)
 // Sunken Temple: the DBC bit order is NOT a valid clear order. The roster removes
 // the three phase/puzzle-gated bosses (Weaver 5720, Dreamscythe 5721, Atal'alarion
 // 8580) from their low bits and re-adds them — plus the statue/idol/Avatar pit
-// wing — as event-bearing objective anchors. Weaver & Dreamscythe land on the
-// required spine (after Jammal'an, before Eranikus); the pit wing follows Hazzas,
-// and Eranikus is reordered to the very end (after the Avatar).
+// wing — as event-bearing objective anchors. The 2.9.4 core hides the four
+// Sanctum dragons until the Avatar dies, so the pit wing follows Jammal'an and
+// Weaver & Dreamscythe, Morphaz and Hazzas follow the Avatar; Eranikus is
+// reordered to the very end.
 TEST(BossRosterRegistryTest, SunkenTempleReordersPhaseGatedBosses)
 {
     std::vector<DungeonBossInfo> base = {
@@ -809,16 +810,18 @@ TEST(BossRosterRegistryTest, SunkenTempleReordersPhaseGatedBosses)
     // Forcefield ring anchors come first, before Jammal'an (the gate to him).
     EXPECT_LT(ffPos, pos(5710));
 
-    // Required spine: Weaver & Dreamscythe after Jammal'an, before Eranikus.
-    EXPECT_LT(pos(5710), wdPos);
-    EXPECT_LT(wdPos, pos(5709));
-
-    // Optional pit wing (statues..Avatar) after Hazzas, then Eranikus LAST: the
-    // CoA 2.8 core keeps him untargetable until the Avatar is dead. He keeps his
-    // real kill-bit (8) and only moves in the clear order.
-    EXPECT_LT(pos(5722), statuePos);
+    // Pit wing (statues..Avatar) after Jammal'an, then the four dragons after
+    // the Avatar (hidden until he dies), then Eranikus LAST: the CoA 2.8 core
+    // keeps him untargetable until the Avatar is dead. The reordered bosses keep
+    // their real kill-bits and only move in the clear order.
+    EXPECT_LT(pos(5710), statuePos);
     EXPECT_LT(statuePos, avatarPos);
-    EXPECT_LT(avatarPos, pos(5709));
+    EXPECT_LT(avatarPos, wdPos);
+    EXPECT_LT(wdPos, pos(5719));
+    EXPECT_LT(pos(5719), pos(5722));
+    EXPECT_LT(pos(5722), pos(5709));
+    EXPECT_EQ(Find(out, 5719)->encounterIndex, 4u);
+    EXPECT_EQ(Find(out, 5722)->encounterIndex, 6u);
     EXPECT_EQ(Find(out, 5709)->encounterIndex, 8u);
 
     // Between the Avatar and the Shade: the dragonkin pre-clear (event 18), then
@@ -835,7 +838,7 @@ TEST(BossRosterRegistryTest, SunkenTempleReordersPhaseGatedBosses)
     }
     ASSERT_GE(packPos, 0) << "dragonkin pre-clear objective missing";
     ASSERT_GE(musterPos, 0) << "Eranikus muster objective missing";
-    EXPECT_LT(avatarPos, packPos);
+    EXPECT_LT(pos(5722), packPos);
     EXPECT_LT(packPos, musterPos);
     EXPECT_LT(musterPos, pos(5709));
     EXPECT_EQ(pos(5709), (int)out.size() - 1);

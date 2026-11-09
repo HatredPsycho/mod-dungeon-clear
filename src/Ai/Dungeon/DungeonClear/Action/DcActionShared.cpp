@@ -442,8 +442,10 @@ namespace DcActionShared
 
         // Stamp routable ground for DoLongPathUnreachable's return (see
         // DungeonClearMath::ShouldReturnToRoutableGround). Only a COMPLETE route,
-        // built from where the bot stands now, on its feet.
-        if (path.reachable && path.complete && !bot->GetVehicle() && !bot->IsFalling())
+        // built from where the bot stands now, on its feet — on the mesh, and not
+        // mid walk-in on a pack (Road: that is where the torn floor is).
+        if (path.reachable && path.complete && !path.startFarFromPoly && appr.engageWalkTarget.IsEmpty() &&
+            !bot->GetVehicle() && !bot->IsFalling())
         {
             appr.lastRoutableFrom = bot->GetPosition();
             appr.lastRoutableMap = bot->GetMapId();

@@ -16,6 +16,8 @@
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
 #include "Ai/Dungeon/DungeonClear/Trigger/DungeonClearTriggers.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLyceumCloseUpDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcThrottle.h"
@@ -53,7 +55,10 @@ namespace
         // A running clear only (a paused or finished one hands the bot back), a
         // member that is not the tank, both in the room, both in this instance.
         Player* tank = botAI->GetAiObjectContext()->GetValue<Player*>(DcKey::PartyTank)->Get();
+        // Player-led: the bot tanks are the Main Tank's off-tanks, held where his
+        // orders put them (CoaTankAction), never drawn in to the party.
         if (!bot->IsInCombat() || !tank || tank == bot || !tank->IsAlive() ||
+            !DcPlayerLedDecision::MemberRungApplies(DcPlayerLed::IsHumanTank(tank), PlayerbotAI::IsTank(bot)) ||
             tank->GetInstanceId() != bot->GetInstanceId() || DcLeaderSignal::IsDungeonClearLeader(bot) ||
             !InRoom(bot) || !InRoom(tank))
         {

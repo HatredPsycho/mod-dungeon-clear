@@ -58,6 +58,9 @@ namespace DcTestRun
         std::uint32_t stallGraceMs = 120 * 1000;
         std::uint32_t noProgressMs = 600 * 1000;
         std::uint32_t overallTimeoutMs = 7200 * 1000;
+        // A comp built with a healer that has none standing, and no boss down
+        // since, has lost the fight even while somebody is still swinging.
+        std::uint32_t noHealerMs = 600 * 1000;
     };
 
     enum class Verdict : std::uint8_t
@@ -88,6 +91,9 @@ namespace DcTestRun
         std::uint32_t stalledForMs = 0;
         std::uint32_t sinceProgressMs = 0;
         std::uint32_t elapsedMs = 0;
+        // How long the comp's healers have all been down with no boss killed
+        // meanwhile (0 = a healer stands, or the comp had none).
+        std::uint32_t noHealerForMs = 0;
 
         // Scenario runs only (both stay false everywhere else, which is exactly
         // today's behaviour). scenarioSuccess = the row's success predicate has

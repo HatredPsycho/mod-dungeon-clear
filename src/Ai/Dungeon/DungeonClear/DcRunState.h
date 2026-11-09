@@ -289,6 +289,18 @@ struct DcRunState
     // encounter.
     std::vector<ObjectGuid> razorEggSkipped;
 
+    // Packs set aside for the rest of the run (DungeonClearMath::
+    // ShouldShelvePackForRun): no pull, no sticky latch, no walk-in. They stay
+    // alive; Advance routes past them like any bystander.
+    std::vector<ObjectGuid> shelvedPacks;
+    bool IsShelved(ObjectGuid guid) const
+    {
+        for (ObjectGuid const& g : shelvedPacks)
+            if (g == guid)
+                return true;
+        return false;
+    }
+
     // === TRANSIT state (leader-owned) ===========================================
     // Blackwing Lair's Vaelastrasz -> Broodlord crossing and Halls of Lightning's
     // Bjarngrim -> Volkhan Slag Furnace share this block, because a bot is only

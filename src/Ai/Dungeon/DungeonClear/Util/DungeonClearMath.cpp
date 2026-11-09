@@ -234,6 +234,11 @@ bool DungeonClearMath::ShouldTripCampSafety(bool inCombat, float healthPct,
     return elapsed >= graceMs;
 }
 
+bool DungeonClearMath::ShouldShelvePackForRun(bool pullTouchedPack, bool packInCombat)
+{
+    return pullTouchedPack && !packInCombat;
+}
+
 bool DungeonClearMath::ShouldStandDownForPull(bool packIsPullsOwn, bool pullPhaseIdle)
 {
     if (packIsPullsOwn)

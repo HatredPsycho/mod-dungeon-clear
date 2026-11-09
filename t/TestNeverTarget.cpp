@@ -209,3 +209,14 @@ TEST(DcNeverTargetRegistryTest, BlackrockDepthsReservistsAreNeverATargetInTheLyc
     // A whole-map row still matches through the positional overload.
     EXPECT_TRUE(DcNeverTargetRegistry::IsNeverTarget(230, 9545, 0.0f, 0.0f));
 }
+
+// Road's Wanderers by the 937 mesh hole are set aside; the rest of the map's
+// Wanderers stay targets.
+TEST(DcNeverTargetRegistryTest, RoadWanderersAreNeverATargetByTheMeshHoleOnly)
+{
+    EXPECT_TRUE(DcNeverTargetRegistry::IsNeverTarget(937, 162783, 415.4f, -284.6f));   // the pack
+    EXPECT_TRUE(DcNeverTargetRegistry::IsNeverTarget(937, 162783, 442.0f, -259.0f));   // where the tank lost the mesh
+    EXPECT_FALSE(DcNeverTargetRegistry::IsNeverTarget(937, 162783, 480.6f, -232.2f));  // the routable ground east of it
+    EXPECT_FALSE(DcNeverTargetRegistry::IsNeverTarget(937, 162783));
+    EXPECT_FALSE(DcNeverTargetRegistry::IsNeverTarget(937, 162776, 415.4f, -284.6f));
+}

@@ -62,6 +62,12 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+#include "GameTime.h"
+#include "Group.h"
+#include "ObjectAccessor.h"
+#include "RandomPlayerbotMgr.h"
+#include <unordered_map>
+#include <unordered_set>
 #include "PlayerScript.h"
 #include "UnitScript.h"
 
@@ -74,6 +80,19 @@
 #include "DcStrategyGate.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
+
+// The combat guards that move from Dungeon Clear to the playerbots module (07/11:
+// "DC is the autorun in the dungeon, the strategies are in playerbots"). On a
+// module without them DC simply keeps every guard itself.
+#if __has_include("CoaGroupTank.h") && __has_include("CoaHealEscort.h")
+#include "CoaGroupTank.h"
+#include "CoaHealEscort.h"
+#define DC_HAS_COA_GARDES 1
+#else
+#define DC_HAS_COA_GARDES 0
+#endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
@@ -213,6 +232,93 @@ public:
     }
 };
 
+// Ghost probe (2.9.5, diagnostic asked by the Pilote for bissakov's ghost fix).
+// Once a minute, on the world thread (OnUpdate runs before the map updates, so no
+// map thread touches a player while this reads it), every player that has been a
+// ghost for 10 minutes gets ONE line: who (random bot, party bot or human), where,
+// and the bot's last state; a second line when it comes back. Cheap: one pass
+// over the online players a minute, a line only past the 10 minutes.
+class DungeonClearGhostProbeWorldScript : public WorldScript
+{
+public:
+    DungeonClearGhostProbeWorldScript() : WorldScript("DungeonClearGhostProbeWorldScript") {}
+
+    void OnUpdate(uint32 diff) override
+    {
+        _elapsedMs += diff;
+        if (_elapsedMs < kTickMs)
+            return;
+        _elapsedMs = 0;
+        if (!DcModule::IsEnabled())
+            return;
+
+        time_t const now = GameTime::GetGameTime().count();
+        std::unordered_set<uint64> ghosts;
+        for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+        {
+            if (!player || !player->IsInWorld())
+                continue;
+            uint64 const key = guid.GetRawValue();
+            auto it = _since.find(key);
+            if (!player->HasPlayerFlag(PLAYER_FLAGS_GHOST))
+            {
+                if (it != _since.end())
+                {
+                    if (it->second.reported)
+                        LOG_INFO("playerbots.dungeonclear", "[GHOST] {} ({}) back after {}s as a ghost",
+                                 player->GetName(), Kind(player), now - it->second.since);
+                    _since.erase(it);
+                }
+                continue;
+            }
+            ghosts.insert(key);
+            if (it == _since.end())
+            {
+                _since.emplace(key, Entry{ now, false });
+                continue;
+            }
+            if (it->second.reported || now - it->second.since < kReportAfterS)
+                continue;
+            it->second.reported = true;
+            PlayerbotAI* ai = GET_PLAYERBOT_AI(player);
+            Player* master = ai ? ai->GetMaster() : nullptr;
+            Group* group = player->GetGroup();
+            LOG_INFO("playerbots.dungeonclear",
+                     "[GHOST] {} ({}) a ghost for {}s: map {} zone {} area {} at ({:.1f},{:.1f},{:.1f}) "
+                     "instance {} | group {} | master {} | bot state {}",
+                     player->GetName(), Kind(player), now - it->second.since, player->GetMapId(),
+                     player->GetZoneId(), player->GetAreaId(), player->GetPositionX(),
+                     player->GetPositionY(), player->GetPositionZ(), player->GetInstanceId(),
+                     group ? group->GetMembersCount() : 0u,
+                     master && master != player ? master->GetName() : std::string("-"),
+                     ai ? static_cast<int>(ai->GetState()) : -1);
+        }
+        // Logged out (or deleted) while a ghost: forget it.
+        for (auto it = _since.begin(); it != _since.end();)
+            it = ghosts.count(it->first) ? std::next(it) : _since.erase(it);
+    }
+
+private:
+    static constexpr uint32 kTickMs = 60000;
+    static constexpr time_t kReportAfterS = 600;
+
+    struct Entry
+    {
+        time_t since;
+        bool reported;
+    };
+
+    static char const* Kind(Player* player)
+    {
+        if (!GET_PLAYERBOT_AI(player))
+            return "human";
+        return sRandomPlayerbotMgr.IsRandomBot(player) ? "random bot" : "party bot";
+    }
+
+    uint32 _elapsedMs = 0;
+    std::unordered_map<uint64, Entry> _since;
+};
+
 class DungeonClearRegistrarWorldScript : public WorldScript
 {
 public:
@@ -328,7 +434,8 @@ public:
     DungeonClearLoginPlayerScript()
         : PlayerScript("DungeonClearLoginPlayerScript", {
             PLAYERHOOK_ON_LOGIN,
-            PLAYERHOOK_ON_MAP_CHANGED
+            PLAYERHOOK_ON_MAP_CHANGED,
+            PLAYERHOOK_ON_LOGOUT
         }) {}
 
     // Both drivers go through DcStrategyGate::Reconcile, which is itself gated
@@ -343,6 +450,12 @@ public:
     {
         DcStrategyGate::Reconcile(player);
         DcStrategyGate::ApplyEntryDefaults(player);
+        DcPlayerLed::Forget(player);  // a Main Tank's lead clock belongs to the map he left
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        DcPlayerLed::Forget(player);
     }
 };
 
@@ -1011,11 +1124,68 @@ private:
     }
 };
 
+namespace
+{
+    // The module guards Dungeon Clear STILL runs itself, by the module's names.
+    // While a member is in a DC run (or player-led mode, which DC also covers),
+    // the module's guard of the same name stands down, so no guard acts twice.
+    // Cutting a guard out of DC drops its name here IN THE SAME CHANGE.
+    char const* const kGuardsStillInDungeonClear[] = {
+        // Builder's lot
+        "heal reposition", "top off party", "threat lead", "tank fight assist",
+        // DC's lot
+        "combat regroup", "escape leap ban", "room boss chase", "lyceum close up", "iron hall",
+        "ground hazards", "target exclusion", "boss stand down",
+    };
+
+    void WireModuleCombatGuards()
+    {
+#if DC_HAS_COA_GARDES
+        // The reference tank of a member in a DC run, or of a player-led party:
+        // exactly what DC's party-tank value resolves (DcPlayerLed::PartyTankFor),
+        // so the module's guards and DC's rungs always agree on the tank.
+        // Read from the map threads for every member the module asks about: gated
+        // on DcModule::IsEnabled() first (an atomic), because with DC disabled no
+        // DC value is registered and the run-state reads below would crash.
+        CoaGroupTank::SetProvider([](Player const* member) -> Player*
+        {
+            Player* const m = const_cast<Player*>(member);
+            if (!DcModule::IsEnabled() || !m)
+                return nullptr;
+            Player* const tank = DcPlayerLed::PartyTankFor(m);
+            Player* const owner = tank ? nullptr : DcLeaderSignal::FindRunOwner(m);
+            switch (DcPlayerLedDecision::ProvideToModule(true, tank != nullptr, owner != nullptr))
+            {
+                case DcPlayerLedDecision::ModuleProvide::PartyTank:
+                    return tank;
+                case DcPlayerLedDecision::ModuleProvide::RunOwner:
+                    return owner;
+                default:
+                    return nullptr;
+            }
+        });
+        // The NPC an event of the run is escorting, for the module's healers.
+        CoaHealEscort::SetProvider([](Player const* member) -> Unit*
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return nullptr;
+            return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member));
+        });
+        for (char const* guard : kGuardsStillInDungeonClear)
+            CoaGroupTank::SetHandledByDungeonClear(guard, true);
+#endif
+    }
+}
+
 void AddSC_dungeon_clear_module()
 {
+    // Before any map updates: the providers and the guard list are read from the
+    // map threads afterwards and never change again.
+    WireModuleCombatGuards();
     new DungeonClearRunTravelGuardScript();
     AddSC_dc_test_run_stats();
     new DungeonClearRegistrarWorldScript();
+    new DungeonClearGhostProbeWorldScript();
     new DungeonClearLoginPlayerScript();
     new DungeonClearPullBrakeScript();
     new DungeonClearLateJoinerScript();

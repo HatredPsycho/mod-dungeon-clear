@@ -154,6 +154,13 @@ EventBuilder& EventBuilder::ContinueOnTimeout()
     return *this;
 }
 
+EventBuilder& EventBuilder::HoldIfUnreachable()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().holdIfUnreachable = true;
+    return *this;
+}
+
 EventBuilder& EventBuilder::SkipIfTargetMissing()
 {
     if (!_ev.steps.empty())
@@ -165,6 +172,20 @@ EventBuilder& EventBuilder::WaitTargetStill()
 {
     if (!_ev.steps.empty())
         _ev.steps.back().waitForStill = true;
+    return *this;
+}
+
+EventBuilder& EventBuilder::StartsEncounter()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().startsEncounter = EncounterStartFlag::Yes;
+    return *this;
+}
+
+EventBuilder& EventBuilder::NoEncounterStart()
+{
+    if (!_ev.steps.empty())
+        _ev.steps.back().startsEncounter = EncounterStartFlag::No;
     return *this;
 }
 

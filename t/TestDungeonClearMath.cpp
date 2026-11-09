@@ -3878,3 +3878,27 @@ TEST(DungeonClearRoomTrashTest, TheStandWalkRoundsAPackOnlyOnItsOwnFloor)
     EXPECT_TRUE(DungeonClearMath::StandWalkRoundsPack(-92.6f, -91.9f, 5.0f));
     EXPECT_TRUE(DungeonClearMath::StandWalkRoundsPack(-90.0f, -85.0f, 5.0f));
 }
+
+// ---------------------------------------------------------------------------
+// ShouldShelvePackForRun — setting aside a pack that never comes.
+// ---------------------------------------------------------------------------
+using DungeonClearMath::ShouldShelvePackForRun;
+
+// Road to De Other Side: the pull worked the Wanderers, nothing came, the
+// walk-in was given up. That pack is set aside for the run.
+TEST(DungeonClearPackShelfTest, APackThePullWorkedThatNeverCameIsShelved)
+{
+    EXPECT_TRUE(ShouldShelvePackForRun(/*pullTouchedPack*/ true, /*packInCombat*/ false));
+}
+
+// A pack fighting someone is a fight, not a pack that never comes.
+TEST(DungeonClearPackShelfTest, APackInCombatIsNeverShelved)
+{
+    EXPECT_FALSE(ShouldShelvePackForRun(/*pullTouchedPack*/ true, /*packInCombat*/ true));
+}
+
+// A walk-in alone is given up for a while (engageWalkGivenUp), not for the run.
+TEST(DungeonClearPackShelfTest, AWalkInGiveUpWithoutAPullIsNotShelved)
+{
+    EXPECT_FALSE(ShouldShelvePackForRun(/*pullTouchedPack*/ false, /*packInCombat*/ false));
+}

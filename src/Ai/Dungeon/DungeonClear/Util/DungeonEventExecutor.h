@@ -203,6 +203,28 @@ public:
     // through it forever (live deadlock).
     static bool HasGameObjectLos(Player* bot, GameObject* go);
 
+    // --- Main Tank mode (player-led v2) -----------------------------------
+    // Read-only seams for DcPlayerLedEvents. A DC run never calls them; each one
+    // reuses the exact helper the run's own steps use, so the two modes cannot
+    // drift apart on what "landed" or "gate clear" means.
+
+    // Relocate every party BOT more than a jump span from (x,y,z) onto it, never
+    // a human and never a rider (the Jump / DropInHole / TeleportParty pull).
+    // `anchor` is the member whose group is pulled; it is never moved itself.
+    static void PullBotsAcross(Player* anchor, float x, float y, float z);
+
+    // The gap after which a drive reads as a fresh activation (see Drive).
+    static uint32 StaleGapMs();
+
+    // The completion gate of a GARRISON MoveTo (instance data, persistent data,
+    // boss state, spawn gate), read around `reader` without moving anyone and
+    // without running its WhileHolding hook. Done once the gate clears; a boss
+    // state that reads "reset" stays Running.
+    static StepResult GarrisonGate(Player* reader, EventStep const& step);
+
+    // The radius a ClearRadius verdict is trusted from (see RunStep).
+    static float ClearJudgeRadius();
+
     // --- Conditional activation (milestone 2) ----------------------------
 
     // Synthetic "dungeon clear cleared anchors" latch key for a Conditional

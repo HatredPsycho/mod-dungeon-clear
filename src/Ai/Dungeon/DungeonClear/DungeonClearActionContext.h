@@ -12,6 +12,7 @@
 #include "Ai/Dungeon/DungeonClear/Action/DungeonClearActions.h"
 #include "Ai/Dungeon/DungeonClear/Action/DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Action/StayDeadAction.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
 class DungeonClearActionContext : public NamedObjectContext<Action>
 {
@@ -24,6 +25,7 @@ public:
         creators["dungeon clear objective arrive"] = &DungeonClearActionContext::objective_arrive;
         creators["dungeon clear objective engage combat"] = &DungeonClearActionContext::objective_engage_combat;
         creators["dungeon clear run event"] = &DungeonClearActionContext::run_event;
+        creators["dungeon clear player led event"] = &DungeonClearActionContext::player_led_event;
         creators["dungeon clear run event combat"] = &DungeonClearActionContext::run_event_combat;
         creators["dungeon clear room clear"] = &DungeonClearActionContext::room_clear;
         creators["dungeon clear room preclear hold"] = &DungeonClearActionContext::room_preclear_hold;
@@ -69,6 +71,7 @@ public:
         creators["dc bosses"] = &DungeonClearActionContext::dc_bosses;
         creators["dc wing"] = &DungeonClearActionContext::dc_wing;
         creators["dc go"] = &DungeonClearActionContext::dc_go;
+        creators["dc go player led"] = &DungeonClearActionContext::dc_go_player_led;
 
         // Override mod-playerbots' "loot roll": a bot in "bot self" mode does
         // not auto-vote on group loot (it shares the human's GUID and would
@@ -140,6 +143,8 @@ private:
     static Action* dc_bosses(PlayerbotAI* ai) { return new DcBossesAction(ai); }
     static Action* dc_wing(PlayerbotAI* ai) { return new DcWingAction(ai); }
     static Action* dc_go(PlayerbotAI* ai) { return new DcGoAction(ai); }
+    static Action* dc_go_player_led(PlayerbotAI* ai) { return new DcGoPlayerLedAction(ai); }
+    static Action* player_led_event(PlayerbotAI* ai) { return new DungeonClearPlayerLedEventAction(ai); }
 
     static Action* better_loot_roll(PlayerbotAI* ai) { return new DungeonClearBetterLootRollAction(ai); }
     static Action* auto_release(PlayerbotAI* ai) { return new DungeonClearStayDeadAction(ai); }

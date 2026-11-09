@@ -5,6 +5,8 @@
 
 #include "DungeonClearPartyTankValue.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 
 #include "Player.h"
 #include "Playerbots.h"
@@ -16,24 +18,7 @@ Player* DungeonClearPartyTankValue::Calculate()
     if (!bot)
         return nullptr;
 
-    // The single elected leader for the whole group (party or raid). For the
-    // leader bot itself this resolves to `bot`; for every follower — non-tanks
-    // and non-leader (off-)tanks alike — it is the tank they should trail.
-    Player* leader = DcLeaderSignal::FindLeaderTank(bot);
-    if (!leader)
-        return nullptr;
-
-    // Only bot tanks can be elected, so this always resolves; guard anyway.
-    PlayerbotAI* leaderAI = GET_PLAYERBOT_AI(leader);
-    if (!leaderAI)
-        return nullptr;
-
-    // Expose the leader only while its clear is actively running and unpaused.
-    // A paused/disabled leader returns null so followers stop following it and
-    // revert to the player — matching the leader's own paused/off behavior.
-    AiObjectContext* leaderCtx = leaderAI->GetAiObjectContext();
-    if (DcRun::Of(leaderCtx).enabled &&
-        !DcRun::Of(leaderCtx).paused)
-        return leader;
-    return nullptr;
+    // See DcPlayerLed::PartyTankFor: the run's elected leader while it runs
+    // unpaused, else the player-led Main Tank, else nobody.
+    return DcPlayerLed::PartyTankFor(bot);
 }

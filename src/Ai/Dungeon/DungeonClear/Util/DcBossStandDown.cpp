@@ -18,6 +18,7 @@
 #include "Timer.h"
 
 #include "Ai/Dungeon/DungeonClear/Data/DungeonBossInfo.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
@@ -112,7 +113,11 @@ namespace DcBossStandDown
 
         // The verdict is the RUN's, so it lives on the run's leader. No leader
         // (DC off / not in a DC party) -> nothing of DC's needs gating.
-        Player* const leader = DcLeaderSignal::FindRunOwner(bot);
+        // Player-led (a human Main Tank leads, no run): the human-led branch below,
+        // on the instance script's own signal.
+        Player* leader = DcLeaderSignal::FindRunOwner(bot);
+        if (!leader)
+            leader = DcPlayerLed::Leader(bot);
         if (!leader)
             return false;
         PlayerbotAI* const leaderAI = GET_PLAYERBOT_AI(leader);

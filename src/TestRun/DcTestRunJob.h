@@ -6,6 +6,7 @@
 #ifndef _PLAYERBOT_DCTESTRUNJOB_H
 #define _PLAYERBOT_DCTESTRUNJOB_H
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -316,6 +317,8 @@ private:
     void TrackDeaths(Player* tank);
     void TrackEngagement(Player* tank);
     void TrackOffTankAggro(Player* tank, uint32 dt);
+    void TrackDispels(Player* tank, uint32 dt);
+    static std::array<float, 5> DispelRanges(Player* member);
     void TrackPulls(Player* tank);
     void ClosePull(bool wipedHere = false);
     DcTestRun::Engagement DeathBlame() const;
@@ -534,6 +537,8 @@ private:
     uint32 _pausedForMs = 0;
     uint32 _stalledForMs = 0;
     uint32 _wipedForMs = 0;
+    uint32 _noHealerForMs = 0;      // Observation::noHealerForMs
+    uint32 _noHealerBosses = 0;     // bossesKilled when it last ran; a kill resets it
     // SetRunOptions (self-found parties).
     std::vector<std::pair<std::string, double>> _runOverrides;
     uint32 _wipeRetriesLeft = 0;
@@ -562,6 +567,20 @@ private:
     // Which member each mob was on at the previous sample (raw guids), for the
     // #11173 off-tank counts — DcTestRun::FoldOffTankAggro.
     std::unordered_map<std::uint64_t, std::uint64_t> _offTankLast;
+    // Dispellable debuffs on each member at the previous sample (member, spell,
+    // caster -> ms left) — DcTestRun::FoldDispelWatch.
+    std::map<DcTestRun::DebuffKey, DcTestRun::DebuffLast> _dispelLast;
+    // Per member, the longest friendly range of a known spell removing each
+    // dispel type (index = SpellInfo::Dispel, 0 = cannot), read once per run.
+    std::map<std::uint64_t, std::array<float, 5>> _dispelRangeYd;
+    // Per member, its health and the harmful creature auras on it at the last
+    // sample it was alive; TrackDeaths stamps them on the death (schema 19).
+    struct HarmSample
+    {
+        int32_t hpPct = -1;
+        std::vector<std::pair<std::uint32_t, std::string>> harm;
+    };
+    std::map<std::uint64_t, HarmSample> _harmLast;
     // The engagement latched at the most recent death. The live latch clears the
     // moment the survivors drop combat, so a run that ends on a failed rez has
     // nothing left to blame; this keeps the killer alive for the post-mortem.

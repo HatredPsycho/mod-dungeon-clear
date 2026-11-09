@@ -454,3 +454,21 @@ TEST(DcTestRunVerdictTest, LongEventWithSequenceBumpsNeverTripsNoProgress)
         ASSERT_EQ(Classify(o, l), Verdict::Continue) << "t=" << t;
     }
 }
+
+// ---- no healer standing -----------------------------------------------------
+
+// The raid lost its healer and kept swinging: past the limit it is a wipe.
+TEST(DcTestRunVerdictTest, NoHealerPastItsLimitIsAWipe)
+{
+    Observation o = Healthy();
+    o.noHealerForMs = DefaultLimits().noHealerMs;
+    EXPECT_EQ(Classify(o, DefaultLimits()), Verdict::FailPartyWiped);
+}
+
+// A healer down for a while is a fight still on: it may be raised.
+TEST(DcTestRunVerdictTest, NoHealerUnderItsLimitContinues)
+{
+    Observation o = Healthy();
+    o.noHealerForMs = DefaultLimits().noHealerMs - 1;
+    EXPECT_EQ(Classify(o, DefaultLimits()), Verdict::Continue);
+}

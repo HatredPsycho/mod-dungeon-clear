@@ -178,6 +178,20 @@ enum class EventStepKind : uint8
                              // UseItemOnGO) for the cooldown probe and the log line.
 };
 
+// Main Tank mode (player-led v2): whether a step STARTS an encounter or brings
+// mobs (a gong, a summon, a gossip that starts a boss or an escort, a walk into
+// an adds trigger). Such a step never fires on its own when a human Main Tank
+// leads: the elected bot executor waits for the player's go ("dc go", or the
+// player doing it himself). Default resolves by step kind, conservatively
+// (DcPlayerLedEventDecision::StartsEncounter); authors pin it with
+// EventBuilder::StartsEncounter / NoEncounterStart. Never read by a DC run.
+enum class EncounterStartFlag : uint8
+{
+    Default,  // resolved by kind: an action step counts as starting one
+    Yes,      // starts an encounter: wait for the player's go
+    No,       // safe (a lever that only opens a door): run automatically
+};
+
 // One typed primitive. Fields are a shared bag — only those relevant to `kind`
 // are read (see DungeonEventExecutor::RunStep). Authoring goes through the
 // fluent EventBuilder below, not by populating this directly.
@@ -274,6 +288,9 @@ struct EventStep
     // still skips rather than waiting forever.
     bool   waitForStill{false};
 
+    // Main Tank mode only (see EncounterStartFlag). A DC run ignores it.
+    EncounterStartFlag startsEncounter{EncounterStartFlag::Default};
+
     uint32 durationMs{0};    // Wait: dwell length
     uint32 timeoutMs{0};     // 0 => EventStepTimeout config default; else per-step
     // A best-effort step: when it runs out of time (its own timeout or the
@@ -281,6 +298,19 @@ struct EventStep
     // failing. For a pre-clear whose leftovers the next steps can live with —
     // the step that follows is what actually does the job (Uldaman's keystone).
     bool   continueOnTimeout{false};
+
+    // KillCreature-engage only. When the creature is alive but the engage walk-in
+    // finds no route to it (it sits in water, on a ledge, behind its own scripted
+    // walk), keep HOLDING and driving the step instead of yielding the tick, so the
+    // step timeout still runs. Pair with Timeout() + ContinueOnTimeout() for an
+    // OPTIONAL kill the run must not deadlock on.
+    //
+    // Without it the objective action returns false on an unreachable target, the
+    // executor never runs (no timeout), and a started persistent event also stands
+    // Advance down ("a pull-owning event is driving"): nothing moves the run again.
+    // Live: tr-20261107-093349-42, Zul'Farrak, 7/7 bosses dead, Gahz'rilla up in the
+    // sacred pool and unreachable, the tank parked 31yd off the gong for ten minutes.
+    bool   holdIfUnreachable{false};
     uint32 hookId{0};        // Custom -> ObjectiveHookRegistry; on a garrison MoveTo,
                              // the hook to re-run each tick WHILE it holds (see
                              // EventBuilder::WhileHolding). 0 => none.
@@ -713,10 +743,23 @@ public:
     //   .ClearRadius(...).Timeout(120000).ContinueOnTimeout()
     EventBuilder& ContinueOnTimeout();
 
+    // Mark the LAST-added KillCreature-engage step EventStep::holdIfUnreachable:
+    // an alive but unreachable target keeps the step driven (its timeout runs)
+    // instead of yielding the tick.
+    //   .KillCreatureEngage(boss).Timeout(180000).ContinueOnTimeout().HoldIfUnreachable()
+    EventBuilder& HoldIfUnreachable();
+
     // Make the LAST-added Gossip step wait until its target NPC stops moving (has
     // finished a scripted walk) before talking to it. Chain after the step:
     //   .Gossip(npc, 0).WaitTargetStill()
     EventBuilder& WaitTargetStill();
+
+    // Main Tank mode: mark the LAST-added step as starting an encounter (wait for
+    // the player's go) or as safe to run without it. A DC run never reads either.
+    //   .UseGO(GO_GONG, 35).StartsEncounter()
+    //   .UseGO(GO_DOOR_LEVER, 14).NoEncounterStart()
+    EventBuilder& StartsEncounter();
+    EventBuilder& NoEncounterStart();
 
     EventBuilder& MoveTo(float x, float y, float z, float radius = 0.0f);
     // Ballistic jump to (x,y,z): MotionMaster::MoveJump at run speed. Bridges a

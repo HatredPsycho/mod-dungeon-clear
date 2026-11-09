@@ -1378,6 +1378,56 @@ StepResult DungeonEventExecutor::RunStep(Player* bot, AiObjectContext* context,
     }
 }
 
+void DungeonEventExecutor::PullBotsAcross(Player* anchor, float x, float y, float z)
+{
+    if (anchor)
+        PullStrandedFollowersAcross(anchor, x, y, z);
+}
+
+uint32 DungeonEventExecutor::StaleGapMs()
+{
+    return EventStaleGapMs();
+}
+
+float DungeonEventExecutor::ClearJudgeRadius()
+{
+    return DC_EVENT_CLEAR_JUDGE_RADIUS;
+}
+
+StepResult DungeonEventExecutor::GarrisonGate(Player* reader, EventStep const& step)
+{
+    if (!reader)
+        return StepResult::Running;
+    if (step.bossStateId >= 0)
+    {
+        InstanceScript* inst = DcTargeting::GetInstanceScript(reader);
+        if (!inst)
+            return StepResult::Running;
+        uint32 const state = inst->GetBossState(static_cast<uint32>(step.bossStateId));
+        return DecideBossStateGate(state, step.bossStateClearMask, step.restartOnBossStateMask) ==
+                       BossStateGateVerdict::Clear
+                   ? StepResult::Done
+                   : StepResult::Running;
+    }
+    if (step.instanceDataId >= 0)
+    {
+        InstanceScript* inst = DcTargeting::GetInstanceScript(reader);
+        uint32 const v = inst ? inst->GetData(static_cast<uint32>(step.instanceDataId)) : 0;
+        return v >= step.instanceDataMin ? StepResult::Done : StepResult::Running;
+    }
+    if (step.persistentDataId >= 0)
+    {
+        InstanceScript* inst = DcTargeting::GetInstanceScript(reader);
+        uint32 const v =
+            inst ? inst->GetPersistentData(static_cast<uint32>(step.persistentDataId)) : 0;
+        return v >= step.persistentDataMin ? StepResult::Done : StepResult::Running;
+    }
+    if (step.creatureEntry != 0 || !step.orEntries.empty())
+        return AnyGateCreaturePresent(reader, step) == step.wantAlive ? StepResult::Done
+                                                                       : StepResult::Running;
+    return StepResult::Done;
+}
+
 EventDriveOutcome DungeonEventExecutor::Advance(DungeonEvent const& ev, DungeonEventProgress& prog,
                                                 StepResult result, uint32 nowMs,
                                                 uint32 defaultTimeoutMs)

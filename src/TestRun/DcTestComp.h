@@ -119,7 +119,8 @@ namespace DcTestComp
     inline constexpr std::size_t kMaxPartySize = 40;
 
     // Role quotas derived from the party size. 5-mans keep the classic
-    // 1/1/3; raids scale tanks stepwise and healers at ~N/4.
+    // 1/1/3; raids of 15-20 field 2 tanks + 3 healers, 21-25 2 + 4, others
+    // scale tanks stepwise and healers at ~N/4.
     struct Quota
     {
         std::size_t tanks;
@@ -137,7 +138,7 @@ namespace DcTestComp
 
     // Sized form: RoleQuota(size) slots, seed-deterministic. Distinct classes
     // while the pools allow, then duplicates spread as evenly as possible (9
-    // classes — 10 with death knights — < 25 slots; 6 healers over 4 heal
+    // classes — 10 with death knights — < 25 slots; 6 healers at 26 over 4 heal
     // classes force duplicates) — the least-used class of the role pool is
     // always preferred. size is clamped to [kMinPartySize, kMaxPartySize].
     std::vector<Slot> BuildComp(std::uint32_t seed, std::size_t size, Roster roster);

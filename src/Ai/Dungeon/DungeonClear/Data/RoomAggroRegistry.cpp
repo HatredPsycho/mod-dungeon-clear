@@ -312,6 +312,15 @@ RoomAggroBoss const* RoomAggroRegistry::Find(uint32 mapId, uint32 bossEntry)
     return nullptr;
 }
 
+std::vector<RoomAggroBoss const*> RoomAggroRegistry::ForMap(uint32 mapId)
+{
+    std::vector<RoomAggroBoss const*> out;
+    for (RoomAggroBoss const& b : kRoomAggroBosses)
+        if (b.mapId == mapId)
+            out.push_back(&b);
+    return out;
+}
+
 float RoomAggroRegistry::SkirtOverride(uint32 mapId, uint32 bossEntry)
 {
     RoomAggroBoss const* b = Find(mapId, bossEntry);

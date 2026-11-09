@@ -16,6 +16,7 @@
 #include <limits>
 #include <optional>
 #include <set>
+#include <unordered_set>
 
 #include "CharacterCache.h"
 #include "DBCStores.h"
@@ -30,6 +31,9 @@
 #include "Item.h"
 #include "Log.h"
 #include "Map.h"
+#include "SpellAuras.h"
+#include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "StringFormat.h"
@@ -1129,6 +1133,14 @@ void DcTestRunJob::TickProvisioningRoster()
                                : PlayerbotAI::IsHeal(bot, /*bySpec*/ true) ? "heal"
                                                                           : "dps";
 
+        // A raid roster (more than a 5-man) is only positional for its first two
+        // names: party= cannot mark a second tank or a third healer, and those
+        // characters play their own spec anyway. Take the spec's role for every
+        // slot past the main tank, or the no-healer watch, the aggro stats and
+        // the death records would only ever see one healer.
+        if (_realChars && _slots.size() > 5 && &slot != &_slots.front())
+            slot.role = detected;
+
         DcTestRunRecord::CompEntry entry;
         entry.name = bot->GetName();
         entry.className = DcBotProvisioning::ClassToken(bot->getClass());
@@ -1965,6 +1977,11 @@ void DcTestRunJob::TrackDeaths(Player* tank)
                     death.healerManaPct = m->second;
             }
         }
+        if (auto h = _harmLast.find(member->GetGUID().GetRawValue()); h != _harmLast.end())
+        {
+            death.hpPct = h->second.hpPct;
+            death.harm = h->second.harm;
+        }
         _record.deaths.push_back(death);
         // Deliberately overwritten even when the latch is empty: this means
         // "what the LAST death was to", not "the last death that had a killer".
@@ -2131,6 +2148,104 @@ void DcTestRunJob::TrackOffTankAggro(Player* tank, uint32 dt)
                 now.push_back({attacker->GetGUID().GetRawValue(), member->GetGUID().GetRawValue(), r});
     }
     DcTestRun::FoldOffTankAggro(_offTankLast, now, tank->IsAlive(), dt, _record.offTank);
+}
+
+// Every dispellable harmful aura a creature put on a living member, folded into
+// the per-spell dispel counts (the rule is DcTestRun::FoldDispelWatch). Only
+// magic, curse, disease and poison: what a bot healer or a class cure can take
+// off. Player-cast auras are left out — a party member's own debuff on a friend
+// (a Barbarian's self-cost, a duel leftover) is not the encounter's.
+// Longest range of an active, learned spell that removes each dispel type from
+// an ally (index = SpellInfo::Dispel). Enemy-only dispels (Purge) do not count.
+std::array<float, 5> DcTestRunJob::DispelRanges(Player* member)
+{
+    std::array<float, 5> range{};
+    for (auto const& [spellId, ps] : member->GetSpellMap())
+    {
+        if (!ps || ps->State == PLAYERSPELL_REMOVED || !ps->Active || !ps->IsInSpec(member->GetActiveSpec()))
+            continue;
+        SpellInfo const* const info = sSpellMgr->GetSpellInfo(spellId);
+        if (!info || info->IsPassive())
+            continue;
+        for (SpellEffectInfo const& eff : info->GetEffects())
+        {
+            if (eff.Effect != SPELL_EFFECT_DISPEL || eff.TargetA.GetCheckType() == TARGET_CHECK_ENEMY)
+                continue;
+            std::uint32_t const mask = SpellInfo::GetDispelMask(DispelType(eff.MiscValue));
+            for (std::uint8_t t = DISPEL_MAGIC; t <= DISPEL_POISON; ++t)
+                if (mask & (1u << t))
+                    range[t] = std::max(range[t], std::max(info->GetMaxRange(true), 1.f));
+        }
+    }
+    return range;
+}
+
+void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
+{
+    if (!tank)
+        return;
+
+    std::vector<DcTestRun::DebuffSample> now;
+    std::unordered_set<std::uint64_t> alive;
+    std::vector<Player*> members;
+    for (Slot const& slot : _slots)
+    {
+        Player* const member = ObjectAccessor::FindPlayer(slot.guid);
+        if (!member || !member->IsInWorld() || member->GetMapId() != tank->GetMapId())
+            continue;
+        if (!member->IsAlive())
+            continue;
+        alive.insert(member->GetGUID().GetRawValue());
+        members.push_back(member);
+        auto [it, fresh] = _dispelRangeYd.try_emplace(member->GetGUID().GetRawValue());
+        if (fresh)
+            it->second = DispelRanges(member);
+    }
+
+    // The carrier's DispelReach for one dispel type: who could have taken it off.
+    auto reachOf = [&](Player* carrier, std::uint8_t type) -> std::uint8_t
+    {
+        bool any = false, free = false;
+        for (Player* d : members)
+        {
+            float const range = _dispelRangeYd[d->GetGUID().GetRawValue()][type];
+            if (range <= 0.f)
+                continue;
+            any = true;
+            if (d->HasUnitState(UNIT_STATE_FLEEING | UNIT_STATE_CONFUSED | UNIT_STATE_STUNNED) ||
+                d->HasUnitFlag(UNIT_FLAG_SILENCED))
+                continue;
+            free = true;
+            if (d == carrier || (d->IsWithinDistInMap(carrier, range) && d->IsWithinLOSInMap(carrier)))
+                return DcTestRun::REACH_IN_REACH;
+        }
+        if (!any)
+            return DcTestRun::REACH_NO_DISPELLER;
+        return free ? DcTestRun::REACH_OUT_OF_REACH : DcTestRun::REACH_DISPELLER_HELD;
+    };
+
+    for (Player* member : members)
+    {
+        HarmSample& harm = _harmLast[member->GetGUID().GetRawValue()];
+        harm.hpPct = int32(member->GetHealthPct());
+        harm.harm.clear();
+        for (auto const& [spellId, app] : member->GetAppliedAuras())
+        {
+            Aura const* const aura = app ? app->GetBase() : nullptr;
+            if (!aura || app->IsPositive() || !aura->GetCasterGUID().IsCreatureOrVehicle())
+                continue;
+            SpellInfo const* const info = aura->GetSpellInfo();
+            if (info && harm.harm.size() < DcTestRunRecord::DeathEntry::kHarmLog &&
+                std::none_of(harm.harm.begin(), harm.harm.end(), [&](auto const& h) { return h.first == spellId; }))
+                harm.harm.emplace_back(spellId, info->SpellName[LOCALE_enUS]);
+            if (!info || info->Dispel < DISPEL_MAGIC || info->Dispel > DISPEL_POISON)
+                continue;
+            std::uint8_t const type = static_cast<std::uint8_t>(info->Dispel);
+            now.push_back({member->GetGUID().GetRawValue(), spellId, aura->GetCasterGUID().GetRawValue(), type,
+                           aura->GetDuration(), info->SpellName[LOCALE_enUS], reachOf(member, type)});
+        }
+    }
+    DcTestRun::FoldDispelWatch(_dispelLast, now, alive, dt, 500u, _record.dispels);
 }
 
 void DcTestRunJob::TrackPulls(Player* tank)
@@ -2468,6 +2583,7 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         TrackDeaths(tank);
         TrackEngagement(tank);
         TrackOffTankAggro(tank, dt);
+        TrackDispels(tank, dt);
         TrackPulls(tank);
 
         if (next.has_value() && next->mapId == tank->GetMapId())
@@ -2582,6 +2698,25 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
         obs.partyWiped = !anyAlive;
         obs.wipedForMs = _wipedForMs;
 
+        // Healers of the comp still standing on the leader's map; reset as well
+        // by a boss kill (Classify's no-healer rung).
+        bool hadHealer = false, healerUp = false;
+        for (Slot const& slot : _slots)
+        {
+            if (std::string_view(slot.role) != "heal")
+                continue;
+            hadHealer = true;
+            if (Player* healer = ObjectAccessor::FindPlayer(slot.guid);
+                healer && healer->IsAlive() && healer->GetMapId() == tank->GetMapId())
+                healerUp = true;
+        }
+        if (!hadHealer || healerUp || _record.bossesKilled != _noHealerBosses)
+            _noHealerForMs = 0;
+        else
+            _noHealerForMs += dt;
+        _noHealerBosses = _record.bossesKilled;
+        obs.noHealerForMs = _noHealerForMs;
+
         // A stall reason left standing through a fight is not the run being
         // stuck: the fight decides, and a lost one is the wipe watchdog's. The
         // SFK tank stalled on "A gate has closed on us" while the party fought
@@ -2651,7 +2786,11 @@ void DcTestRunJob::TickMonitoring(uint32 dt)
                 _lastAliveMember.empty() ? std::string()
                                          : " (last standing: " + _lastAliveMember + ")";
             DcTestRun::Engagement const blame = DeathBlame();
-            if (blame.Empty())
+            if (!obs.partyWiped)
+                failReason = "no healer standing for " + std::to_string(_limits.noHealerMs / 1000) +
+                             "s and no boss down since" +
+                             (blame.Empty() ? std::string() : ", last death to " + blame.name);
+            else if (blame.Empty())
                 failReason = "party wiped out of combat" + who;
             else if (blame.isBoss)
                 failReason = "party wiped on " + blame.name + who;

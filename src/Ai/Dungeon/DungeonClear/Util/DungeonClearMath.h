@@ -342,6 +342,16 @@ namespace DungeonClearMath
     // the trigger; this carries only the decision so it is unit-testable.
     bool ShouldStandDownForPull(bool packIsPullsOwn, bool pullPhaseIdle);
 
+    // Set a pack aside for the rest of the run (pure). Called where the engage
+    // walk-in on it was just given up. A pack the pull pipeline already worked
+    // (its tag, its standing verdict, its abort or fizzle latch) and that still
+    // is not fighting anyone never came to the tank: on Road to De Other Side the
+    // floor beside the first Interstitial Wanderers is torn out of the navmesh,
+    // the pack cannot path to the camp, and the tank that walks in after it ends
+    // up off the mesh with no route to the boss. Shelving it ends the pull /
+    // walk-in / give-up cycle; a pack already in combat is never shelved.
+    bool ShouldShelvePackForRun(bool pullTouchedPack, bool packInCombat);
+
     // Advance's yield to a live engage-trash walk-in (pure). Engage-trash (rel 25)
     // and Advance (rel 15) share the tank's movement: when the blocking-trash
     // trigger only holds on alternate ticks, each tick the winner replaces the

@@ -683,6 +683,56 @@ bool DungeonClearEngageActionBase::MoveToStandSkirtingRoomAggro(Unit* pack,
 // wrong side of a wall; we keep walking in that case until anchors are cleared.
 // Likewise a boss one floor up is 3D-near but not atBoss, so the tank keeps
 // walking the route up to its level instead of parking underneath.
+// The walk-in on `target` was just given up. If the pull pipeline had already
+// worked this pack and none of it is fighting, set the whole pack aside for the
+// run (DungeonClearMath::ShouldShelvePackForRun): the pack is the target plus the
+// live candidates within kShelfPackYd of it and the units of its entry the pull
+// worked. Returns whether the pack was set aside.
+bool DungeonClearEngageTrashAction::ShelvePackIfPullTouched(Unit* target)
+{
+    constexpr float kShelfPackYd = 12.0f;
+    std::vector<Unit*> pack{target};
+    for (ObjectGuid const& g : context->GetValue<GuidVector>(DcKey::Stock::PossibleTargets)->Get())
+        if (Unit* u = ObjectAccessor::GetUnit(*bot, g))
+            if (u != target && u->IsAlive() && u->GetExactDist(target) <= kShelfPackYd)
+                pack.push_back(u);
+
+    DcPullContext const& pull = context->GetValue<DcPullContext&>(DcKey::PullContext)->Get();
+    // A pack that drifted apart (Road's Interstitial Wanderers, tr-20261105-172917-16:
+    // given up on one at 61yd while the pull worked its mates 24-56yd away) is
+    // still one pack: the units the pull worked, of the target's entry and within
+    // kShelfLinkYd, join it.
+    constexpr float kShelfLinkYd = 60.0f;
+    for (ObjectGuid const& g : {pull.abortTarget, pull.fizzleTarget, pull.pullTarget, pull.decisionTarget})
+        if (Unit* u = g.IsEmpty() ? nullptr : ObjectAccessor::GetUnit(*bot, g))
+            if (u->IsAlive() && u->GetEntry() == target->GetEntry() &&
+                u->GetExactDist(target) <= kShelfLinkYd &&
+                std::find(pack.begin(), pack.end(), u) == pack.end())
+                pack.push_back(u);
+
+    bool touched = false, inCombat = false;
+    for (Unit* u : pack)
+    {
+        ObjectGuid const g = u->GetGUID();
+        touched = touched || g == pull.abortTarget || g == pull.fizzleTarget ||
+                  g == pull.pullTarget || g == pull.decisionTarget;
+        inCombat = inCombat || u->IsInCombat();
+    }
+    if (!DungeonClearMath::ShouldShelvePackForRun(touched, inCombat))
+        return false;
+
+    DcRunState& run = DcRun::Of(context);
+    for (Unit* u : pack)
+        if (!run.IsShelved(u->GetGUID()))
+            run.shelvedPacks.push_back(u->GetGUID());
+    LOG_INFO("playerbots.dungeonclear",
+             "[DC:{}] engage trash: {} ({} unit(s) within {:.0f}yd of {}) never came to a pull "
+             "or a walk-in -> set aside for the rest of the run",
+             bot->GetName(), target->GetName(), uint32(pack.size()), kShelfPackYd,
+             target->GetGUID().ToString());
+    return true;
+}
+
 bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
 {
     // Pause guard — same already-queued-action race as DungeonClearAdvanceAction.
@@ -793,7 +843,8 @@ bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
     // Advance until the give-up lapses; the trigger may well keep naming it.
     DcApproachState& appr =
         context->GetValue<DcApproachState&>(DcKey::ApproachState)->Get();
-    if (target && appr.engageWalkGivenUp.Has(target->GetGUID(), getMSTime()))
+    if (target && (appr.engageWalkGivenUp.Has(target->GetGUID(), getMSTime()) ||
+                   DcRun::Of(context).IsShelved(target->GetGUID())))
         target = nullptr;
 
     if (!target)
@@ -940,6 +991,11 @@ bool DungeonClearEngageTrashAction::Execute(Event /*event*/)
                          nowMs - appr.engageWalkWatch.progressMs, bot->GetExactDist(target),
                          appr.engageWalkWatch.bestDist, DC_ENGAGE_WALK_GIVEN_UP_MS / 1000);
             appr.engageWalkGivenUp.Add(target->GetGUID(), nowMs, DC_ENGAGE_WALK_GIVEN_UP_MS);
+            // The pack out of the way, the route gets its returns to routable
+            // ground back: the ones spent while the pack kept drawing the tank
+            // off the mesh say nothing about the route itself.
+            if (ShelvePackIfPullTouched(target))
+                appr.routableReturns = 0;
             appr.engageWalkWatchTarget.Clear();
             appr.engageWalkWatch = DungeonClearMath::WalkInWatch{};
             appr.engageWalkTarget.Clear();
@@ -2313,13 +2369,23 @@ bool DcObjectiveArriveAction::Execute(Event /*event*/)
                     // engage one we can actually reach (a complete on-level route);
                     // requireDirect=false keeps a legitimately FAR seek alive, since
                     // the seek IS this objective's navigation.
-                    if (!DcEngageGeometry::IsEngageReachable(bot, target, /*requireDirect*/ false))
+                    if (DcEngageGeometry::IsEngageReachable(bot, target, /*requireDirect*/ false))
+                    {
+                        // ResolveEscortConflict cancels a launched escort glide but
+                        // leaves our own approach move intact (unlike StopBot(Hold)).
+                        DcMovement::ResolveEscortConflict(bot);
+                        SetPhase(context, "objective");
+                        return EngageDirect(target);
+                    }
+                    // Unreachable. By default yield the tick; a step marked
+                    // holdIfUnreachable falls through to the hold + Drive below so
+                    // its timeout runs (see EventStep::holdIfUnreachable).
+                    if (!step.holdIfUnreachable)
                         return false;
-                    // ResolveEscortConflict cancels a launched escort glide but
-                    // leaves our own approach move intact (unlike StopBot(Hold)).
-                    DcMovement::ResolveEscortConflict(bot);
-                    SetPhase(context, "objective");
-                    return EngageDirect(target);
+                    LOG_DEBUG("playerbots.dungeonclear",
+                              "[DC:{}] objective '{}': {} alive but unreachable -> holding, "
+                              "step timeout running",
+                              bot->GetName(), next->name, target->GetName());
                 }
             }
             // ClearRadius: a point-anchored room pre-clear. Engage the nearest

@@ -107,8 +107,10 @@ namespace DcTestComp
             size = kMaxPartySize;
 
         Quota q{};
-        q.tanks = size <= 9 ? 1 : size <= 15 ? 2 : size <= 30 ? 3 : 4;
-        q.healers = size / 4;
+        // 15-20 players: 2 tanks, 3 healers; 21-25: 2 tanks, 4 healers (the
+        // owner's raid ratios). Other sizes keep the stepwise tanks and ~N/4 healers.
+        q.tanks = size <= 9 ? 1 : size <= 25 ? 2 : size <= 30 ? 3 : 4;
+        q.healers = size >= 15 && size <= 20 ? 3 : size >= 21 && size <= 25 ? 4 : size / 4;
         if (q.healers == 0)
             q.healers = 1;
         // Never quota away the last DPS on tiny sizes (size 2 = tank + healer).

@@ -12,6 +12,7 @@
 #include "TestRun/DcTestRunRecord.h"
 
 using DcTestRunRecord::CompEntry;
+using DcTestRunRecord::DeathEntry;
 using DcTestRunRecord::EscapeJson;
 using DcTestRunRecord::Record;
 using DcTestRunRecord::StatusEntry;
@@ -138,14 +139,14 @@ TEST(DcTestRunRecordTest, DeathsSerializeWhoDiedAndToWhat)
     r.deaths.push_back({413, "Olanne", "Anzu", 23035, true});
 
     std::string const line = ToJsonl(r);
-    // role / manaPct / healerManaPct / healerAlive follow onBoss; left at their
-    // defaults here ("" and -1 = unknown).
+    // role / manaPct / healerManaPct / healerAlive / hpPct / harm follow onBoss;
+    // left at their defaults here ("", -1 = unknown, no harm).
     EXPECT_NE(line.find("\"deaths\":[{\"t\":410,\"name\":\"Bero\",\"opponent\":\"Anzu\","
                         "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-                        "\"healerManaPct\":-1,\"healerAlive\":false},"
+                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[]},"
                         "{\"t\":413,\"name\":\"Olanne\",\"opponent\":\"Anzu\","
                         "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-                        "\"healerManaPct\":-1,\"healerAlive\":false}]"),
+                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[]}]"),
               std::string::npos);
     EXPECT_EQ(Count(line, "\"name\":\"Olanne\""), 1u);
 }
@@ -181,7 +182,7 @@ TEST(DcTestRunRecordTest, BossRosterSerializesInProgressionOrder)
               std::string::npos);
 }
 
-TEST(DcTestRunRecordTest, SchemaIsSixteen)
+TEST(DcTestRunRecordTest, SchemaIsNineteen)
 {
     // 12: added combatHolders[].trigger, and with it a change of meaning in the
     // sibling `legitimate` field — a trigger creature now sinks the verdict.
@@ -191,7 +192,10 @@ TEST(DcTestRunRecordTest, SchemaIsSixteen)
     // 15: added gear worn before/after (gearIlvlBefore/After, itemLevelAfter,
     // itemsChanged).
     // 16: added offTank (mobs on a healer or a dps while the tank stands).
-    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":16"), std::string::npos);
+    // 17: added dispels (per dispellable debuff the party carried).
+    // 18: added dispels[].expiredWhy (expiries by the carrier's dispel reach).
+    // 19: added deaths[].hpPct and deaths[].harm (the victim's last sample).
+    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":19"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"size\":"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"difficulty\":"), std::string::npos);
 }
@@ -463,5 +467,38 @@ TEST(DcTestRunRecordTest, OffTankCountsAreWritten)
     rec.offTank.healerMobMs = 12500;
     rec.offTank.dpsMobMs = 999;
     EXPECT_NE(ToJsonl(rec).find("\"offTank\":{\"healer\":7,\"dps\":3,\"healerMobS\":12,\"dpsMobS\":0}"),
+              std::string::npos);
+}
+
+// The dispel table is written most-seen first, carried time in whole seconds.
+TEST(DcTestRunRecordTest, DispelsAreWrittenMostSeenFirst)
+{
+    auto rec = SampleRecord();
+    rec.dispels[24099] = {4, "Poison Bolt Volley", 3, 2, 1, 14500};
+    rec.dispels[24300] = {2, "Curse of Blood", 9, 1, 8, 61000, {0, 1, 5, 2, 0}};
+    std::string const line = ToJsonl(rec);
+    std::size_t const curse = line.find("{\"spell\":24300,\"name\":\"Curse of Blood\",\"dispel\":2,\"seen\":9,"
+                                        "\"early\":1,\"expired\":8,\"carriedS\":61,\"expiredWhy\":{\"unknown\":0,"
+                                        "\"noDispeller\":1,\"dispellerHeld\":5,\"outOfReach\":2,\"inReach\":0}}");
+    std::size_t const poison = line.find("{\"spell\":24099,\"name\":\"Poison Bolt Volley\",\"dispel\":4,\"seen\":3,"
+                                         "\"early\":2,\"expired\":1,\"carriedS\":14,");
+    ASSERT_NE(curse, std::string::npos);
+    ASSERT_NE(poison, std::string::npos);
+    EXPECT_LT(curse, poison);
+}
+
+// A death carries what was on the victim at its last living sample.
+TEST(DcTestRunRecordTest, ADeathCarriesTheHarmOnTheVictim)
+{
+    auto r = SampleRecord();
+    DeathEntry d;
+    d.t = 729;
+    d.name = "Miklekish";
+    d.hpPct = 41;
+    d.harm = {{23861, "Poison Cloud"}, {2118026, "Virulent Poison"}};
+    r.deaths.push_back(d);
+    std::string const line = ToJsonl(r);
+    EXPECT_NE(line.find("\"hpPct\":41,\"harm\":[{\"spell\":23861,\"name\":\"Poison Cloud\"},"
+                        "{\"spell\":2118026,\"name\":\"Virulent Poison\"}]}"),
               std::string::npos);
 }

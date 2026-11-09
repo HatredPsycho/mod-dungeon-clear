@@ -23,6 +23,8 @@
 #include "Ai/Dungeon/DungeonClear/Trigger/DungeonClearTriggers.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcIronHallDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcThrottle.h"
 
@@ -89,7 +91,9 @@ namespace
         // Members of a running clear only; a paused or finished run hands the
         // bot back to its player.
         Player* tank = botAI->GetAiObjectContext()->GetValue<Player*>(DcKey::PartyTank)->Get();
-        if (!tank)
+        // Player-led: the Main Tank leads the hall himself, and the bot tanks are
+        // his off-tanks — never the "leader" hop, never moved by DC.
+        if (!tank || !DcPlayerLedDecision::MemberRungApplies(DcPlayerLed::IsHumanTank(tank), PlayerbotAI::IsTank(bot)))
         {
             ClearHop(st);
             return v;

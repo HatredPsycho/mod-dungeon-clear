@@ -44,6 +44,8 @@
 #include "Ai/Dungeon/DungeonClear/Util/DcEngageGeometry.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcHazard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearApproach.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearMath.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearApproachIo.h"
@@ -221,8 +223,13 @@ bool DungeonClearFollowTankAction::Execute(Event /*event*/)
     ObjectGuid& followedTank =
         context->GetValue<ObjectGuid>(DcKey::FollowedTank)->RefGet();
 
+    // A human Main Tank (player-led) counts as no DC tank: DC never follows a
+    // human, stock follow-master does. Without this, the switch from a run to
+    // player-led (PartyTank goes straight from the bot tank to the player) kept
+    // the DC follow on the player and re-armed FollowedTank every tick, over
+    // the stock follow and the off-tanks' own stay / placement.
     Player* tank = AI_VALUE(Player*, DcKey::PartyTank);
-    if (!tank || tank == bot)
+    if (!DcPlayerLedDecision::RungsFor(tank != nullptr, tank == bot, DcPlayerLed::IsHumanTank(tank)).dcFollowTank)
     {
         // No DC tank: tear down the leftover continuous MoveFollow we
         // installed while following. MoveFollow is a persistent MotionMaster
@@ -1361,7 +1368,12 @@ namespace
 
 bool DungeonClearAssistCampActionBase::Execute(Event /*event*/)
 {
-    Player* leader = DcLeaderSignal::FindLeaderTank(bot);
+    // Player-led: the fight to join is the human Main Tank's (never for a bot
+    // tank, which is his off-tank and takes his orders instead).
+    Player* const human = DcPlayerLed::Leader(bot);
+    if (human && !DcPlayerLedDecision::MemberRungApplies(true, PlayerbotAI::IsTank(bot)))
+        return false;
+    Player* leader = human ? human : DcLeaderSignal::FindLeaderTank(bot);
     if (!leader || leader == bot)
         return false;
 
@@ -1400,7 +1412,15 @@ bool DungeonClearAssistCampActionBase::Execute(Event /*event*/)
     // attacker list populates.
     if (!target)
     {
-        target = PickPartyFightTarget(bot, context, leader);
+        // The player's own target first: "the Main Tank hits X, the DPS come onto X".
+        if (human)
+            if (Unit* victim = human->GetVictim(); victim && victim->IsAlive() &&
+                victim->GetMapId() == bot->GetMapId() && bot->IsValidAttackTarget(victim) &&
+                DcTickMemoAccess::LevelReachable(bot, context, victim) &&
+                !approach.AssistGivenUp(victim->GetGUID(), now))
+                target = victim;
+        if (!target)
+            target = PickPartyFightTarget(bot, context, leader);
         if (!target)
             return false;
 

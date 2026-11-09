@@ -118,6 +118,10 @@ namespace
     // Gahz'rilla's emerge-from-pool walk takes a few seconds; a generous wait
     // bridges the summon delay without escalating to a stall.
     constexpr uint32 ZF_GAHZRILLA_SPAWN_TIMEOUT = 60000;  // 1 min
+    // From the summon to the kill. A normal fight ends well inside it (the kill
+    // usually lands before the step is even re-read); it only matters when he
+    // cannot be reached, and then the optional boss is left behind.
+    constexpr uint32 ZF_GAHZRILLA_KILL_TIMEOUT = 180000;  // 3 min
 
     // --- Witch Doctor Zum'rah — the area-trigger wake-up ------------------
     // Zum'rah (7271) is a normal roster boss (order key 3), but he spawns FRIENDLY:
@@ -211,10 +215,14 @@ void RegisterZulFarrakEvents(std::vector<DungeonEvent>& out)
     out.push_back(EventBuilder(209, 2, "Sacred Pool (Gahz'rilla)")
                       .Anchored(8)
                       .Persistent()
-                      .UseGO(ZF_GONG, ZF_GONG_SEARCH)
+                      .UseGO(ZF_GONG, ZF_GONG_SEARCH).StartsEncounter()
                       .WaitForSpawn(ZF_GAHZRILLA, /*alive*/ true)
                           .Timeout(ZF_GAHZRILLA_SPAWN_TIMEOUT)
+                      // Optional boss: if he stays out of reach (back in the pool
+                      // after an interrupted emerge), finish the run at 7/7 rather
+                      // than park on the gong forever (tr-20261107-093349-42).
                       .KillCreatureEngage(ZF_GAHZRILLA, /*count*/ 1, /*searchRadius*/ 100.0f)
+                          .Timeout(ZF_GAHZRILLA_KILL_TIMEOUT).ContinueOnTimeout().HoldIfUnreachable()
                       .Build());
 
     // Wake Zum'rah: flip him hostile once the party reaches him, so he fights an

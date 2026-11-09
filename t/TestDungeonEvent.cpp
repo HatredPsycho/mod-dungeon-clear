@@ -656,6 +656,30 @@ TEST(DungeonEventRegistryTest, ZulFarrakGahzrillaEventShape)
     EXPECT_EQ(e->steps[2].kind, EventStepKind::KillCreature);
     EXPECT_EQ(e->steps[2].creatureEntry, 7273u);
     EXPECT_TRUE(e->steps[2].engage);
+    // ...but he is optional: an unreachable Gahz'rilla (back in the pool) keeps
+    // the step driven and its timeout ends the event, so the run finishes at 7/7
+    // instead of parking on the gong (tr-20261107-093349-42).
+    EXPECT_TRUE(e->steps[2].holdIfUnreachable);
+    EXPECT_TRUE(e->steps[2].continueOnTimeout);
+    EXPECT_GE(e->steps[2].timeoutMs, 120000u);
+}
+
+// holdIfUnreachable is opt-in: no other event step carries it, so every other
+// engage keeps yielding the tick on an unreachable target exactly as before.
+TEST(DungeonEventRegistryTest, HoldIfUnreachableOnlyOnTheGahzrillaKill)
+{
+    uint32 count = 0;
+    for (DungeonEvent const& e : DungeonEventRegistry::AllEvents())
+        for (EventStep const& s : e.steps)
+            if (s.holdIfUnreachable)
+            {
+                ++count;
+                EXPECT_EQ(e.mapId, 209u);
+                EXPECT_EQ(e.id, 2u);
+                EXPECT_EQ(s.kind, EventStepKind::KillCreature);
+                EXPECT_TRUE(s.engage);
+            }
+    EXPECT_EQ(count, 1u);
 }
 
 // Blackrock Depths Ring of Law (map 230): a PERSISTENT anchored event that walks

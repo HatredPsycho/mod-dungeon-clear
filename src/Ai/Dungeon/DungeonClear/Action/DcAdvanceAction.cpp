@@ -70,6 +70,15 @@ using namespace DcActionShared;
 
 namespace
 {
+    // The cached route was built for the anchor the run targets now. Right after an
+    // objective completes, the route still belongs to the previous one until the
+    // next rebuild (see the blocking-door value's same test); its points then say
+    // nothing about where the tank should stand.
+    bool RouteIsForCurrentTarget(DcApproachState const* appr, DungeonBossInfo const* next)
+    {
+        return appr && next && appr->longPathTargetEntry == next->entry;
+    }
+
     // MoveTo-returned-false counter. Raised from 2 to 8 because dedup
     // (IsDuplicateMove returning true while the bot is making real progress
     // on the prior move) was tripping the original threshold during normal
@@ -1373,6 +1382,41 @@ void DungeonClearAdvanceAction::FillPathObs(AdvanceState& st, DungeonClearApproa
 // swim, then stalls for the stalled-fallback / `dc skip`. Its internal branching
 // mirrors DecideApproach's unreachable ladder, so the effect and the captured
 // verdict agree.
+// Go back to the last spot a complete route was built from
+// (DungeonClearMath::ShouldReturnToRoutableGround). The party follows by the
+// stranded recovery, and the next tick rebuilds from there. `why` names the
+// failure for the log.
+bool DungeonClearAdvanceAction::TryRoutableReturn(AdvanceState& st, char const* why)
+{
+    DungeonBossInfo const* next = st.next;
+    DcApproachState& appr = *st.appr;
+    if (!DC_ALLOW_RECOVERY_MOVES || bot->GetVehicle() ||
+        !DungeonClearMath::ShouldReturnToRoutableGround(
+            appr.hasRoutableFrom, appr.lastRoutableMap == bot->GetMapId(), bot->IsInCombat(),
+            bot->GetExactDist(&appr.lastRoutableFrom), DC_ROUTABLE_RETURN_MIN,
+            appr.routableReturns, DC_ROUTABLE_RETURN_LIMIT))
+        return false;
+
+    LOG_INFO("playerbots.dungeonclear",
+             "[DC:{}] {} to {} from ({:.1f},{:.1f},{:.1f}) -> back to routable "
+             "ground at ({:.1f},{:.1f},{:.1f}), {:.1f}yd (return {}/{})",
+             bot->GetName(), why, next->name, bot->GetPositionX(), bot->GetPositionY(),
+             bot->GetPositionZ(), appr.lastRoutableFrom.GetPositionX(),
+             appr.lastRoutableFrom.GetPositionY(), appr.lastRoutableFrom.GetPositionZ(),
+             bot->GetExactDist(&appr.lastRoutableFrom), appr.routableReturns + 1,
+             DC_ROUTABLE_RETURN_LIMIT);
+    ++appr.routableReturns;
+    bot->GetMotionMaster()->Clear();
+    bot->NearTeleportTo(appr.lastRoutableFrom.GetPositionX(),
+                        appr.lastRoutableFrom.GetPositionY(),
+                        appr.lastRoutableFrom.GetPositionZ() + 0.5f, bot->GetOrientation());
+    appr.longPathExpiresMs = 0;
+    *st.follower = DungeonFollowerState{};
+    ClearStall(context);
+    SetPhase(context, "recovering");
+    return true;
+}
+
 DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoLongPathUnreachable(AdvanceState& st)
 {
     DungeonBossInfo const* next = st.next;
@@ -1425,34 +1469,9 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoLongPathUnreachable
     }
 
     // Thrown somewhere the objective no longer routes from: go back to the last
-    // spot a complete route was built from. The party follows by the stranded
-    // recovery, and the next tick rebuilds from there.
-    if (DC_ALLOW_RECOVERY_MOVES &&
-        DungeonClearMath::ShouldReturnToRoutableGround(
-            appr.hasRoutableFrom, appr.lastRoutableMap == bot->GetMapId(), bot->IsInCombat(),
-            bot->GetExactDist(&appr.lastRoutableFrom), DC_ROUTABLE_RETURN_MIN,
-            appr.routableReturns, DC_ROUTABLE_RETURN_LIMIT) &&
-        !bot->GetVehicle())
-    {
-        LOG_INFO("playerbots.dungeonclear",
-                 "[DC:{}] no route to {} from ({:.1f},{:.1f},{:.1f}) -> back to routable "
-                 "ground at ({:.1f},{:.1f},{:.1f}), {:.1f}yd (return {}/{})",
-                 bot->GetName(), next->name, bot->GetPositionX(), bot->GetPositionY(),
-                 bot->GetPositionZ(), appr.lastRoutableFrom.GetPositionX(),
-                 appr.lastRoutableFrom.GetPositionY(), appr.lastRoutableFrom.GetPositionZ(),
-                 bot->GetExactDist(&appr.lastRoutableFrom), appr.routableReturns + 1,
-                 DC_ROUTABLE_RETURN_LIMIT);
-        ++appr.routableReturns;
-        bot->GetMotionMaster()->Clear();
-        bot->NearTeleportTo(appr.lastRoutableFrom.GetPositionX(),
-                            appr.lastRoutableFrom.GetPositionY(),
-                            appr.lastRoutableFrom.GetPositionZ() + 0.5f, bot->GetOrientation());
-        appr.longPathExpiresMs = 0;
-        *st.follower = DungeonFollowerState{};
-        ClearStall(context);
-        SetPhase(context, "recovering");
+    // spot a complete route was built from.
+    if (TryRoutableReturn(st, "no route"))
         return Step::ReturnTrue;
-    }
 
     // The chunked builder couldn't produce any segment. Failure
     // reason is carried through from PathGenerator's path type
@@ -1905,6 +1924,11 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoHopDoneEscalation(
         return Step::ReturnTrue;
     }
 
+    // A route that dead-ends short may be one built from a torn patch of mesh:
+    // try the last routable ground before giving the run up.
+    if (TryRoutableReturn(st, "route dead-ends short"))
+        return Step::ReturnTrue;
+
     LOG_INFO("playerbots.dungeonclear",
              "[DC:{}] {} unreachable: route dead-ends {:.0f}yd short after {} approach "
              "attempts -> stalling",
@@ -1976,8 +2000,16 @@ DungeonClearAdvanceAction::Step DungeonClearAdvanceAction::DoOffLineRejoin(Advan
     // the rejoin would path from the hole and the next rebuild re-plans from down
     // there, on a layer under the street (Stratholme, Timmy: 65yd under the route at
     // (3603,-3333), three runs on 31/10). Same cure as the stranded-cursor case.
+    //
+    // Only on a route built for the CURRENT target. Right after a deliberate drop
+    // (Wailing Caverns' hole behind Verdan, a DropInHole step) the next objective
+    // is already the one below while the cached route still runs along the lip
+    // above: that is not a fall, it is the drop working. Teleporting "back" put
+    // the tank on the upper tier with no way down to the Disciple, the party was
+    // then rescued up to it, and the escort never started (tr-20261107-120812-102;
+    // WC's no_progress at the escort since 28/10).
     if (DungeonPathFollower::FellThroughFloor(bot->GetPositionZ(), hop.point.z) &&
-        !bot->GetVehicle() && DC_ALLOW_RECOVERY_MOVES)
+        !bot->GetVehicle() && DC_ALLOW_RECOVERY_MOVES && RouteIsForCurrentTarget(st.appr, st.next))
     {
         LOG_WARN("playerbots.dungeonclear",
                  "[DC:{}] fell through the floor: {:.1f}yd under route point "
@@ -2620,7 +2652,7 @@ bool DungeonClearAdvanceAction::Execute(Event /*event*/)
             // Put the tank back on the walked point it fell from; the stranded-member
             // recovery brings the party up to it.
             if (DungeonPathFollower::FellThroughFloor(bot->GetPositionZ(), skipped.z) &&
-                !bot->GetVehicle())
+                !bot->GetVehicle() && RouteIsForCurrentTarget(st.appr, st.next))
             {
                 LOG_WARN("playerbots.dungeonclear",
                          "[DC:{}] fell through the floor: {:.1f}yd under route point "

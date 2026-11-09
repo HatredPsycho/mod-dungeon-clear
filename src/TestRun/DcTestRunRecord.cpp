@@ -5,11 +5,14 @@
 
 #include "DcTestRunRecord.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <mutex>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 namespace DcTestRunRecord
 {
@@ -123,7 +126,34 @@ namespace DcTestRunRecord
           << ",\"offTank\":{\"healer\":" << rec.offTank.healerSwitches
           << ",\"dps\":" << rec.offTank.dpsSwitches
           << ",\"healerMobS\":" << rec.offTank.healerMobMs / 1000
-          << ",\"dpsMobS\":" << rec.offTank.dpsMobMs / 1000 << '}'
+          << ",\"dpsMobS\":" << rec.offTank.dpsMobMs / 1000 << '}';
+        s << ",\"dispels\":[";
+        {
+            std::vector<std::pair<std::uint32_t, DcTestRun::DispelStat const*>> order;
+            for (auto const& [id, st] : rec.dispels)
+                order.emplace_back(id, &st);
+            std::stable_sort(order.begin(), order.end(),
+                             [](auto const& a, auto const& b) { return a.second->seen > b.second->seen; });
+            if (order.size() > Record::kDispelLog)
+                order.resize(Record::kDispelLog);
+            for (std::size_t i = 0; i < order.size(); ++i)
+            {
+                DcTestRun::DispelStat const& st = *order[i].second;
+                if (i)
+                    s << ',';
+                s << "{\"spell\":" << order[i].first << ",\"name\":";
+                AppendEscaped(s, st.name);
+                s << ",\"dispel\":" << unsigned(st.dispelType) << ",\"seen\":" << st.seen
+                  << ",\"early\":" << st.early << ",\"expired\":" << st.expired
+                  << ",\"carriedS\":" << st.carriedMs / 1000
+                  << ",\"expiredWhy\":{\"unknown\":" << st.expiredWhy[DcTestRun::REACH_UNKNOWN]
+                  << ",\"noDispeller\":" << st.expiredWhy[DcTestRun::REACH_NO_DISPELLER]
+                  << ",\"dispellerHeld\":" << st.expiredWhy[DcTestRun::REACH_DISPELLER_HELD]
+                  << ",\"outOfReach\":" << st.expiredWhy[DcTestRun::REACH_OUT_OF_REACH]
+                  << ",\"inReach\":" << st.expiredWhy[DcTestRun::REACH_IN_REACH] << "}}";
+            }
+        }
+        s << ']'
           << ",\"roster\":" << (rec.roster ? "true" : "false")
           << ",\"comp\":[";
         for (std::size_t i = 0; i < rec.comp.size(); ++i)
@@ -203,7 +233,17 @@ namespace DcTestRunRecord
             AppendEscaped(s, d.role);
             s << ",\"manaPct\":" << d.manaPct
               << ",\"healerManaPct\":" << d.healerManaPct
-              << ",\"healerAlive\":" << (d.healerAlive ? "true" : "false") << '}';
+              << ",\"healerAlive\":" << (d.healerAlive ? "true" : "false")
+              << ",\"hpPct\":" << d.hpPct << ",\"harm\":[";
+            for (std::size_t k = 0; k < d.harm.size(); ++k)
+            {
+                if (k)
+                    s << ',';
+                s << "{\"spell\":" << d.harm[k].first << ",\"name\":";
+                AppendEscaped(s, d.harm[k].second);
+                s << '}';
+            }
+            s << "]}";
         }
         s << "],\"pulls\":[";
         for (std::size_t i = 0; i < rec.pulls.size(); ++i)

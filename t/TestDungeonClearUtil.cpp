@@ -165,7 +165,7 @@ public:
         this->ai = ai;
     }
 
-    UntypedValue* GetUntypedValue(std::string const name) override
+    UntypedValue* GetUntypedValue(std::string const& name) override
     {
         auto it = values.find(name);
         if (it != values.end())
