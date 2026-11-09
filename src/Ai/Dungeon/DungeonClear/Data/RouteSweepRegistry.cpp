@@ -32,26 +32,10 @@ namespace
     //   same geometry with Moroes' dinner guests in it, and both sibling runs
     //   lost him to a trash fight no pull was in flight for. 10-man normal only:
     //   EnRouteSweepApplies excludes heroic, and Karazhan has none.
-    //   33 — Shadowfang Keep (3.0, 08/11). The courtyard: one pack fought in place
-    //   recruits the next through the 3 s assistance re-call (Creature-
-    //   FamilyAssistancePeriod), and the chain reaches the whole keep — ~1,650
-    //   joins from 30-180yd over ~30 bench runs, Silverlaine and Razorclaw among
-    //   them, the mythic wipes. One pack at a time, dragged to a camp, is the
-    //   only shape that keeps a pull a single pack. On EVERY tier (see below).
     uint32 const kSweepMaps[] =
     {
         34,     // The Stockade
         532,    // Karazhan
-        33,     // Shadowfang Keep
-    };
-
-    // Sweep maps where the heroic-tier exclusion does NOT apply. CoA Mythic on a
-    // 5-man reads heroic tier (DcDifficulty::IsHeroicTier), and SFK's chain is
-    // worst there: the walk detour (PullEnRouteAvoid) cannot stop a fight that
-    // spreads by assistance once it starts.
-    uint32 const kSweepEveryTierMaps[] =
-    {
-        33,     // Shadowfang Keep
     };
 
     // Stacked-floor maps (GuardsStackedFloors), measured off acore_world.creature.
@@ -77,14 +61,6 @@ namespace
 bool RouteSweepRegistry::GuardsStackedFloors(uint32 mapId)
 {
     for (uint32 const id : kStackedFloorMaps)
-        if (id == mapId)
-            return true;
-    return false;
-}
-
-bool RouteSweepRegistry::SweepsEveryTier(uint32 mapId)
-{
-    for (uint32 const id : kSweepEveryTierMaps)
         if (id == mapId)
             return true;
     return false;

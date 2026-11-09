@@ -583,7 +583,7 @@ bool DcEngageGeometry::EnRouteSweepApplies(Player* bot)
     // raid — whose raw difficulty is also 1 — is not misread as heroic, and a
     // CoA Mythic/Ascended classic raid (raw 2/3) neither: no heroic layer arms
     // PullEnRouteAvoid there (DcDifficulty::IsHeroicTier).
-    if (DcDifficulty::IsHeroicTier(map) && !RouteSweepRegistry::SweepsEveryTier(map->GetId()))
+    if (DcDifficulty::IsHeroicTier(map))
         return false;
     return RouteSweepRegistry::SweepsRoute(map->GetId());
 }
