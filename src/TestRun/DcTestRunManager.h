@@ -182,6 +182,12 @@ public:
     // Drive every live job from the global playerbots tick (world thread).
     void Tick(uint32 diff);
 
+    // Is this character a member (tank or any slot) of a live `.dc test` / lab
+    // run? The real-run log (DcRealRunTracker) asks at `dc on` so a bench run is
+    // never written as a player's run. Any thread: locks _runsMutex like the
+    // observers below.
+    bool IsRunMember(ObjectGuid guid) const;
+
     // Observer: every DisableDungeonClear lands here; routed to the monitoring
     // job whose leader tank matches (no-op otherwise).
     void OnRunDisabled(Player* leader, std::string const& reason);

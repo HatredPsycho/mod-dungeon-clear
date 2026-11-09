@@ -69,6 +69,7 @@
 #include "Spell.h"
 #include "SpellInfo.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRealRunTracker.h"
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
@@ -807,6 +808,9 @@ public:
         // the global tick (not a per-bot one) so it keeps firing through boss
         // fights, when the bot's non-combat strategy engine is dormant.
         DcStatusPublisher::TickStatusPushes(diff);
+        // Real-run log: sample boss kills of the player-started runs and close
+        // any whose leader vanished (runs.jsonl). Throttled to 1 Hz inside.
+        DcRealRunTracker::Tick(diff);
 
         // Unreachable-holder combat purge: break a run out of a fight that can
         // never end — a registered mob stranded off the navmesh holding the party

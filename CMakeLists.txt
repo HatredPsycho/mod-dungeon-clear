@@ -15,6 +15,11 @@
 
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src")
 
+# New files added: Util/DcRealRunLog.{h,cpp}, Util/DcRealRunTracker.{h,cpp}
+#   (real-run log: one runs.jsonl line per player-started `dc on` run, written
+#    under AiPlayerbot.CoaDataDir ("" = <LogsDir>/squidbot) for the dashboard;
+#    bench and lab parties excluded. Pure part pinned by t/TestRealRunLog.)
+
 # New files added: Data/Events/VaultsEvents.cpp
 #   (Vaults of the Inquisition, map 936, CoA — the leader breaks the Deceiver's
 #    three seal crystals by spell click so he becomes attackable; hook 64.)

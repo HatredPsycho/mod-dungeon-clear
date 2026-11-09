@@ -76,6 +76,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DungeonPathFollower.h"
 #include "Ai/Dungeon/DungeonClear/Util/LongRangePathfinder.h"
 #include "Ai/Dungeon/DungeonClear/Util/StridedPathfinder.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRealRunTracker.h"
 #include "Ai/Dungeon/DungeonClear/Util/SwimPathfinder.h"
 #include "Ai/Dungeon/DungeonClear/Value/DungeonClearStateValues.h"
 #include "Playerbots.h"
@@ -2893,7 +2894,10 @@ bool DungeonClearDisableOnDeathAction::Execute(Event /*event*/)
     // disable only when no entrance is known for the map.
     if (plan.verdict.outcome == DcRezDecision::Outcome::Regroup &&
         DcRezRecovery::RegroupAtEntrance(bot))
+    {
+        DcRealRunTracker::NoteWipe(RunOwnerAI(bot, botAI)->GetBot());
         return true;
+    }
 
     if ((plan.verdict.reason == DcRezDecision::Reason::NoRezzer ||
          plan.verdict.reason == DcRezDecision::Reason::TimedOut) &&
@@ -2969,7 +2973,12 @@ bool DungeonClearDisableOnDeathAction::Execute(Event /*event*/)
             break;
     }
 
-    DisableDungeonClear(RunOwnerAI(bot, botAI), reason);
+    // Real-run log: this end is the party's death, and a full wipe counts.
+    PlayerbotAI* const ownerAI = RunOwnerAI(bot, botAI);
+    if (plan.verdict.reason == DcRezDecision::Reason::Wipe)
+        DcRealRunTracker::NoteWipe(ownerAI->GetBot());
+    DcRealRunTracker::NoteDeathEnd(ownerAI->GetBot());
+    DisableDungeonClear(ownerAI, reason);
     return true;
 }
 

@@ -161,6 +161,7 @@ if (BUILD_TESTING)
             "${MOD_PATH}/t/TestWatchHop.cpp"
             "${MOD_PATH}/t/TestTestRoster.cpp"
             "${MOD_PATH}/t/TestTestRunLiveJson.cpp"
+            "${MOD_PATH}/t/TestRealRunLog.cpp"
             "${MOD_PATH}/t/TestDispelWatch.cpp"
             "${MOD_PATH}/t/TestOffTankAggro.cpp"
             "${MOD_PATH}/t/TestWipeContext.cpp"
