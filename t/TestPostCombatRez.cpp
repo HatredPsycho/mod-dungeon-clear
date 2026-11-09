@@ -503,6 +503,59 @@ TEST(DcRezDecisionTest, BlockedWithNoWaitConfiguredStandsDownImmediately)
     EXPECT_EQ(r.reason, Reason::BlockedStandDown);
 }
 
+// MC, 09/11 (tr-20261109-082745-1): the raid tank died in the Shazzrah trash, the
+// Reflections kept the encounter IN_PROGRESS and the survivors engaged, so neither
+// the rez nor the 90 % wipe verdict could ever come. A raid whose owner is down
+// under a block that outlives the owner window regroups at the entrance.
+TEST(DcRezDecisionTest, RaidOwnerDownUnderALongBlockRegroups)
+{
+    auto party = BaseParty();
+    party[0].isDead = true;
+    party[0].drivesRun = true;
+    Inputs in = BaseInputs();
+    in.regroupOnWipe = true;
+    in.partyEngaged = true;  // survivors still swinging at the adds
+    in.rezBlocked = true;
+    in.blockedSinceMs = in.nowMs - 120000;
+    in.blockedHoldMaxMs = 20000;
+    in.ownerBlockedRegroupMs = 120000;
+    Result const r = Decide(in, party);
+    EXPECT_EQ(r.outcome, Outcome::Regroup);
+    EXPECT_EQ(r.reason, Reason::Wipe);
+}
+
+TEST(DcRezDecisionTest, RaidOwnerDownStandsDownBeforeTheOwnerWindow)
+{
+    auto party = BaseParty();
+    party[0].isDead = true;
+    party[0].drivesRun = true;
+    Inputs in = BaseInputs();
+    in.regroupOnWipe = true;
+    in.rezBlocked = true;
+    in.blockedSinceMs = in.nowMs - 60000;
+    in.blockedHoldMaxMs = 20000;
+    in.ownerBlockedRegroupMs = 120000;
+    Result const r = Decide(in, party);
+    EXPECT_EQ(r.outcome, Outcome::None);
+    EXPECT_EQ(r.reason, Reason::BlockedStandDown);
+}
+
+TEST(DcRezDecisionTest, RaidDeadNonOwnerUnderALongBlockNeverRegroups)
+{
+    auto party = BaseParty();
+    party[2].isDead = true;  // a DPS, not the owner
+    party[0].drivesRun = true;
+    Inputs in = BaseInputs();
+    in.regroupOnWipe = true;
+    in.rezBlocked = true;
+    in.blockedSinceMs = in.nowMs - 300000;
+    in.blockedHoldMaxMs = 20000;
+    in.ownerBlockedRegroupMs = 120000;
+    Result const r = Decide(in, party);
+    EXPECT_EQ(r.outcome, Outcome::None);
+    EXPECT_EQ(r.reason, Reason::BlockedStandDown);
+}
+
 TEST(DcRezDecisionTest, AnUnstampedBlockClockStillHolds)
 {
     // The glue stamps the clock a tick behind the first blocked read; until it does,
