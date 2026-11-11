@@ -20,6 +20,7 @@
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcStatusPublisher.h"
 
 char const* DcRunWing::SourceName(Source source)
 {
@@ -215,6 +216,34 @@ std::string DcRunWing::ActiveWingToken(Player* bot)
         if (DungeonWing const* wing = DungeonWingRegistry::WingOf(bot->GetMapId(), b.entry))
             return wing->token;
     return "";
+}
+
+bool DcRunWing::ContinueTo(Player* bot, DungeonWing const& from)
+{
+    if (from.continueTo.empty())
+        return false;
+    DungeonWingLayout const* layout = ExplicitLayout(bot);
+    if (!layout)
+        return false;
+    DungeonWing const* next = DungeonWingRegistry::FindWing(*layout, from.continueTo);
+    Player* holder = LatchHolder(bot);
+    PlayerbotAI* holderAI = holder ? GET_PLAYERBOT_AI(holder) : nullptr;
+    if (!next || !holderAI)
+        return false;
+
+    uint32 const instanceId = bot->GetMap()->GetInstanceId();
+    Latch& latch = DcRun::Of(holderAI).runWing;
+    if (!MayContinue(latch, instanceId) || latch.token != from.token)
+        return false;
+
+    latch.token = next->token;  // same instance, same source
+    LOG_INFO("playerbots.dungeonclear",
+             "[DC:{}] wing '{}' done -> continuing into '{}' ({}) for instance {}",
+             holder->GetName(), from.token, next->token, next->name, instanceId);
+    RefreshPartyBossLists(holder);
+    DcStatusPublisher::SendAddonMessage(holderAI, "CHAT	" + from.name + " cleared â continuing into " +
+                                                      next->name + ".");
+    return true;
 }
 
 bool DcRunWing::Set(Player* bot, DungeonWing const& wing, Source source)

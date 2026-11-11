@@ -234,6 +234,32 @@ TEST(DcRunWingTest, HigherSourcesWinAndLowerOnesNeverFlipALatch)
     EXPECT_TRUE(ShouldReplace(chosen, 8, Source::Fallback));
 }
 
+TEST(DcRunWingTest, OnlyANonExplicitWingContinuesIntoTheNext)
+{
+    // BRD, a47 test 10/11: an RDF/fallback Detention Block run goes on to the
+    // Upper City after Bael'Gar; `dc on brd-db` or a brd-db test row stops there.
+    using DcRunWing::Latch;
+    using DcRunWing::MayContinue;
+    using DcRunWing::Source;
+    EXPECT_TRUE(MayContinue(Latch{7, "brd-db", Source::Fallback}, 7));
+    EXPECT_TRUE(MayContinue(Latch{7, "brd-db", Source::Lfg}, 7));
+    EXPECT_FALSE(MayContinue(Latch{7, "brd-db", Source::Explicit}, 7));
+    EXPECT_FALSE(MayContinue(Latch{7, "brd-db", Source::Lfg}, 8));  // another instance
+    EXPECT_FALSE(MayContinue(Latch{}, 7));
+}
+
+TEST(DcRunWingTest, BrdDetentionBlockHandsOverToTheUpperCity)
+{
+    DungeonWingLayout const* layout = DungeonWingRegistry::Get(230);
+    ASSERT_NE(layout, nullptr);
+    DungeonWing const* db = DungeonWingRegistry::FindWing(*layout, "brd-db");
+    DungeonWing const* uc = DungeonWingRegistry::FindWing(*layout, "brd-uc");
+    ASSERT_NE(db, nullptr);
+    ASSERT_NE(uc, nullptr);
+    EXPECT_EQ(db->continueTo, "brd-uc");
+    EXPECT_TRUE(uc->continueTo.empty());  // the Emperor ends the run
+}
+
 TEST(DcRunWingTest, FallbackAtThePortalIsLbrs)
 {
     // The portal lies in no wing region, so a bare `.dc on` there clears LBRS —

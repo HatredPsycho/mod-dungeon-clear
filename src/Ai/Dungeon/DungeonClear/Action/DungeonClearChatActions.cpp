@@ -20,6 +20,7 @@
 #include "Config.h"
 #include "Creature.h"
 #include "Group.h"
+#include "LFGMgr.h"
 #include "Map.h"
 #include "MotionMaster.h"
 #include "ObjectGuid.h"
@@ -307,6 +308,18 @@ namespace
             out = wing;
             return true;
         }
+        // A dungeon-finder group takes the wing it was formed for (LFG 30 Prison,
+        // 276 Upper City, 32/44 LBRS/UBRS...), as the queue-fill job already does:
+        // a real RDF group used to fall back to the default wing, so an Upper City
+        // queue cleared the Detention Block instead.
+        if (Group* group = bot->GetGroup(); group && group->isLFGGroup())
+            if (DungeonWing const* wing = DungeonWingRegistry::WingForLfgDungeon(
+                    bot->GetMapId(), sLFGMgr->GetDungeon(group->GetGUID())))
+                if (DcRunWing::Set(bot, *wing, DcRunWing::Source::Lfg))
+                {
+                    out = wing;
+                    return true;
+                }
         DcRunWing::ClearFallback(bot);
         out = DcRunWing::Resolve(bot);
         if (out)
