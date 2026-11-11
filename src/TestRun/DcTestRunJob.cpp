@@ -1808,6 +1808,18 @@ void DcTestRunJob::TickStarting()
                 _record.bossRoster.push_back(ref.name);
         }
         _record.bossesTotal = static_cast<uint32>(_roster.size());
+        // A run not pinned to a wing goes on into the wings its wing hands over to
+        // (DungeonWing::continueTo, BRD Prison -> Upper City): count them too, or
+        // a full Blackrock Depths clear reads 9/9 (brd-full, a51 11/11).
+        if (_runWing.empty())
+            if (DungeonWingLayout const* layout = DungeonWingRegistry::Get(_mapId);
+                layout && layout->select == WingSelect::Explicit)
+            {
+                DungeonWing const* wing = DcRunWing::Resolve(tank);
+                for (int hop = 0; wing && !wing->continueTo.empty() && hop < 4; ++hop)
+                    if ((wing = DungeonWingRegistry::FindWing(*layout, wing->continueTo)))
+                        _record.bossesTotal += static_cast<uint32>(wing->bossEntries.size());
+            }
 
         // SCENARIO: the run is scoped to its focus. Every focus entry must be
         // on this map's live roster — the registry gtest can only check the
