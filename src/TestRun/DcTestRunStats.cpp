@@ -5,6 +5,7 @@
 #include "DynamicObject.h"
 #include "Spell.h"
 #include "Player.h"
+#include "PlayerScript.h"
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
@@ -102,6 +103,50 @@ namespace
                 hit.lastMarkerMs = seen->second.ms;
             }
         }
+        std::deque<DcTestRunStats::Hit>& log = g_hits[low];
+        log.push_back(std::move(hit));
+        while (log.size() > DcTestRunStats::kHitLog)
+            log.pop_front();
+    }
+
+    // Lava, fire, slime, falls, drowning: the core deals these as self-damage,
+    // which the creature-hit filter above drops. A death after such a tick read
+    // "no hit for minutes" (brd-uc a51: the party died out of combat again after
+    // each rez). Logged with attacker "environment" and the damage type as name.
+    char const* EnvironmentName(uint32 type)
+    {
+        switch (type)
+        {
+            case DAMAGE_EXHAUSTED:    return "env:fatigue";
+            case DAMAGE_DROWNING:     return "env:drowning";
+            case DAMAGE_FALL:         return "env:fall";
+            case DAMAGE_LAVA:         return "env:lava";
+            case DAMAGE_SLIME:        return "env:slime";
+            case DAMAGE_FIRE:         return "env:fire";
+            case DAMAGE_FALL_TO_VOID: return "env:void";
+            default:                  return "env";
+        }
+    }
+
+    void NoteEnvironmentHit(Player* target, uint32 type, uint32 damage)
+    {
+        if (!damage || !target)
+            return;
+        uint32 const low = target->GetGUID().GetCounter();
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (g_tracked.find(low) == g_tracked.end())
+            return;
+        DcTestRunStats::Hit hit;
+        hit.msTime = getMSTime();
+        hit.spellName = EnvironmentName(type);
+        hit.attackerName = "environment";
+        hit.amount = damage;
+        hit.dealt = std::min<uint32>(damage, target->GetHealth());
+        hit.hpBefore = target->GetHealth();
+        hit.victimX = target->GetPositionX();
+        hit.victimY = target->GetPositionY();
+        hit.attackerX = hit.victimX;
+        hit.attackerY = hit.victimY;
         std::deque<DcTestRunStats::Hit>& log = g_hits[low];
         log.push_back(std::move(hit));
         while (log.size() > DcTestRunStats::kHitLog)
@@ -342,8 +387,22 @@ public:
     }
 };
 
+// Environmental damage on a member (see NoteEnvironmentHit). Never vetoes.
+class DcTestRunEnvironmentScript : public PlayerScript
+{
+public:
+    DcTestRunEnvironmentScript() : PlayerScript("DcTestRunEnvironmentScript", { PLAYERHOOK_ON_PLAYER_ENVIRONMENTAL_DAMAGE }) { }
+
+    bool OnPlayerEnvironmentalDamage(Player* player, uint32 type, uint32 damage) override
+    {
+        NoteEnvironmentHit(player, type, damage);
+        return true;
+    }
+};
+
 void AddSC_dc_test_run_stats()
 {
     new DcTestRunStatsScript();
     new DcTestRunBossCastScript();
+    new DcTestRunEnvironmentScript();
 }
