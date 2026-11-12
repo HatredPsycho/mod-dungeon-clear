@@ -302,7 +302,7 @@ namespace
           /*hasCampBox*/ true, /*campMinX*/ -11013.0f, /*campMaxX*/ -10900.0f,
           /*campMinY*/ -1940.0f, /*campMaxY*/ -1800.0f },
 
-        // Molten Core — Shazzrah (3.0, 09/11). His packs stand around him:
+        // Molten Core — Shazzrah. His packs stand around him:
         // Flameguard x3 at 28yd, Lava Reaver 35, Firewalker x3 at 42, Lava
         // Elemental x4 at 48 (acore_world.creature). With no row the raid fought
         // the Firewalkers walk-in 20yd off him (tr-20261109-082745-1: Ifibi woke

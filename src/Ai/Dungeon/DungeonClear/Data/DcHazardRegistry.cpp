@@ -685,7 +685,7 @@ namespace
         // Rain of Fire -- Gehennas', on a random raid member every 6s.
         { 409, 19717, 13.0f, 6.0f, 10.0f, 2.0f, 6.0f },
         // Burning Ground -- Baron Geddon's fire left where a Living Bomb went off
-        // (CoA, D0..D3 = 2105713..2105716, 4yd periodic pool). MC bench 09/11 (a33):
+        // (CoA, D0..D3 = 2105713..2105716, 4yd periodic pool). In an MC bench run:
         // 9 deaths in it, 3 of them out of combat long after Geddon -- the follower
         // and route movers walked through old fires (a tick ~4500 at level 60:
         // 5336 -> 820 -> 492 -> dead) and the module's flee guard came two ticks

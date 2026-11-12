@@ -83,7 +83,7 @@ struct DungeonWing
     // the wing was not chosen explicitly (`dc on <wing>`, a test row). Blackrock
     // Depths: the Detention Block (LFG 30 "Prison") ends at Bael'Gar, but a party
     // in the dungeon goes on through the Shadowforge Lock to the Emperor; without
-    // this a real run stopped at Bael'Gar and never reached Thaurissan (a47, 10/11).
+    // this a real run stopped at Bael'Gar and never reached Thaurissan.
     // "" = the run ends with the wing.
     std::string continueTo{};
 };

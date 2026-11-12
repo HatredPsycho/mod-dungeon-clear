@@ -236,7 +236,7 @@ TEST(DcRunWingTest, HigherSourcesWinAndLowerOnesNeverFlipALatch)
 
 TEST(DcRunWingTest, OnlyANonExplicitWingContinuesIntoTheNext)
 {
-    // BRD, a47 test 10/11: an RDF/fallback Detention Block run goes on to the
+    // BRD: an RDF/fallback Detention Block run goes on to the
     // Upper City after Bael'Gar; `dc on brd-db` or a brd-db test row stops there.
     using DcRunWing::Latch;
     using DcRunWing::MayContinue;

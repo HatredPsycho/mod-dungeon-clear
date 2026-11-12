@@ -133,7 +133,7 @@ namespace DcTestRunRecord
         std::vector<Hit> hits;
 
         // The ground-marker episode behind a marker-linked killing blow (schema
-        // 20, 09/11): Targorr's impact 2102737 killed bots 1-2 m from the center
+        // 20): Targorr's impact 2102737 killed bots 1-2 m from the center
         // of his marker 2102735 while Combat's guard should have walked them out.
         // Where each member stood when the marker appeared, then 1 s and 2 s
         // later, says whether the exit never started or something walked it back.
@@ -274,7 +274,7 @@ namespace DcTestRunRecord
         // 19: deaths[].hpPct and deaths[].harm (the victim's last sample).
         // 20: deaths[].hits (the last creature hits, the killing blow last):
         //     harm is the harmful AURAS present, and a dummy marker read as the
-        //     killer (Targorr's 2102735, 09/11).
+        //     killer (Targorr's 2102735).
         std::uint32_t schema = 20;
         std::string runId;
         std::string planId;       // owning `.dc test plan`, "" for ad-hoc runs

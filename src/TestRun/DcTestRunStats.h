@@ -20,7 +20,7 @@ namespace DcTestRunStats
         uint64 absorbDone = 0;   // damage soaked by the member's absorb shields, on anyone
     };
 
-    // One hit a tracked member took from a creature (schema 20, 09/11): the record's
+    // One hit a tracked member took from a creature (schema 20): the record's
     // harm list is the harmful AURAS present at the last sample, which named a dummy
     // marker (Targorr's 2102735) as the killer. These are the actual damage events.
     struct Hit
@@ -35,7 +35,7 @@ namespace DcTestRunStats
         uint32 dealt = 0;             // what OnDamage then reported for it (after scaling); 0 = not matched
         uint32 hpBefore = 0;          // the member's health when it landed
         // Where it happened (map x/y), and the attacker's live ground markers from
-        // kMarkerSpells (Targorr's Berserker Leap, 09/11: the impact 2102737 killed
+        // kMarkerSpells (Targorr's Berserker Leap: the impact 2102737 killed
         // ranged bots the marker 2102735 never covered; Combat needs the three spots).
         float victimX = 0.0f, victimY = 0.0f;
         float attackerX = 0.0f, attackerY = 0.0f;

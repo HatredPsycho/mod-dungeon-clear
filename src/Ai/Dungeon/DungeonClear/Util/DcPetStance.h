@@ -14,7 +14,7 @@ class Player;
 // Lesser Zombie, Air Elemental, Hellfire Imp, Hallucination, and hunter pets left
 // aggressive) engage whatever comes into their own aggro range, 20-60yd ahead of
 // the party. In the SFK courtyard that opens a second front that the assistance
-// chain then spreads through the keep (72 of ~1,650 far joins, 07-08/11).
+// chain then spreads through the keep (72 of ~1,650 far joins in a bench run).
 //
 // While the owner is out of combat, every aggressive unit it controls is held
 // DEFENSIVE and called back to follow if it strays past kRecallYards. The moment

@@ -1051,7 +1051,7 @@ namespace DungeonClearMath
         }
         // Progress: a count below the lowest seen, or a drop that came after a fight
         // (a kill). A drop with no fight in between is a patroller walking back OUT
-        // of the radius, not progress: MC 09/11 (tr-20261109-183659-4), a Core Hound
+        // of the radius, not progress: in an MC bench run, a Core Hound
         // and a Lava Elemental drifting across Shazzrah's 50yd row flipped the count
         // 2 <-> 3 for ten minutes, every 3 -> 2 re-armed the clock, and the tank held
         // at the standoff until the run's no-progress watchdog.

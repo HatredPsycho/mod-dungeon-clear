@@ -1810,7 +1810,7 @@ void DcTestRunJob::TickStarting()
         _record.bossesTotal = static_cast<uint32>(_roster.size());
         // A run not pinned to a wing goes on into the wings its wing hands over to
         // (DungeonWing::continueTo, BRD Prison -> Upper City): count them too, or
-        // a full Blackrock Depths clear reads 9/9 (brd-full, a51 11/11).
+        // a full Blackrock Depths clear reads 9/9 (brd-full).
         if (_runWing.empty())
             if (DungeonWingLayout const* layout = DungeonWingRegistry::Get(_mapId);
                 layout && layout->select == WingSelect::Explicit)

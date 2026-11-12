@@ -304,7 +304,7 @@ constexpr uint32 DC_REZ_BLOCKED_HOLD_MAX_MS = 20000;
 // Raid only: the run's owner is dead and the instance has refused every resurrect
 // for this long -> entrance regroup (DcRezDecision, owner branch). Long enough for
 // the survivors to finish a boss that is still winnable (the block lifts with it),
-// short of the 600 s no-progress watchdog. MC, 09/11 (tr-20261109-082745-1): the
+// short of the 600 s no-progress watchdog. In an MC bench run, the
 // Reflections of Shazzrah kept the encounter IN_PROGRESS for ten minutes.
 constexpr uint32 DC_REZ_RAID_OWNER_BLOCKED_MAX_MS = 120000;
 

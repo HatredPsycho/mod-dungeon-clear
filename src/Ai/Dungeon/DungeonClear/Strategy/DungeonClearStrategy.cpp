@@ -518,7 +518,7 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // the first living member (DcLeaderSignal::FindTerminalDriver), and in a raid
     // that survivor is usually still fighting: the non-combat copy of this trigger
     // never ran, so the owner-down regroup (DcRezDecision) could not fire.
-    // MC, 09/11 (tr-20261109-153107-4): 18 of 20 dead on Shazzrah, the two
+    // MC bench run: 18 of 20 dead on Shazzrah, the two
     // survivors fighting 90yd away, the encounter IN_PROGRESS, no_progress at 600s.
     // In combat the trigger answers ONLY a Regroup verdict (see its IsActive), so
     // every other death outcome keeps waiting for the fight to end.

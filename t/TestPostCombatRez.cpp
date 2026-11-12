@@ -503,7 +503,7 @@ TEST(DcRezDecisionTest, BlockedWithNoWaitConfiguredStandsDownImmediately)
     EXPECT_EQ(r.reason, Reason::BlockedStandDown);
 }
 
-// MC, 09/11 (tr-20261109-082745-1): the raid tank died in the Shazzrah trash, the
+// In an MC bench run, the raid tank died in the Shazzrah trash, the
 // Reflections kept the encounter IN_PROGRESS and the survivors engaged, so neither
 // the rez nor the 90 % wipe verdict could ever come. A raid whose owner is down
 // under a block that outlives the owner window regroups at the entrance.

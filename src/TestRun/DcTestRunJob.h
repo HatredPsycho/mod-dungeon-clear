@@ -338,7 +338,7 @@ private:
     static std::array<float, 5> DispelRanges(Player* member);
     void TrackPulls(Player* tank);
     void ClosePull(bool wipedHere = false);
-    // Ground-marker episodes (schema 20, 09/11): every tick while monitoring,
+    // Ground-marker episodes (schema 20): every tick while monitoring,
     // a marker of DcTestRunJob.cpp's kMarkerSpells newly owned by a creature on
     // the party is T0; each living member's spot, aura and cast are filed, then
     // its spot 1 s and 2 s later. TrackDeaths hangs the matching one on a death.
