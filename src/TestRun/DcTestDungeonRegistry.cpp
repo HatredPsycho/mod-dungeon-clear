@@ -78,6 +78,14 @@ namespace DcTestDungeonRegistry
             // 330s torch-wait stall it is allowed) between two objective latches.
             { "brd-uc",          "Blackrock Depths: Upper City",  230,   456.93f,    34.09f,  -68.09f, 4.712f, 58, "Upper City",
               0, nullptr, {}, {}, 0, 0, /*noProgressS*/ 900 },
+            // The whole dungeon, as a party that is not pinned to a wing runs it
+            // (an RDF Prison group, a bare `dc on`): `brd-full` is no wing's token,
+            // so the harness latches nothing explicitly and the run takes the
+            // default Detention Block from the fallback, then carries on through the
+            // Shadowforge Lock to the Emperor (DungeonWing::continueTo).
+            // bossesTotal counts the Detention Block list the run starts with.
+            { "brd-full",        "Blackrock Depths (full)",       230,   456.93f,    34.09f,  -68.09f, 4.712f, 58, "Full",
+              0, nullptr, {}, {}, 0, 0, /*noProgressS*/ 900 },
             // Blackrock Spire is two dungeons on one map (see BlackrockSpireEvents).
             // LBRS enters at the shared portal; UBRS drops the party inside the
             // shared hall facing the Dragonspine Door (GO 164725), where a UBRS

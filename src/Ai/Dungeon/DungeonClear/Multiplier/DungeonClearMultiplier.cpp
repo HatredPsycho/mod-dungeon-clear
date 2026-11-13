@@ -27,6 +27,7 @@
 #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcEscapeLeap.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcFlightLeg.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLyceumCloseUpDecision.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcOculusPlan.h"
@@ -57,6 +58,7 @@
 // Free everywhere else — HoldsThePossession rejects on a map compare, and it reads
 // this bot's own charm field rather than any cross-bot signal, so no stale stamp
 // can drop the guard while the channel is still up.
+#if !DC_MODULE_OWNS_THREAT_LEAD
 // Does `action` deal damage? Melee/attack actions, the stock target picker that
 // starts them, and any HARMFUL spell — judged by the spell itself, not by its
 // target: Frost Nova, Arcane Explosion, Consecration and the like are cast on
@@ -94,13 +96,16 @@ static bool PeelsAMobOffTheParty(Player* bot, PlayerbotAI* botAI, Action* action
     Player* p = victim ? victim->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
     return p && p != bot && p->IsInSameRaidWith(bot) && !PlayerbotAI::IsTank(p);
 }
+#endif
 
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK  // the module's CoA Combat B6 clamps it
 static float RazorgorePossessionClamp(Player* bot, std::string const& name)
 {
     if (!DcBlackwingLair::HoldsThePossession(bot))
         return 1.0f;
     return name == "dungeon clear razorgore orb" ? 1.0f : 0.0f;
 }
+#endif
 
 // KARAZHAN, the chess game: while this bot is held by the game, NOTHING but the
 // chess rung is worth doing — the Razorgore-possession shape, for the whole raid.
@@ -230,6 +235,7 @@ static bool OculusDrakeAttackUnsafe(Player* bot, PlayerbotAI* botAI, AiObjectCon
 // stand in the room. The other half of the close-up rung — see
 // DcLyceumCloseUpDecision.h. ReachTargetAction is every stock combat chase
 // (reach melee / reach spell / reach party member to heal all end in ChaseTo).
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
 static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Action* action)
 {
     if (bot->GetMapId() != DcBlackrockDepths::MAP_ID)
@@ -247,6 +253,7 @@ static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Acti
     return target && DcLyceumCloseUp::ChaseLeavesThePack(target->GetPositionX(), target->GetPositionY(),
                                                          tank->GetPositionX(), tank->GetPositionY());
 }
+#endif
 
 // ROOM-AGGRO PRE-CLEAR: no stock reach / chase toward a target standing inside the
 // sleeping boss's wake sphere, for any member, tank included. The room clear keeps
@@ -274,6 +281,7 @@ static bool LyceumChaseLeavesThePack(Player* bot, AiObjectContext* context, Acti
 // pays, so the GUIDs are kept per bot for ROOM_BOSS_MEMO_MS and only resolved and
 // re-tested (alive, out of combat) on each read. thread_local: a bot is only ever
 // evaluated on its own map's thread, so no lock and no cross-map read.
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
 static std::vector<ObjectGuid> const& SleepingRoomBossesNear(Player* bot)
 {
     constexpr uint32 ROOM_BOSS_MEMO_MS = 2000;
@@ -362,6 +370,7 @@ static bool ChaseWakesSleepingRoomBoss(Player* bot, AiObjectContext* context, Ac
     return DungeonClearMath::ChaseWakesSleepingBoss(
         chaseEnd, DcEngageGeometry::RoomAggroSphereRadius(tank, boss), boss->IsInCombat());
 }
+#endif
 
 namespace
 {
@@ -376,8 +385,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
 
     std::string const& name = action->getName();
 
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK
     if (float const clamp = RazorgorePossessionClamp(bot, name); clamp != 1.0f)
         return clamp;
+#endif
 
     if (float const clamp = KaraChessClamp(bot, botAI, name); clamp != 1.0f)
         return clamp;
@@ -450,8 +461,10 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // Blink / Disengage leap a fixed distance straight away from the bot's target
     // and land it in whatever pack is behind — see DcEscapeLeap. Every member of an
     // active run, same cross-bot gate as above.
+#if !DC_MODULE_OWNS_ESCAPE_LEAP
     if (DcEscapeLeap::IsBanned(name) && AI_VALUE(Player*, DcKey::PartyTank))
         return 0.0f;
+#endif
 
     // Wander-style autonomous navigation (grind / rpg / travel). This is what
     // drives the bot around the world on its own.
@@ -532,9 +545,11 @@ float DungeonClearMultiplier::GetValue(Action* action)
     // tank below the panic HP and the tank itself are never held (a healer's heals
     // are not damaging actions, its damage spells wait like a DPS's). Only
     // damaging actions pay for the leader lookup.
+#if !DC_MODULE_OWNS_THREAT_LEAD
     if (IsDamagingAction(botAI, action, name) && DcLeaderSignal::ShouldHoldDpsDamage(bot) &&
         !PeelsAMobOffTheParty(bot, botAI, action))
         return 0.0f;
+#endif
 
     // Stock follow-master (FollowAction, relevance ~1) points a bot at its MASTER —
     // the human party leader — NOT the dungeon-clear tank. While a DC run is active
@@ -609,15 +624,19 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
     // touched a bot that was already in combat — the Pull Lab still caught a
     // mage's Frost Nova 0.9s after the tank's first hit with the non-combat
     // gate in place (lb-20261003-165604-1). Same rule, same exemptions.
+#if !DC_MODULE_OWNS_THREAT_LEAD
     if (IsDamagingAction(botAI, action, name) && DcLeaderSignal::ShouldHoldDpsDamage(bot) &&
         !PeelsAMobOffTheParty(bot, botAI, action))
         return 0.0f;
+#endif
 
     // The possession clamp, first and unconditional — see its definition above.
     // The runner is IN COMBAT for most of its window (the adds are on it), so the
     // combat engine is where this actually has to bite.
+#if !DC_MODULE_OWNS_RAZORGORE_POSSESSION_LOCK
     if (float const clamp = RazorgorePossessionClamp(bot, name); clamp != 1.0f)
         return clamp;
+#endif
 
     // The chess clamp, for the same reason and in the same place: a controller is
     // combat-flagged by its piece's fight half the time.
@@ -657,23 +676,29 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
     // place, and 29 landed the leaper on a fresh Reservist within six seconds.
     // Above the fast path (both are stock actions). A raid encounter's stand-down
     // hands the fight to the playerbots raid strategy, which rules on its own leaps.
+#if !DC_MODULE_OWNS_ESCAPE_LEAP
     if (DcEscapeLeap::IsBanned(name) && AI_VALUE(Player*, DcKey::PartyTank) &&
-        !DcBossStandDown::IsActive(bot))
+        !DcBossStandDown::IsRaidStandDown(bot))
         return 0.0f;
+#endif
 
     // The Lyceum's close-up, chase half — see LyceumChaseLeavesThePack above.
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
     if (LyceumChaseLeavesThePack(bot, context, action))
         return 0.0f;
+#endif
 
     // The sleeping room-aggro boss's sphere — see ChaseWakesSleepingRoomBoss above.
     // A raid encounter's stand-down hands the fight to the raid strategy.
-    if (ChaseWakesSleepingRoomBoss(bot, context, action) && !DcBossStandDown::IsActive(bot))
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
+    if (ChaseWakesSleepingRoomBoss(bot, context, action) && !DcBossStandDown::IsRaidStandDown(bot))
         return 0.0f;
+#endif
 
     bool const isDcAction = name.compare(0, 13, "dungeon clear") == 0;
     if (!isDcAction && name != "drop target")
         return 1.0f;
-    if (DcBossStandDown::IsActive(bot))
+    if (DcBossStandDown::IsRaidStandDown(bot))
     {
         switch (DcBossStandDown::ClassifyAction(name, isDcAction))
         {
@@ -745,9 +770,16 @@ float DungeonClearCombatMultiplier::GetValue(Action* action)
                         pull.phase == DcPullPhase::Returning);
     }
 
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The follower case belongs to the module's CoA Combat A8, whose strategy
+    // neutralises drop target during its own assist; the leader's drag stays here.
+    if (!losBreakDrag)
+        return 1.0f;
+#else
     if (!losBreakDrag &&
         (PlayerbotAI::IsHeal(bot) || !DcLeaderSignal::IsLeaderFightAssistWanted(bot)))
         return 1.0f;
+#endif
 
     Unit* tgt = AI_VALUE(Unit*, DcKey::Stock::CurrentTarget);
     if (tgt && tgt->IsAlive() && tgt->GetMapId() == bot->GetMapId() &&

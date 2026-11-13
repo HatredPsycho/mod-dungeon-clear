@@ -20,6 +20,7 @@
 #include "Config.h"
 #include "Creature.h"
 #include "Group.h"
+#include "LFGMgr.h"
 #include "Map.h"
 #include "MotionMaster.h"
 #include "ObjectGuid.h"
@@ -37,6 +38,7 @@
 #include "Ai/Dungeon/DungeonClear/Util/DungeonClearUtil.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonEventExecutor.h"
 #include "Ai/Dungeon/DungeonClear/Util/DungeonPathFollower.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRealRunTracker.h"
 #include "Ai/Dungeon/DungeonClear/Value/DungeonBossesValue.h"
 #include "Ai/Dungeon/DungeonClear/Value/DungeonClearStateValues.h"
 #include "Playerbots.h"
@@ -306,6 +308,18 @@ namespace
             out = wing;
             return true;
         }
+        // A dungeon-finder group takes the wing it was formed for (LFG 30 Prison,
+        // 276 Upper City, 32/44 LBRS/UBRS...), as the queue-fill job already does:
+        // a real RDF group used to fall back to the default wing, so an Upper City
+        // queue cleared the Detention Block instead.
+        if (Group* group = bot->GetGroup(); group && group->isLFGGroup())
+            if (DungeonWing const* wing = DungeonWingRegistry::WingForLfgDungeon(
+                    bot->GetMapId(), sLFGMgr->GetDungeon(group->GetGUID())))
+                if (DcRunWing::Set(bot, *wing, DcRunWing::Source::Lfg))
+                {
+                    out = wing;
+                    return true;
+                }
         DcRunWing::ClearFallback(bot);
         out = DcRunWing::Resolve(bot);
         if (out)
@@ -453,6 +467,11 @@ bool DcOnAction::Execute(Event event)
     // next run (the drive path also self-invalidates, but this is the clean
     // teardown alongside the rest of the run state).
     context->GetValue<DungeonClearSwimState&>(DcKey::SwimState)->Get().Reset();
+
+    // Real-run log (runs.jsonl for the dashboard): the run starts here, after
+    // the cleared-anchor set was emptied above. A no-op for `.dc test` / lab
+    // parties and for a `dc on` on the run already followed.
+    DcRealRunTracker::Begin(botAI);
 
     std::optional<DungeonBossInfo> next = AI_VALUE(std::optional<DungeonBossInfo>, DcKey::NextDungeonBoss);
     std::string const target = next.has_value() ? next->name : "the next boss";

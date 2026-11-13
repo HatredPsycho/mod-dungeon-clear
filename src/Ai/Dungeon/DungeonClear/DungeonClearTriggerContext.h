@@ -10,6 +10,7 @@
 #include "NamedObjectContext.h"
 #include "Ai/Dungeon/DungeonClear/Trigger/DungeonClearTriggers.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 
 class DungeonClearTriggerContext : public NamedObjectContext<Trigger>
 {
@@ -47,7 +48,9 @@ public:
         creators["dungeon clear leader assist"] = &DungeonClearTriggerContext::leader_assist;
         creators["dungeon clear objective engage combat"] = &DungeonClearTriggerContext::objective_engage_combat;
         creators["dungeon clear regroup combat"] = &DungeonClearTriggerContext::regroup_combat;
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
         creators["dungeon clear break stuck combat"] = &DungeonClearTriggerContext::break_stuck_combat;
+#endif
         creators["dungeon clear heal reposition"] = &DungeonClearTriggerContext::heal_reposition;
         creators["dungeon clear hazard vacate"] = &DungeonClearTriggerContext::hazard_vacate;
         creators["dungeon clear hor stay ahead"] = &DungeonClearTriggerContext::hor_stay_ahead;

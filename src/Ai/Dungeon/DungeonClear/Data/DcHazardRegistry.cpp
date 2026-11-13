@@ -650,7 +650,7 @@ namespace
     //
     // vacate 10 is the aura; hold 2 reads in danger inside 12yd; slack 6 aims the step at
     // 16yd, outside the 13yd placement radius.
-    constexpr std::array<DcGroundHazard, 13> kGroundHazards = {{
+    constexpr std::array<DcGroundHazard, 17> kGroundHazards = {{
         //                   radius  zBand  vacate  hold  slack
         // Cloud of Disease — the pool a dying Diseased Ghoul (10495) leaves.
         { 289, 17742, 8.0f, 6.0f, 5.0f, 2.0f, 6.0f },
@@ -684,6 +684,16 @@ namespace
         { 668, 72362, 6.0f, 6.0f, 3.0f, 2.0f, 6.0f },
         // Rain of Fire -- Gehennas', on a random raid member every 6s.
         { 409, 19717, 13.0f, 6.0f, 10.0f, 2.0f, 6.0f },
+        // Burning Ground -- Baron Geddon's fire left where a Living Bomb went off
+        // (CoA, D0..D3 = 2105713..2105716, 4yd periodic pool). In an MC bench run:
+        // 9 deaths in it, 3 of them out of combat long after Geddon -- the follower
+        // and route movers walked through old fires (a tick ~4500 at level 60:
+        // 5336 -> 820 -> 492 -> dead) and the module's flee guard came two ticks
+        // late. Same shape as the module's kGroundHazards rows (CoA Combat).
+        { 409, 2105713, 6.0f, 6.0f, 3.0f, 2.0f, 6.0f },
+        { 409, 2105714, 6.0f, 6.0f, 3.0f, 2.0f, 6.0f },
+        { 409, 2105715, 6.0f, 6.0f, 3.0f, 2.0f, 6.0f },
+        { 409, 2105716, 6.0f, 6.0f, 3.0f, 2.0f, 6.0f },
     }};
 
     // ---- the trap table --------------------------------------------------

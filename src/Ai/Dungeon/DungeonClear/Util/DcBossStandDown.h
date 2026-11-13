@@ -10,6 +10,11 @@
 
 #include <string_view>
 
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+#include "CoaBossStandDown.h"
+#endif
+
 class Player;
 
 // Raid boss STAND-DOWN — the non-interference contract of a raid run.
@@ -214,7 +219,21 @@ namespace DcBossStandDown
     // per tick window and read cross-bot by every member (one check in the
     // combat multiplier gates every DC combat action; the recovery ladders and
     // the phantom-combat breaker consult it directly).
+#if !DC_MODULE_OWNS_BOSS_STAND_DOWN
     bool IsActive(Player* bot);
+#endif
+
+    // The live verdict every DC reader asks (multiplier, stalled and stuck-combat
+    // rungs, combat purge, stranded recovery, event executor, pull mode, player-led
+    // events): the module's CoA Combat A12 when it carries it, else DC's own.
+    inline bool IsRaidStandDown(Player* bot)
+    {
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+        return CoaBossStandDown::IsActive(bot);
+#else
+        return IsActive(bot);
+#endif
+    }
 }
 
 #endif  // _PLAYERBOT_DCBOSSSTANDDOWN_H

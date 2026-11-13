@@ -127,6 +127,17 @@ namespace DcTestRunRecord
           << ",\"dps\":" << rec.offTank.dpsSwitches
           << ",\"healerMobS\":" << rec.offTank.healerMobMs / 1000
           << ",\"dpsMobS\":" << rec.offTank.dpsMobMs / 1000 << '}';
+        s << ",\"bossCasts\":[";
+        for (std::size_t i = 0; i < rec.bossCasts.size(); ++i)
+        {
+            Record::BossCast const& b = rec.bossCasts[i];
+            s << (i ? "," : "") << "{\"entry\":" << b.entry << ",\"boss\":";
+            AppendEscaped(s, b.boss);
+            s << ",\"spell\":" << b.spell << ",\"name\":";
+            AppendEscaped(s, b.name);
+            s << ",\"cast\":" << b.cast << ",\"interrupted\":" << b.interrupted << '}';
+        }
+        s << ']';
         s << ",\"dispels\":[";
         {
             std::vector<std::pair<std::uint32_t, DcTestRun::DispelStat const*>> order;
@@ -243,7 +254,73 @@ namespace DcTestRunRecord
                 AppendEscaped(s, d.harm[k].second);
                 s << '}';
             }
-            s << "]}";
+            s << "],\"hits\":[";
+            for (std::size_t k = 0; k < d.hits.size(); ++k)
+            {
+                DcTestRunRecord::DeathEntry::Hit const& h = d.hits[k];
+                if (k)
+                    s << ',';
+                s << "{\"msBefore\":" << h.msBefore << ",\"spell\":" << h.spell << ",\"name\":";
+                AppendEscaped(s, h.name);
+                s << ",\"attackerEntry\":" << h.attackerEntry << ",\"attacker\":";
+                AppendEscaped(s, h.attacker);
+                s << ",\"attackerTarget\":";
+                AppendEscaped(s, h.attackerTarget);
+                s << ",\"amount\":" << h.amount << ",\"dealt\":" << h.dealt << ",\"hpBefore\":" << h.hpBefore
+                  << ",\"victimPos\":[" << h.victimX << ',' << h.victimY << ']'
+                  << ",\"attackerPos\":[" << h.attackerX << ',' << h.attackerY << "],\"markers\":[";
+                for (std::size_t m = 0; m < h.markers.size(); ++m)
+                    s << (m ? "," : "") << '[' << h.markers[m].first << ',' << h.markers[m].second << ']';
+                s << ']';
+                if (h.hasLastMarker)
+                    s << ",\"lastMarker\":{\"pos\":[" << h.lastMarkerX << ',' << h.lastMarkerY
+                      << "],\"msBefore\":" << h.lastMarkerMsBefore << '}';
+                s << '}';
+            }
+            s << ']';
+            if (d.marker.has)
+            {
+                DeathEntry::MarkerEpisode const& m = d.marker;
+                auto point = [&s](char const* key, DeathEntry::MarkerPoint const& p, bool withMs)
+                {
+                    s << ",\"" << key << "\":";
+                    if (!p.has)
+                    {
+                        s << "null";
+                        return;
+                    }
+                    s << "{\"pos\":[" << p.x << ',' << p.y << "],\"dist\":" << p.dist;
+                    if (withMs)
+                        s << ",\"ms\":" << p.ms;
+                };
+                s << ",\"marker\":{\"markerSpell\":" << m.markerSpell << ",\"markerMsBefore\":" << m.markerMsBefore
+                  << ",\"markerPos\":[" << m.markerX << ',' << m.markerY << ']';
+                point("atAppear", m.atAppear, false);
+                if (m.atAppear.has)
+                {
+                    s << ",\"hasAura\":" << (m.hasAura ? "true" : "false") << ",\"casting\":" << m.casting
+                      << ",\"castingName\":";
+                    AppendEscaped(s, m.castingName);
+                    s << '}';
+                }
+                point("at1s", m.at1s, true);
+                if (m.at1s.has)
+                    s << '}';
+                point("at2s", m.at2s, true);
+                if (m.at2s.has)
+                    s << '}';
+                s << ",\"lastAction\":";
+                AppendEscaped(s, m.lastAction);
+                s << ",\"actions\":[";
+                for (std::size_t k = 0; k < m.actions.size(); ++k)
+                {
+                    s << (k ? "," : "") << "{\"a\":";
+                    AppendEscaped(s, m.actions[k].first);
+                    s << ",\"msBefore\":" << m.actions[k].second << '}';
+                }
+                s << "]}";
+            }
+            s << '}';
         }
         s << "],\"pulls\":[";
         for (std::size_t i = 0; i < rec.pulls.size(); ++i)

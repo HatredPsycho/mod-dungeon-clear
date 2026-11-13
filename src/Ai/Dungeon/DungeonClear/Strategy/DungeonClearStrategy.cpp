@@ -9,6 +9,7 @@
 #include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
 #include "Ai/Dungeon/DungeonClear/Multiplier/DungeonClearMultiplier.h"
 #include "Ai/Dungeon/DungeonClear/Strategy/DcRelevance.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Playerbots.h"
 #include "Util/DcPlayerbotsExclusionType.h"
 
@@ -98,6 +99,7 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     //    blood (the old loot>flame order starved the douse, the reported "trouble
     //    getting priority to extinguish the flames"). The flame trigger only fires
     //    when the bot already carries blood, so a bot WITHOUT blood still loots.
+#if !DC_MODULE_OWNS_HAKKAR_AVATAR  // the module's CoA Combat B5 (vanilla-st) runs them instead
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar suppressor",
         { NextAction("dungeon clear hakkar suppressor", DcRel::HakkarSuppressor) }));
@@ -107,6 +109,7 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar loot blood",
         { NextAction("dungeon clear hakkar loot blood", DcRel::HakkarLootBlood) }));
+#endif
 
     // Arrived at a travel OBJECTIVE (BossRosterRegistry, non-combat anchor).
     // Peer of at-boss (30) — mutually exclusive via the anchor-kind check in
@@ -228,9 +231,11 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // those drivers are LEADER-only — a role partition, asserted in the ladder
     // test. Same trigger as the combat side; it defers during passive camp holds.
     // See DungeonClearHealRepositionTrigger.
+#if !DC_MODULE_OWNS_HEAL_REPOSITION  // the module's CoA Combat A10 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear heal reposition",
         { NextAction("dungeon clear heal reposition", DcRel::HealReposition) }));
+#endif
 
     // Phantom-combat escape hatch, NON-COMBAT side — and this is the half that
     // matters, because the state it recovers is one the bot can only be in HERE.
@@ -263,9 +268,11 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // guards (no attackers, no victim, no legitimate holder, sustained
     // StuckCombatTimeout, never in a raid) live in the trigger, so registering it here
     // only widens WHERE it can see, not WHEN it fires.
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER  // the module's CoA Combat B3 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear break stuck combat",
         { NextAction("dungeon clear break stuck combat", DcRel::BreakStuckCombat) }));
+#endif
 
     // Pull maneuver, NON-combat side — a LIVENESS NET, not a second driver.
     //
@@ -309,10 +316,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // the whole non-combat driving ladder (advance 15, rest, loot, follow) so the
     // bot leaves before it loots/regroups on the death spot. Same node runs in the
     // combat strategy for the case combat is still up. See
-    // DungeonClearHazardVacateTrigger.
+    // DungeonClearHazardVacateTrigger. The module's CoA Combat A5 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
     triggers.push_back(new TriggerNode(
         "dungeon clear hazard vacate",
         { NextAction("dungeon clear hazard vacate", DcRel::HazardVacate) }));
+#endif
 
     // Halls of Reflection only: while the escape is running, step FORWARD out of
     // the Lich King's ring rather than radially away from it. Registered in BOTH
@@ -330,10 +340,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // non-combat engine, Magmus the combat one, and a combat-flagged bot with no
     // attackers (the blind window) idles on the non-combat one. Inert
     // everywhere else: the trigger's first test is the map id. See
-    // DungeonClearIronHallSafeSpotTrigger.
+    // DungeonClearIronHallSafeSpotTrigger. The module's CoA Combat A4 runs it
+    // instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_IRON_HALL
     triggers.push_back(new TriggerNode(
         "dungeon clear iron hall safe spot",
         { NextAction("dungeon clear iron hall safe spot", DcRel::IronHallSafeSpot) }));
+#endif
 
     // The Oculus only: the rider rung. Registered in BOTH engines — a rider never
     // reaches the combat engine (the drake seat has no CAN_ATTACK), and a member
@@ -403,10 +416,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // the camp is: the barred window spans combat and the gaps in it, and a bot
     // that walked out of combat still carrying the target resumes on it the moment
     // it walks back in. Inert on every map with no rows.
-    // See DungeonClearHoldFireTrigger.
+    // See DungeonClearHoldFireTrigger. The module's CoA Combat A6 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
     triggers.push_back(new TriggerNode(
         "dungeon clear hold fire",
         { NextAction("dungeon clear hold fire", DcRel::HoldFire) }));
+#endif
 
     // Rest-target override: top up to the run's chosen HP/mana before pulling.
     // Relevance 26.5 (DcRel::NeedsRest) — above advance (15) and follow-tank (25)
@@ -426,10 +442,13 @@ void DungeonClearStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // CoA healers top the party off to the same floor between pulls (loot
     // collection included): the class kit's own out-of-combat heal waits for
     // 45%. Above the rest rung so the healer heals before it sits to drink;
-    // "coa heal" stands it up anyway. See DungeonClearTopOffPartyTrigger.
+    // "coa heal" stands it up anyway. See DungeonClearTopOffPartyTrigger. The
+    // module's CoA Combat A11 runs it instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TOP_OFF_PARTY
     triggers.push_back(new TriggerNode(
         "dungeon clear top off party",
         { NextAction("coa heal", DcRel::TopOffParty) }));
+#endif
 
     // Keep the DC loot policy (quality floor / IgnoreChests) enforced for the
     // WHOLE party while the run is PAUSED — leader and followers alike. The
@@ -495,6 +514,18 @@ void DungeonClearStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers
 
 void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
+    // Raid regroup from INSIDE a fight. With the tank dead, the terminal driver is
+    // the first living member (DcLeaderSignal::FindTerminalDriver), and in a raid
+    // that survivor is usually still fighting: the non-combat copy of this trigger
+    // never ran, so the owner-down regroup (DcRezDecision) could not fire.
+    // MC bench run: 18 of 20 dead on Shazzrah, the two
+    // survivors fighting 90yd away, the encounter IN_PROGRESS, no_progress at 600s.
+    // In combat the trigger answers ONLY a Regroup verdict (see its IsActive), so
+    // every other death outcome keeps waiting for the fight to end.
+    triggers.push_back(new TriggerNode(
+        "dungeon clear party died",
+        { NextAction("dungeon clear disable on death", DcRel::PartyDied) }));
+
     // Phantom-combat escape hatch (ANY member). A bot left flagged in combat by a
     // mob that spawned far away / behind a gate — nothing meleeing it, no victim, no
     // reachable holder — force-clears its combat after DungeonClear.StuckCombatTimeout
@@ -503,9 +534,11 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // recovery always wins the tick when it legitimately fires; it is inert whenever
     // anything is fightable, so it never contends with a real fight or a scripted
     // wave. See DungeonClearBreakStuckCombatTrigger.
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER  // the module's CoA Combat B3 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear break stuck combat",
         { NextAction("dungeon clear break stuck combat", DcRel::BreakStuckCombat) }));
+#endif
 
     // The in-combat half of the advanced pull: once the tank aggros, run it back
     // to the camp before releasing the party. Relevance above the stock combat
@@ -566,10 +599,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // 60), which own positioning during an advanced-pull camp where this stands down
     // anyway. 29 ties AssistCamp (29) but that runs only in the NON-combat engine, so
     // they never contend. Inert the instant the follower can contribute again. See
-    // DungeonClearRegroupCombatTrigger + DcRegroupDecision.
+    // DungeonClearRegroupCombatTrigger + DcRegroupDecision. The module's CoA
+    // Combat A9 runs it instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_COMBAT_REGROUP
     triggers.push_back(new TriggerNode(
         "dungeon clear regroup combat",
         { NextAction("dungeon clear regroup combat", DcRel::RegroupCombat) }));
+#endif
 
     // Healer LOS reposition, COMBAT side. The real fix for the stranded-healer
     // bug: a healer whose hurt heal target (usually the tank) was dragged out of
@@ -581,9 +617,11 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // heals is done in the trigger (it defers to a visible hurt member), not by
     // relevance, so this never steals a tick from a real heal. See
     // DungeonClearHealRepositionTrigger.
+#if !DC_MODULE_OWNS_HEAL_REPOSITION  // the module's CoA Combat A10 runs it instead
     triggers.push_back(new TriggerNode(
         "dungeon clear heal reposition",
         { NextAction("dungeon clear heal reposition", DcRel::HealReposition) }));
+#endif
 
     // Survival: move out of an unfightable hazard's pulse — the Arcatraz Destroyed
     // Sentinel (21761) summoned at a Sentinel's corpse, pulsing 15yd/1s until it
@@ -593,10 +631,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // owns the tick, below the camp owners (60) and Hakkar (62-64) which never
     // contend. Also registered in the NON-combat strategy, because the summon
     // ticks after the kill once combat has dropped. See
-    // DungeonClearHazardVacateTrigger.
+    // DungeonClearHazardVacateTrigger. The module's CoA Combat A5 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
     triggers.push_back(new TriggerNode(
         "dungeon clear hazard vacate",
         { NextAction("dungeon clear hazard vacate", DcRel::HazardVacate) }));
+#endif
 
     // Halls of Reflection only: while the escape is running, step FORWARD out of
     // the Lich King's ring rather than radially away from it. Registered in BOTH
@@ -614,10 +655,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // non-combat engine, Magmus the combat one, and a combat-flagged bot with no
     // attackers (the blind window) idles on the non-combat one. Inert
     // everywhere else: the trigger's first test is the map id. See
-    // DungeonClearIronHallSafeSpotTrigger.
+    // DungeonClearIronHallSafeSpotTrigger. The module's CoA Combat A4 runs it
+    // instead when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_IRON_HALL
     triggers.push_back(new TriggerNode(
         "dungeon clear iron hall safe spot",
         { NextAction("dungeon clear iron hall safe spot", DcRel::IronHallSafeSpot) }));
+#endif
 
     // Blackrock Depths' Lyceum only, combat engine: in a fight inside the room,
     // every member but the tank stays within 15yd of the tank — how a real group
@@ -625,10 +669,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // a target outside that radius) is DungeonClearCombatMultiplier's. Combat
     // only: between fights the event's pack leash and the follow own spacing.
     // Inert everywhere else: the trigger's first test is the map id. See
-    // DungeonClearLyceumCloseUpTrigger.
+    // DungeonClearLyceumCloseUpTrigger. The module's CoA Combat A3 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
     triggers.push_back(new TriggerNode(
         "dungeon clear lyceum close up",
         { NextAction("dungeon clear lyceum close up", DcRel::LyceumCloseUp) }));
+#endif
 
     // The Oculus only: the rider rung, combat side. See the non-combat copy; the
     // stand-down exempts it by name (DcBossStandDown::ClassifyAction), because the
@@ -689,10 +736,13 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // the camp is: the barred window spans combat and the gaps in it, and a bot
     // that walked out of combat still carrying the target resumes on it the moment
     // it walks back in. Inert on every map with no rows.
-    // See DungeonClearHoldFireTrigger.
+    // See DungeonClearHoldFireTrigger. The module's CoA Combat A6 runs it instead
+    // when it carries it (DcModuleCombat.h).
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
     triggers.push_back(new TriggerNode(
         "dungeon clear hold fire",
         { NextAction("dungeon clear hold fire", DcRel::HoldFire) }));
+#endif
 
     // Conditional-event driver, COMBAT side. Fires only for an event that opted in
     // with DrivesInCombat() — a continuous WAVE encounter where the party is in
@@ -720,6 +770,7 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     // resetting suppressor / douse a flame / grab blood. Same suppressor > flame >
     // loot-blood order as the non-combat copy (flame above loot so a blood carrier
     // douses instead of hoarding). All inert outside the live Sanctum.
+#if !DC_MODULE_OWNS_HAKKAR_AVATAR  // the module's CoA Combat B5 (vanilla-st) runs them instead
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar suppressor",
         { NextAction("dungeon clear hakkar suppressor", DcRel::HakkarSuppressorCombat) }));
@@ -729,6 +780,7 @@ void DungeonClearCombatStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(new TriggerNode(
         "dungeon clear hakkar loot blood",
         { NextAction("dungeon clear hakkar loot blood", DcRel::HakkarLootBloodCombat) }));
+#endif
 }
 
 void DungeonClearCombatStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers)
@@ -742,8 +794,12 @@ void DungeonClearCombatStrategy::InitMultipliers(std::vector<Multiplier*>& multi
 
 bool DungeonClearCombatStrategy::HasTargetExclusions() const
 {
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+    return false;  // the module's CoA Combat A6 excludes them (DcModuleCombat.h)
+#else
     Player* const self = botAI ? botAI->GetBot() : nullptr;
     return self && DcTargetExclusionRegistry::HasRowsFor(self->GetMapId());
+#endif
 }
 
 void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
@@ -764,6 +820,11 @@ void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
     // starts a Blizzard, and the tank keeps counting whatever she is allowed to
     // hold. The enumerators go through DcPbExclusion because #2912 renamed them
     // and the module builds against playerbots on both sides of that change.
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+    // The module's CoA Combat A6 excludes them (DcModuleCombat.h).
+    (void)exclusions;
+    (void)type;
+#else
     Player* const self = botAI ? botAI->GetBot() : nullptr;
     if (!self)
         return;
@@ -789,4 +850,5 @@ void DungeonClearCombatStrategy::AppendTargetExclusions(GuidSet& exclusions,
         if (unit && DcTargetExclusionRegistry::IsExcluded(self, mapId, unit->GetEntry(), forTank))
             exclusions.insert(guid);
     }
+#endif
 }

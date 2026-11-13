@@ -13,6 +13,9 @@
 #include <string_view>
 #include <array>
 #include <ctime>
+#include <deque>
+#include <iterator>
+#include <memory>
 #include <limits>
 #include <optional>
 #include <set>
@@ -20,6 +23,7 @@
 
 #include "CharacterCache.h"
 #include "DBCStores.h"
+#include "DynamicObject.h"
 #include "Chat.h"
 #include "Creature.h"
 #include "Group.h"
@@ -31,16 +35,20 @@
 #include "Item.h"
 #include "Log.h"
 #include "Map.h"
+#include "Spell.h"
 #include "SpellAuras.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "StringFormat.h"
+#include "Timer.h"
 #include "Util/DcPlayerbotsConfig.h"
 #include "World.h"
 
+#include "Action.h"
 #include "AiFactory.h"
+#include "Engine.h"
 #include "Playerbots.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
@@ -114,6 +122,33 @@ namespace
         return std::string(buf) + "-" + std::to_string(++counter);
     }
 
+}
+
+namespace
+{
+    // Files each action a member's engine executed on its tape (schema 20).
+    class DcTestRunActionListener : public ActionExecutionListener
+    {
+    public:
+        explicit DcTestRunActionListener(std::shared_ptr<DcTestRunActionTape> tape) : _tape(std::move(tape)) {}
+
+        bool Before(Action* /*action*/, Event /*event*/) override { return true; }
+        bool AllowExecution(Action* /*action*/, Event /*event*/) override { return true; }
+        bool OverrideResult(Action* /*action*/, bool executed, Event /*event*/) override { return executed; }
+        void After(Action* action, bool executed, Event /*event*/) override
+        {
+            if (!action || !executed)
+                return;
+            std::lock_guard<std::mutex> lock(_tape->mu);
+            _tape->recent.emplace_back(action->getName(), getMSTime());
+            while (_tape->recent.size() > DcTestRunActionTape::kKeep)
+                _tape->recent.pop_front();
+            ++_tape->seq;
+        }
+
+    private:
+        std::shared_ptr<DcTestRunActionTape> _tape;
+    };
 }
 
 DcTestRunJob::~DcTestRunJob() = default;
@@ -867,6 +902,9 @@ void DcTestRunJob::Tick(uint32 diff)
             // trigger box in well under a second, and a relay that samples at
             // 1Hz would silently skip the set-piece it exists to fire.
             _areaTriggers.Tick(FindTank());
+            // Same reason: a ground marker lives 3.5 s, and the exit it calls
+            // for is measured in fractions of a second.
+            TrackMarkers(FindTank());
             if (_trace)
                 _trace->Tick(diff);
             _monitorAccumMs += diff;
@@ -1754,6 +1792,7 @@ void DcTestRunJob::TickStarting()
     if (!_dcOnIssued)
     {
         _record.instanceId = tank->GetMap()->GetInstanceId();
+        DcTestRunStats::WatchInstance(_record.instanceId);
         _roster.clear();
         for (DungeonBossInfo const& b : bosses)
         {
@@ -1769,6 +1808,18 @@ void DcTestRunJob::TickStarting()
                 _record.bossRoster.push_back(ref.name);
         }
         _record.bossesTotal = static_cast<uint32>(_roster.size());
+        // A run not pinned to a wing goes on into the wings its wing hands over to
+        // (DungeonWing::continueTo, BRD Prison -> Upper City): count them too, or
+        // a full Blackrock Depths clear reads 9/9 (brd-full).
+        if (_runWing.empty())
+            if (DungeonWingLayout const* layout = DungeonWingRegistry::Get(_mapId);
+                layout && layout->select == WingSelect::Explicit)
+            {
+                DungeonWing const* wing = DcRunWing::Resolve(tank);
+                for (int hop = 0; wing && !wing->continueTo.empty() && hop < 4; ++hop)
+                    if ((wing = DungeonWingRegistry::FindWing(*layout, wing->continueTo)))
+                        _record.bossesTotal += static_cast<uint32>(wing->bossEntries.size());
+            }
 
         // SCENARIO: the run is scoped to its focus. Every focus entry must be
         // on this map's live roster — the registry gtest can only check the
@@ -1886,6 +1937,7 @@ void DcTestRunJob::TickStarting()
         // the party is actually walking the dungeon.
         _areaTriggers.Arm(_mapId);
         ArmTrace(tank, ctx);
+        ArmActionTaps();
         EnterStage(Stage::Monitoring);
         return;
     }
@@ -1982,6 +2034,32 @@ void DcTestRunJob::TrackDeaths(Player* tank)
             death.hpPct = h->second.hpPct;
             death.harm = h->second.harm;
         }
+        uint32 const nowMs = getMSTime();
+        for (DcTestRunStats::Hit const& hit : DcTestRunStats::LastHits(member->GetGUID().GetCounter()))
+        {
+            DcTestRunRecord::DeathEntry::Hit h;
+            h.msBefore = int32(getMSTimeDiff(hit.msTime, nowMs));
+            h.spell = hit.spellId;
+            h.name = hit.spellName;
+            h.attackerEntry = hit.attackerEntry;
+            h.attacker = hit.attackerName;
+            h.attackerTarget = hit.attackerTarget;
+            h.amount = hit.amount;
+            h.hpBefore = hit.hpBefore;
+            h.dealt = hit.dealt;
+            h.victimX = hit.victimX;
+            h.victimY = hit.victimY;
+            h.attackerX = hit.attackerX;
+            h.attackerY = hit.attackerY;
+            h.markers = hit.markers;
+            h.hasLastMarker = hit.hasLastMarker;
+            h.lastMarkerX = hit.lastMarkerX;
+            h.lastMarkerY = hit.lastMarkerY;
+            h.lastMarkerMsBefore = hit.hasLastMarker ? int32(getMSTimeDiff(hit.lastMarkerMs, hit.msTime)) : 0;
+            death.hits.push_back(std::move(h));
+        }
+        if (!death.hits.empty())
+            FillMarkerEpisode(member, death, nowMs - uint32(death.hits.back().msBefore));
         _record.deaths.push_back(death);
         // Deliberately overwritten even when the latch is empty: this means
         // "what the LAST death was to", not "the last death that had a killer".
@@ -2246,6 +2324,193 @@ void DcTestRunJob::TrackDispels(Player* tank, uint32 dt)
         }
     }
     DcTestRun::FoldDispelWatch(_dispelLast, now, alive, dt, 500u, _record.dispels);
+}
+
+void DcTestRunJob::ArmActionTaps()
+{
+    if (!_actionTaps.empty())
+        return;
+    for (Slot const& slot : _slots)
+    {
+        Player* const bot = ObjectAccessor::FindPlayer(slot.guid);
+        PlayerbotAI* const ai = bot ? GET_PLAYERBOT_AI(bot) : nullptr;
+        if (!ai)
+            continue;
+        std::uint64_t const key = slot.guid.GetRawValue();
+        std::shared_ptr<DcTestRunActionTape>& tape = _actionTapes[key];
+        if (!tape)
+            tape = std::make_shared<DcTestRunActionTape>();
+        for (uint8 s = 0; s < BOT_STATE_MAX; ++s)
+            if (Engine* const engine = ai->GetEngine(static_cast<BotState>(s)))
+            {
+                auto* const listener = new DcTestRunActionListener(tape);
+                engine->AddActionExecutionListener(listener);
+                _actionTaps.push_back({key, ai, engine, listener});
+            }
+    }
+}
+
+void DcTestRunJob::DisarmActionTaps()
+{
+    for (ActionTap const& tap : _actionTaps)
+    {
+        // Same AI, same engine: the listener is still in that engine's list and
+        // is ours to take out and free. Anything else means the AI is gone, and
+        // its engines deleted their listeners with it (as DcLabRecorder::Disarm).
+        Player* const bot = ObjectAccessor::FindConnectedPlayer(ObjectGuid(tap.guid));
+        PlayerbotAI* const ai = bot ? GET_PLAYERBOT_AI(bot) : nullptr;
+        if (!ai || ai != tap.ai)
+            continue;
+        for (uint8 s = 0; s < BOT_STATE_MAX; ++s)
+            if (ai->GetEngine(static_cast<BotState>(s)) == tap.engine)
+            {
+                tap.engine->removeActionExecutionListener(tap.listener);
+                delete tap.listener;
+                break;
+            }
+    }
+    _actionTaps.clear();
+}
+
+void DcTestRunJob::TrackMarkers(Player* tank)
+{
+    if (!tank || !tank->IsInWorld())
+        return;
+    uint32 const now = getMSTime();
+
+    std::vector<Player*> members;
+    for (Slot const& slot : _slots)
+    {
+        Player* const member = ObjectAccessor::FindPlayer(slot.guid);
+        if (member && member->IsInWorld() && member->IsAlive() && member->GetMapId() == tank->GetMapId())
+            members.push_back(member);
+    }
+
+    for (Player* member : members)
+    {
+        std::uint64_t const key = member->GetGUID().GetRawValue();
+
+        // The action tape as of this living tick: the dead engine keeps going.
+        if (auto tape = _actionTapes.find(key); tape != _actionTapes.end())
+        {
+            std::lock_guard<std::mutex> lock(tape->second->mu);
+            auto& alive = _actionsAlive[key];
+            if (alive.first != tape->second->seq)
+                alive = {tape->second->seq, tape->second->recent};
+        }
+
+        // Where it stands 1 s and 2 s after each episode: the first tick past
+        // the mark, never one a whole second late (a member that was away or
+        // dead then gets no sample).
+        auto eps = _markerEpisodes.find(key);
+        if (eps == _markerEpisodes.end())
+            continue;
+        for (MarkerEpisodeSample& e : eps->second)
+        {
+            uint32 const since = getMSTimeDiff(e.t0, now);
+            auto fill = [&](DcTestRunRecord::DeathEntry::MarkerPoint& p, uint32 at)
+            {
+                if (p.has || since < at || since >= at + 1000)
+                    return;
+                p.has = true;
+                p.x = member->GetPositionX();
+                p.y = member->GetPositionY();
+                p.dist = member->GetExactDist2d(e.markerX, e.markerY);
+                p.ms = int32(since);
+            };
+            fill(e.at1s, 1000);
+            fill(e.at2s, 2000);
+        }
+    }
+
+    for (auto it = _markerSeen.begin(); it != _markerSeen.end();)
+        it = getMSTimeDiff(it->second, now) > 10000 ? _markerSeen.erase(it) : std::next(it);
+
+    // The creatures on the party: what each member swings at and what swings
+    // at it. A ground marker is only reachable through the unit that owns it.
+    std::vector<Unit*> creatures;
+    auto consider = [&](Unit* u)
+    {
+        if (u && u->IsInWorld() && u->ToCreature() &&
+            std::find(creatures.begin(), creatures.end(), u) == creatures.end())
+            creatures.push_back(u);
+    };
+    for (Player* member : members)
+    {
+        consider(member->GetVictim());
+        for (Unit* attacker : member->getAttackers())
+            consider(attacker);
+    }
+
+    for (Unit* creature : creatures)
+        for (std::uint32_t const markerSpell : DcTestRunRecord::kMarkerSpells)
+        {
+            DynamicObject* const marker = creature->GetDynObject(markerSpell);
+            if (!marker || !_markerSeen.emplace(marker->GetGUID().GetRawValue(), now).second)
+                continue;
+            for (Player* member : members)
+            {
+                MarkerEpisodeSample e;
+                e.markerSpell = markerSpell;
+                e.t0 = now;
+                e.markerX = marker->GetPositionX();
+                e.markerY = marker->GetPositionY();
+                e.atAppear.has = true;
+                e.atAppear.x = member->GetPositionX();
+                e.atAppear.y = member->GetPositionY();
+                e.atAppear.dist = member->GetExactDist2d(e.markerX, e.markerY);
+                e.hasAura = member->HasAura(markerSpell);
+                Spell const* cast = member->GetCurrentSpell(CURRENT_GENERIC_SPELL);
+                if (!cast)
+                    cast = member->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
+                if (cast && cast->GetSpellInfo())
+                {
+                    e.casting = cast->GetSpellInfo()->Id;
+                    e.castingName = cast->GetSpellInfo()->SpellName[LOCALE_enUS];
+                }
+                std::deque<MarkerEpisodeSample>& eps = _markerEpisodes[member->GetGUID().GetRawValue()];
+                eps.push_back(std::move(e));
+                while (eps.size() > kMarkerEpisodes)
+                    eps.pop_front();
+            }
+        }
+}
+
+void DcTestRunJob::FillMarkerEpisode(Player* member, DcTestRunRecord::DeathEntry& death, std::uint32_t blowMs)
+{
+    std::uint32_t const markerSpell = DcTestRunRecord::MarkerForImpact(death.hits.back().spell);
+    if (!markerSpell)
+        return;
+    std::uint64_t const key = member->GetGUID().GetRawValue();
+    auto eps = _markerEpisodes.find(key);
+    if (eps == _markerEpisodes.end())
+        return;
+    std::vector<std::pair<std::uint32_t, std::int32_t>> view;
+    for (MarkerEpisodeSample const& e : eps->second)
+        view.emplace_back(e.markerSpell, static_cast<std::int32_t>(blowMs - e.t0));  // < 0: after the blow
+    int const pick = DcTestRunRecord::PickMarkerEpisode(view, markerSpell);
+    if (pick < 0)
+        return;
+    MarkerEpisodeSample const& e = eps->second[pick];
+    DcTestRunRecord::DeathEntry::MarkerEpisode& m = death.marker;
+    m.has = true;
+    m.markerSpell = e.markerSpell;
+    m.markerMsBefore = view[pick].second;
+    m.markerX = e.markerX;
+    m.markerY = e.markerY;
+    m.atAppear = e.atAppear;
+    m.hasAura = e.hasAura;
+    m.casting = e.casting;
+    m.castingName = e.castingName;
+    m.at1s = e.at1s;
+    m.at2s = e.at2s;
+    if (auto alive = _actionsAlive.find(key); alive != _actionsAlive.end())
+    {
+        for (auto const& [name, ms] : alive->second.second)
+            m.actions.emplace_back(name, static_cast<std::int32_t>(blowMs - ms));
+        if (!m.actions.empty())
+            m.lastAction = m.actions.back().first;
+    }
 }
 
 void DcTestRunJob::TrackPulls(Player* tank)
@@ -3164,6 +3429,7 @@ void DcTestRunJob::Teardown()
     // Before anything below disables the run or moves the party: the trace's
     // last frame should show the party where the run actually ended.
     FinishTrace();
+    DisarmActionTaps();
     if (_lab)
         _lab->OnTeardown(MakeLabParty(), _record.result.empty() ? std::string("teardown") : _record.result);
 
@@ -3250,6 +3516,18 @@ void DcTestRunJob::Teardown()
         c.absorbDone = done.absorbDone;
         c.combatS = _combatMs[low] / 1000;
     }
+    if (_record.instanceId)
+        for (DcTestRunStats::BossCast const& b : DcTestRunStats::ReleaseInstance(_record.instanceId))
+        {
+            DcTestRunRecord::Record::BossCast r;
+            r.entry = b.entry;
+            r.boss = b.boss;
+            r.spell = b.spellId;
+            r.name = b.spellName;
+            r.cast = b.cast;
+            r.interrupted = b.interrupted;
+            _record.bossCasts.push_back(std::move(r));
+        }
     _record.endedAtMs = NowUnixMs();
     _record.durationS = static_cast<uint32>((_record.endedAtMs - _record.startedAtMs) / 1000);
     // A Lab party's runs are recorded by the Lab (dc_labruns.jsonl); the host

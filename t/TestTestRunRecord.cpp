@@ -499,6 +499,59 @@ TEST(DcTestRunRecordTest, ADeathCarriesTheHarmOnTheVictim)
     r.deaths.push_back(d);
     std::string const line = ToJsonl(r);
     EXPECT_NE(line.find("\"hpPct\":41,\"harm\":[{\"spell\":23861,\"name\":\"Poison Cloud\"},"
-                        "{\"spell\":2118026,\"name\":\"Virulent Poison\"}]}"),
+                        "{\"spell\":2118026,\"name\":\"Virulent Poison\"}],\"hits\":[]}"),
+              std::string::npos);
+}
+
+// Targorr's impact maps back to his marker; nothing else is a marker blow.
+TEST(DcTestRunRecordTest, MarkerForImpactKnowsTargorrsLeap)
+{
+    EXPECT_EQ(DcTestRunRecord::MarkerForImpact(2102737), 2102735u);
+    EXPECT_EQ(DcTestRunRecord::MarkerForImpact(0), 0u);
+    EXPECT_EQ(DcTestRunRecord::MarkerForImpact(2102735), 0u);
+}
+
+// The most recent episode of the right marker inside the 5 s window wins.
+TEST(DcTestRunRecordTest, PickMarkerEpisodeTakesTheLatestInWindow)
+{
+    using DcTestRunRecord::PickMarkerEpisode;
+    std::vector<std::pair<std::uint32_t, std::int32_t>> const eps = {
+        {2102735, 9000},  // the previous leap: too old
+        {2102735, 3400},  // this leap
+        {1111, 100},      // another marker
+        {2102735, -200},  // appeared after the blow
+    };
+    EXPECT_EQ(PickMarkerEpisode(eps, 2102735), 1);
+    EXPECT_EQ(PickMarkerEpisode(eps, 0), -1);
+    EXPECT_EQ(PickMarkerEpisode({{2102735, 5001}}, 2102735), -1);
+    EXPECT_EQ(PickMarkerEpisode({{2102735, 5000}, {2102735, 0}}, 2102735), 1);
+}
+
+// The episode serializes under "marker"; a missing later sample is null.
+TEST(DcTestRunRecordTest, ADeathCarriesItsMarkerEpisode)
+{
+    auto r = SampleRecord();
+    DeathEntry d;
+    d.t = 300;
+    d.name = "Olanne";
+    d.marker.has = true;
+    d.marker.markerSpell = 2102735;
+    d.marker.markerMsBefore = 3300;
+    d.marker.markerX = 10;
+    d.marker.markerY = 20;
+    d.marker.atAppear = {true, 11, 20, 1, 0};
+    d.marker.hasAura = true;
+    d.marker.casting = 585;
+    d.marker.castingName = "Smite";
+    d.marker.at1s = {true, 13, 20, 3, 1040};
+    d.marker.lastAction = "dc follow";
+    d.marker.actions = {{"smite", 900}, {"dc follow", 120}};
+    r.deaths.push_back(d);
+    std::string const line = ToJsonl(r);
+    EXPECT_NE(line.find("\"hits\":[],\"marker\":{\"markerSpell\":2102735,\"markerMsBefore\":3300,"
+                        "\"markerPos\":[10,20],\"atAppear\":{\"pos\":[11,20],\"dist\":1,\"hasAura\":true,"
+                        "\"casting\":585,\"castingName\":\"Smite\"},\"at1s\":{\"pos\":[13,20],\"dist\":3,"
+                        "\"ms\":1040},\"at2s\":null,\"lastAction\":\"dc follow\",\"actions\":[{\"a\":\"smite\","
+                        "\"msBefore\":900},{\"a\":\"dc follow\",\"msBefore\":120}]}}"),
               std::string::npos);
 }

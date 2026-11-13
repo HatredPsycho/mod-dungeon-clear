@@ -66,6 +66,11 @@
 #include "Group.h"
 #include "ObjectAccessor.h"
 #include "RandomPlayerbotMgr.h"
+#include "Spell.h"
+#include "SpellInfo.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRealRunTracker.h"
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 #include "PlayerScript.h"
@@ -78,6 +83,7 @@
 #include "DcModuleEnable.h"
 #include "TestRun/DcSelfFoundPlanner.h"
 #include "DcStrategyGate.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcPetStance.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBreathGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcLeaderSignal.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
@@ -93,9 +99,34 @@
 #else
 #define DC_HAS_COA_GARDES 0
 #endif
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
+#if DC_HAS_COA_COMBAT
+#include "CoaCombatGroupTank.h"
+#endif
+#if DC_MODULE_OWNS_ROOM_BOSS_CHASE || DC_MODULE_OWNS_COMBAT_REGROUP
+#include "CoaGardesRunHooks.h"
+#endif
+#if DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
+#include "CoaStuckCombat.h"
+#endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION && DC_MODULE_OWNS_COMBAT_PURGE
+#include "CoaCombatPurge.h"
+#endif
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+#include "CoaBossStandDown.h"
+#include <vector>
+#endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+#include "CoaTargetExclusion.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcCombatPurge.h"
+#include <unordered_set>
+#endif
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerbotCompat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunTravelGuard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcTargeting.h"
+#include "Ai/Dungeon/DungeonClear/Data/DungeonBossInfo.h"
+#include "Ai/Dungeon/DungeonClear/DcValueKeys.h"
+#include <optional>
 #include "Group.h"
 #include "Map.h"
 #include "InstanceSaveMgr.h"
@@ -203,6 +234,7 @@ public:
         if (!DcModule::IsEnabled())
             return;
         DcSpectator::BeginBotAiMoverWindow(player);
+        DcPetStance::Tick(player);
     }
 };
 
@@ -491,6 +523,70 @@ public:
     }
 };
 
+// Bench probe for the escape leap ban (3.0, CoA Combat A1): every Blink or
+// Disengage a run member casts is counted on the run record (extras
+// `escapeLeaps`), and every creature that engages that member within 6 s of the
+// leap is counted too (`escapeLeapJoins`, the packs a leap lands in). Matched by
+// spell name so CoA's own ranks and twins count. Map thread only: the member,
+// its run owner and the creature all live on one map.
+namespace DcEscapeLeapProbe
+{
+    constexpr uint32 kJoinWindowMs = 6000;
+    thread_local std::unordered_map<ObjectGuid::LowType, uint32> lastLeap;
+
+    DcRunState* RunOf(Player* member)
+    {
+        Player* owner = member ? DcLeaderSignal::FindRunOwner(member) : nullptr;
+        PlayerbotAI* ai = owner ? GET_PLAYERBOT_AI(owner) : nullptr;
+        if (!ai)
+            return nullptr;
+        DcRunState& st = DcRun::Of(ai->GetAiObjectContext());
+        return st.enabled ? &st : nullptr;
+    }
+
+    void OnCast(Player* player, Spell* spell)
+    {
+        SpellInfo const* info = spell ? spell->GetSpellInfo() : nullptr;
+        char const* name = info ? info->SpellName[0] : nullptr;
+        if (!name || (std::strcmp(name, "Blink") != 0 && std::strcmp(name, "Disengage") != 0))
+            return;
+        DcRunState* st = RunOf(player);
+        if (!st)
+            return;
+        st->AddTestExtra("escapeLeaps");
+        lastLeap[player->GetGUID().GetCounter()] = getMSTime();
+        DC_PULL_INFO("[DC:{}] escape leap cast: {} ({})", player->GetName(), name, info->Id);
+    }
+
+    void OnEngage(Unit* victim)
+    {
+        Player* player = victim ? victim->ToPlayer() : nullptr;
+        if (!player)
+            return;
+        auto it = lastLeap.find(player->GetGUID().GetCounter());
+        if (it == lastLeap.end() || getMSTimeDiff(it->second, getMSTime()) > kJoinWindowMs)
+            return;
+        if (DcRunState* st = RunOf(player))
+            st->AddTestExtra("escapeLeapJoins");
+    }
+}
+
+class DungeonClearEscapeLeapProbeScript : public PlayerScript
+{
+public:
+    DungeonClearEscapeLeapProbeScript()
+        : PlayerScript("DungeonClearEscapeLeapProbeScript", {
+            PLAYERHOOK_ON_SPELL_CAST
+        }) {}
+
+    void OnPlayerSpellCast(Player* player, Spell* spell, bool /*skipCheck*/) override
+    {
+        if (!DcModule::IsEnabled())
+            return;
+        DcEscapeLeapProbe::OnCast(player, spell);
+    }
+};
+
 // A creature engaging a run member mid-fight. The player-side hook above only
 // fires on a player's 0->1 transition, so an add joining a running fight is
 // otherwise unrecorded. See DcFirstContact::OnCreatureEngage.
@@ -507,7 +603,10 @@ public:
         if (!DcModule::IsEnabled())
             return;
         if (Creature* creature = unit ? unit->ToCreature() : nullptr)
+        {
             DcFirstContact::OnCreatureEngage(creature, victim);
+            DcEscapeLeapProbe::OnEngage(victim);
+        }
     }
 };
 
@@ -709,6 +808,9 @@ public:
         // the global tick (not a per-bot one) so it keeps firing through boss
         // fights, when the bot's non-combat strategy engine is dormant.
         DcStatusPublisher::TickStatusPushes(diff);
+        // Real-run log: sample boss kills of the player-started runs and close
+        // any whose leader vanished (runs.jsonl). Throttled to 1 Hz inside.
+        DcRealRunTracker::Tick(diff);
 
         // Unreachable-holder combat purge: break a run out of a fight that can
         // never end — a registered mob stranded off the navmesh holding the party
@@ -747,7 +849,9 @@ public:
         _gateSweepAccumMs += diff;
         if (_gateSweepAccumMs >= DC_STRATEGY_GATE_SWEEP_MS)
         {
+#if !DC_MODULE_OWNS_BREATH_GUARD  // the module's CoA Combat B2 ticks it itself
             DcBreathGuard::Tick(_gateSweepAccumMs);
+#endif
             _gateSweepAccumMs = 0;
             DcStrategyGate::ReconcileAllBots();
         }
@@ -1132,38 +1236,77 @@ namespace
     // Cutting a guard out of DC drops its name here IN THE SAME CHANGE.
     char const* const kGuardsStillInDungeonClear[] = {
         // Builder's lot
-        "heal reposition", "top off party", "threat lead", "tank fight assist",
+#if !DC_MODULE_OWNS_HEAL_REPOSITION
+        "heal reposition",
+#endif
+#if !DC_MODULE_OWNS_TOP_OFF_PARTY
+        "top off party",
+#endif
+#if !DC_MODULE_OWNS_THREAT_LEAD
+        "threat lead",
+#endif
+#if !DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+        "tank fight assist",
+#endif
         // DC's lot
-        "combat regroup", "escape leap ban", "room boss chase", "lyceum close up", "iron hall",
-        "ground hazards", "target exclusion", "boss stand down",
+#if !DC_MODULE_OWNS_COMBAT_REGROUP
+        "combat regroup",
+#endif
+#if !DC_MODULE_OWNS_ESCAPE_LEAP
+        "escape leap ban",
+#endif
+#if !DC_MODULE_OWNS_ROOM_BOSS_CHASE
+        "room boss chase",
+#endif
+#if !DC_MODULE_OWNS_LYCEUM_CLOSE_UP
+        "lyceum close up",
+#endif
+#if !DC_MODULE_OWNS_IRON_HALL
+        "iron hall",
+#endif
+#if !DC_MODULE_OWNS_GROUND_HAZARDS
+        "ground hazards",
+#endif
+#if !DC_MODULE_OWNS_TARGET_EXCLUSION
+        "target exclusion",
+#endif
+#if !DC_MODULE_OWNS_BOSS_STAND_DOWN
+        "boss stand down",
+#endif
+        nullptr,  // ends the list, which is empty once the module owns every guard
     };
+
+    // The reference tank of a member in a DC run, or of a player-led party:
+    // exactly what DC's party-tank value resolves (DcPlayerLed::PartyTankFor),
+    // so the module's guards and DC's rungs always agree on the tank.
+    // Read from the map threads for every member the module asks about: gated
+    // on DcModule::IsEnabled() first (an atomic), because with DC disabled no
+    // DC value is registered and the run-state reads below would crash.
+    Player* DcRunTankFor(Player const* member)
+    {
+        Player* const m = const_cast<Player*>(member);
+        if (!DcModule::IsEnabled() || !m)
+            return nullptr;
+        Player* const tank = DcPlayerLed::PartyTankFor(m);
+        Player* const owner = tank ? nullptr : DcLeaderSignal::FindRunOwner(m);
+        switch (DcPlayerLedDecision::ProvideToModule(true, tank != nullptr, owner != nullptr))
+        {
+            case DcPlayerLedDecision::ModuleProvide::PartyTank:
+                return tank;
+            case DcPlayerLedDecision::ModuleProvide::RunOwner:
+                return owner;
+            default:
+                return nullptr;
+        }
+    }
 
     void WireModuleCombatGuards()
     {
+#if DC_HAS_COA_COMBAT
+        CoaCombatGroupTank::SetRunTankProvider([](Player* bot) -> Player* { return DcRunTankFor(bot); });
+#endif
 #if DC_HAS_COA_GARDES
-        // The reference tank of a member in a DC run, or of a player-led party:
-        // exactly what DC's party-tank value resolves (DcPlayerLed::PartyTankFor),
-        // so the module's guards and DC's rungs always agree on the tank.
-        // Read from the map threads for every member the module asks about: gated
-        // on DcModule::IsEnabled() first (an atomic), because with DC disabled no
-        // DC value is registered and the run-state reads below would crash.
-        CoaGroupTank::SetProvider([](Player const* member) -> Player*
-        {
-            Player* const m = const_cast<Player*>(member);
-            if (!DcModule::IsEnabled() || !m)
-                return nullptr;
-            Player* const tank = DcPlayerLed::PartyTankFor(m);
-            Player* const owner = tank ? nullptr : DcLeaderSignal::FindRunOwner(m);
-            switch (DcPlayerLedDecision::ProvideToModule(true, tank != nullptr, owner != nullptr))
-            {
-                case DcPlayerLedDecision::ModuleProvide::PartyTank:
-                    return tank;
-                case DcPlayerLedDecision::ModuleProvide::RunOwner:
-                    return owner;
-                default:
-                    return nullptr;
-            }
-        });
+        CoaGroupTank::SetProvider([](Player const* member) -> Player* { return DcRunTankFor(member); });
         // The NPC an event of the run is escorting, for the module's healers.
         CoaHealEscort::SetProvider([](Player const* member) -> Unit*
         {
@@ -1171,8 +1314,109 @@ namespace
                 return nullptr;
             return DcLeaderSignal::GetLeaderEscortee(const_cast<Player*>(member));
         });
+#if DC_MODULE_OWNS_ROOM_BOSS_CHASE
+        // A2: the sleeping room-aggro boss whose room the run's tank is clearing
+        // (the run's next boss, while its room clear is active), or nullptr.
+        CoaGardesRunHooks::SetRoomClearBoss([](Player* tank) -> Creature*
+        {
+            if (!DcModule::IsEnabled() || !tank)
+                return nullptr;
+            PlayerbotAI* const tankAI = GET_PLAYERBOT_AI(tank);
+            AiObjectContext* const ctx = tankAI ? tankAI->GetAiObjectContext() : nullptr;
+            if (!ctx || !DcTargeting::IsRoomClearActive(tank, ctx))
+                return nullptr;
+            std::optional<DungeonBossInfo> const next =
+                ctx->GetValue<std::optional<DungeonBossInfo>>(DcKey::NextDungeonBoss)->Get();
+            return next.has_value() ? DcTargeting::GetLiveBoss(tank, ctx, next->entry) : nullptr;
+        });
+#endif
+#if DC_MODULE_OWNS_COMBAT_REGROUP
+        // A9: the run holds this member passive at the leader's advanced-pull
+        // camp (Forming / Advancing / Returning); the camp owns it there.
+        CoaGardesRunHooks::SetCampHoldPassive([](Player* member) -> bool
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return false;
+            Position camp;
+            bool passive = false;
+            return DcLeaderSignal::GetLeaderCampHold(member, camp, passive) && passive;
+        });
+#endif
+#if DC_MODULE_OWNS_TARGET_EXCLUSION
+        // A6: the creatures a combat purge has just barred for the run (Gundrak's
+        // raiders), and the bosses the operator skipped with `dc skip` (BWL:
+        // Broodlord skipped lifts the drake hall's bar).
+        CoaTargetExclusion::RunHooks exclusionHooks;
+        exclusionHooks.purgeBarred = [](Player* bot, uint32 entry) -> bool
+        {
+            if (!DcModule::IsEnabled() || !bot)
+                return false;
+#if DC_MODULE_OWNS_COMBAT_PURGE
+            // B4: the module purges (and bars) the CoA rows; DC still the others.
+            if (CoaCombatPurge::IsBarred(bot, entry))
+                return true;
+#endif
+            return DcCombatPurge::IsBarred(bot, entry);
+        };
+        exclusionHooks.bossSkipped = [](Player* bot, uint32 bossEntry) -> bool
+        {
+            if (!DcModule::IsEnabled() || !bot)
+                return false;
+            PlayerbotAI* const botAI = GET_PLAYERBOT_AI(bot);
+            AiObjectContext* const ctx = botAI ? botAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            std::unordered_set<uint32> const& skipped =
+                ctx->GetValue<std::unordered_set<uint32>&>(DcKey::Skipped)->Get();
+            return skipped.find(bossEntry) != skipped.end();
+        };
+        CoaTargetExclusion::SetRunHooks(std::move(exclusionHooks));
+#endif
+#if DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
+        // B3: the breaker may clear this member's combat only in a live, unpaused
+        // run led by a bot tank (RungsFor(...).breakStuckCombat; a paused run has
+        // no party tank) and never during Karazhan's chess game.
+        CoaStuckCombat::SetRunAllows([](Player* member) -> bool
+        {
+            if (!DcModule::IsEnabled() || !member)
+                return false;
+            PlayerbotAI* const memberAI = GET_PLAYERBOT_AI(member);
+            AiObjectContext* const ctx = memberAI ? memberAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            Player* const runTank = ctx->GetValue<Player*>(DcKey::PartyTank)->Get();
+            if (!DcPlayerLedDecision::RungsFor(runTank != nullptr, runTank == member,
+                                               DcPlayerLed::IsHumanTank(runTank)).breakStuckCombat)
+                return false;
+            return !DcKarazhan::ChessIsOn(member);
+        });
+#endif
+#if DC_MODULE_OWNS_BOSS_STAND_DOWN
+        // A12: is `entry` a boss (kind Boss) of the run's roster? Read off the
+        // run leader's roster, as DC's own no-script fallback did. A human-led
+        // party has no roster: nothing counts, the instance script decides.
+        CoaBossStandDown::SetRosterBossProvider([](Player* at, uint32 entry) -> bool
+        {
+            if (!DcModule::IsEnabled() || !at)
+                return false;
+            Player* leader = DcLeaderSignal::FindRunOwner(at);
+            if (!leader)
+                leader = DcPlayerLed::Leader(at);
+            PlayerbotAI* const leaderAI = leader ? GET_PLAYERBOT_AI(leader) : nullptr;
+            AiObjectContext* const ctx = leaderAI ? leaderAI->GetAiObjectContext() : nullptr;
+            if (!ctx)
+                return false;
+            std::vector<DungeonBossInfo> const& bosses =
+                ctx->GetValue<std::vector<DungeonBossInfo>>(DcKey::DungeonBosses)->Get();
+            for (DungeonBossInfo const& info : bosses)
+                if (info.kind == DungeonAnchorKind::Boss && info.entry == entry)
+                    return true;
+            return false;
+        });
+#endif
         for (char const* guard : kGuardsStillInDungeonClear)
-            CoaGroupTank::SetHandledByDungeonClear(guard, true);
+            if (guard)
+                CoaGroupTank::SetHandledByDungeonClear(guard, true);
 #endif
     }
 }
@@ -1189,6 +1433,7 @@ void AddSC_dungeon_clear_module()
     new DungeonClearLoginPlayerScript();
     new DungeonClearPullBrakeScript();
     new DungeonClearLateJoinerScript();
+    new DungeonClearEscapeLeapProbeScript();
     // Opening half only — the End script registers on the first world tick so
     // it sorts after playerbots' AI-update hook (see the ordering contract).
     new DungeonClearSpectatorMoverBeginScript();

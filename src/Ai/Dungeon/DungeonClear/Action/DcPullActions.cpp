@@ -691,7 +691,7 @@ bool DungeonClearPullAction::Execute(Event /*event*/)
     // target does shift — see the Idle branch, which arms it once the target is
     // resolved rather than resolving it twice.
     if (phase != DcPullPhase::Idle)
-        DcTankForm::EnsureBearForm(botAI);
+        DcBearForm::EnsureBearForm(botAI);
 
     switch (phase)
     {
@@ -711,7 +711,7 @@ bool DungeonClearPullAction::Execute(Event /*event*/)
             // A pack is in hand — arm the druid tank's bear form now, so it is
             // already up by the time this tick's commit lands (see the top of
             // Execute, which covers every later phase).
-            DcTankForm::EnsureBearForm(botAI);
+            DcBearForm::EnsureBearForm(botAI);
 
             // PULL-BACK boss (BossPullbackRegistry). Two things differ from a
             // trash pull and both are structural, not tuning:

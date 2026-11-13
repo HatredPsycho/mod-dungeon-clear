@@ -479,6 +479,7 @@ namespace
         {
             in.wipeFractionPct = DcSettings::GetUInt(bot, "RaidWipeFractionPct");
             in.regroupOnWipe = true;
+            in.ownerBlockedRegroupMs = DC_REZ_RAID_OWNER_BLOCKED_MAX_MS;
         }
         // Five-man maps that regroup on a FULL wipe like a raid does. The Oculus: an
         // Eregos wipe is the most likely failure in the dungeon, it happens in the

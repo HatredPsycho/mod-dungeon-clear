@@ -8,6 +8,9 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
+#include <deque>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -26,9 +29,23 @@
 #include "TestRun/DcTestRunVerdict.h"
 #include "TestRun/DcWipeContext.h"
 
+class ActionExecutionListener;
 class AiObjectContext;
 class DcLabRecorder;
+class Engine;
 class Player;
+class PlayerbotAI;
+
+// One member's last executed playerbots actions during a test run (schema 20).
+// The engine listener (bot update thread) appends, the job reads; shared so an
+// engine that deletes its listener on logout never leaves either side dangling.
+struct DcTestRunActionTape
+{
+    static constexpr std::size_t kKeep = DcTestRunRecord::DeathEntry::MarkerEpisode::kActionLog;
+    std::mutex mu;
+    std::deque<std::pair<std::string, std::uint32_t>> recent;  // name, getMSTime()
+    std::uint32_t seq = 0;
+};
 
 // One `.dc test` run in flight: a single 5-bot party driven through the full
 // state machine and watched to a verdict. Extracted verbatim from the old
@@ -321,6 +338,16 @@ private:
     static std::array<float, 5> DispelRanges(Player* member);
     void TrackPulls(Player* tank);
     void ClosePull(bool wipedHere = false);
+    // Ground-marker episodes (schema 20): every tick while monitoring,
+    // a marker of DcTestRunJob.cpp's kMarkerSpells newly owned by a creature on
+    // the party is T0; each living member's spot, aura and cast are filed, then
+    // its spot 1 s and 2 s later. TrackDeaths hangs the matching one on a death.
+    void TrackMarkers(Player* tank);
+    void FillMarkerEpisode(Player* member, DcTestRunRecord::DeathEntry& death, std::uint32_t blowMs);
+    // The executed-action tape per member (one listener per playerbots engine),
+    // armed with monitoring and taken off at teardown.
+    void ArmActionTaps();
+    void DisarmActionTaps();
     DcTestRun::Engagement DeathBlame() const;
     static bool AnyMemberDead(Player* tank);
 
@@ -581,6 +608,35 @@ private:
         std::vector<std::pair<std::uint32_t, std::string>> harm;
     };
     std::map<std::uint64_t, HarmSample> _harmLast;
+    // Marker episodes per member (raw guid), newest last, kMarkerEpisodes kept.
+    struct MarkerEpisodeSample
+    {
+        std::uint32_t markerSpell = 0;
+        std::uint32_t t0 = 0;            // getMSTime() the marker was first seen
+        float markerX = 0.0f, markerY = 0.0f;
+        DcTestRunRecord::DeathEntry::MarkerPoint atAppear, at1s, at2s;
+        bool hasAura = false;
+        std::uint32_t casting = 0;
+        std::string castingName;
+    };
+    static constexpr std::size_t kMarkerEpisodes = 4;
+    std::map<std::uint64_t, std::deque<MarkerEpisodeSample>> _markerEpisodes;
+    // Markers already filed (DynamicObject raw guid -> T0), pruned after 10 s.
+    std::map<std::uint64_t, std::uint32_t> _markerSeen;
+    // Executed playerbots actions, per member (DcTestRunActionTape).
+    struct ActionTap
+    {
+        std::uint64_t guid = 0;
+        PlayerbotAI* ai = nullptr;
+        Engine* engine = nullptr;
+        ActionExecutionListener* listener = nullptr;
+    };
+    std::vector<ActionTap> _actionTaps;
+    std::map<std::uint64_t, std::shared_ptr<DcTestRunActionTape>> _actionTapes;
+    // The tape as of the member's last living tick (seq, copy): the dead
+    // engine keeps executing (release spirit...) after the killing blow.
+    std::map<std::uint64_t, std::pair<std::uint32_t, std::deque<std::pair<std::string, std::uint32_t>>>>
+        _actionsAlive;
     // The engagement latched at the most recent death. The live latch clears the
     // moment the survivors drop combat, so a run that ends on a failed rez has
     // nothing left to blame; this keeps the killer alive for the post-mortem.

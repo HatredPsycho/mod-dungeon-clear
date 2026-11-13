@@ -5,6 +5,9 @@
 
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
 
+// The module's CoA Combat A12 evaluates the stand-down when it carries it.
+#if !DC_MODULE_OWNS_BOSS_STAND_DOWN
+
 #include <vector>
 
 #include "CombatManager.h"
@@ -148,3 +151,4 @@ namespace DcBossStandDown
         return v.active;
     }
 }
+#endif  // !DC_MODULE_OWNS_BOSS_STAND_DOWN

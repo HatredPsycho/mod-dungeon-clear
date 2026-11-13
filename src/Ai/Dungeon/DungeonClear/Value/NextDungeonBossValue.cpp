@@ -137,6 +137,18 @@ std::optional<DungeonBossInfo> NextDungeonBossValue::Calculate()
         BossLiveState const terminal = LookupLive(liveness, wing->terminalBossEntry);
         if (DcRunWing::TerminalDone(*wing, bosses, completedMask, terminal.present && !terminal.alive))
         {
+            // A wing that hands over to the next one (BRD: Detention Block ->
+            // Upper City) is not the end of the run: re-latch and pick from the
+            // new wing's list. One hop only per call — the next wing's own
+            // terminal check ends it if that one is done too.
+            thread_local bool continuing = false;
+            if (!continuing && DcRunWing::ContinueTo(bot, *wing))
+            {
+                continuing = true;
+                std::optional<DungeonBossInfo> next = Calculate();
+                continuing = false;
+                return next;
+            }
             DcRun::Of(context).selectedBossEntry = 0u;
             context->GetValue<uint32>(DcKey::StickyBoss)->Set(0u);
             return std::nullopt;

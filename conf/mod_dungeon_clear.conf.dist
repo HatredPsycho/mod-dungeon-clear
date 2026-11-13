@@ -1439,6 +1439,19 @@ DungeonClear.AdvanceWindowYards = 0.0
 DungeonClear.SpectateEnable = 1
 
 #
+#    DungeonClear.PetsDefensiveBetweenFights
+#        While a run member is out of combat, its aggressive pets and summons
+#        are held defensive and called back past 30 yards, so they do not open
+#        a fight ahead of the party; in combat they go back to aggressive.
+#        Server-only.
+#            0 = disabled (pets keep their own stance)
+#            1 = enabled
+#        Default: 1 (enabled)
+#
+
+DungeonClear.PetsDefensiveBetweenFights = 1
+
+#
 #    DungeonClear.SpectateSpeed
 #        Movement speed multiplier for the spectator free-camera (`.dc spectate`
 #        or the addon's Spectate button) — how fast the detached camera flies,

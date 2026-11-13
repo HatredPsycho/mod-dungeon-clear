@@ -13,6 +13,7 @@
 #include "Ai/Dungeon/DungeonClear/Action/DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Action/StayDeadAction.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 
 class DungeonClearActionContext : public NamedObjectContext<Action>
 {
@@ -34,7 +35,9 @@ public:
         creators["dungeon clear disable on death"] = &DungeonClearActionContext::disable_on_death;
         creators["dungeon clear rez party"] = &DungeonClearActionContext::rez_party;
         creators["dungeon clear disable on cleared"] = &DungeonClearActionContext::disable_on_cleared;
+#if !DC_MODULE_OWNS_STUCK_COMBAT_BREAKER
         creators["dungeon clear break stuck combat"] = &DungeonClearActionContext::break_stuck_combat;
+#endif
         creators["dungeon clear recover stranded"] = &DungeonClearActionContext::recover_stranded;
         creators["dungeon clear door blocked"] = &DungeonClearActionContext::door_blocked;
         creators["dungeon clear door reopened"] = &DungeonClearActionContext::door_reopened;

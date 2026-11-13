@@ -3497,8 +3497,35 @@ TEST(DungeonClearRoomClearClockTest, PatrollerWalkingInThenDyingIsProgress)
     EXPECT_FALSE(RoomClearGiveUpDue(c, 6, true, false, 20500, 30000));
     std::uint32_t const idleBefore = c.idleMs;
     EXPECT_GT(idleBefore, 15000u);
-    // It dies: back to 5, which is below the new high, so progress.
-    EXPECT_FALSE(RoomClearGiveUpDue(c, 5, true, false, 21000, 30000));
+    // The party fights it (busy), then it dies: back to 5 after a fight, so progress.
+    EXPECT_FALSE(RoomClearGiveUpDue(c, 6, true, /*busy*/ true, 21000, 30000));
+    EXPECT_FALSE(RoomClearGiveUpDue(c, 5, true, false, 21500, 30000));
+    EXPECT_EQ(c.idleMs, 0u);
+}
+
+TEST(DungeonClearRoomClearClockTest, PatrollerWalkingInAndOutIsNotProgress)
+{
+    // MC, tr-20261109-183659-4: patrollers crossing Shazzrah's radius flipped the
+    // count 2 <-> 3 with no fight; each 3 -> 2 used to re-arm the clock forever.
+    RoomClearClock c;
+    std::uint32_t t = 1000;
+    bool due = false;
+    for (int flip = 0; flip < 20 && !due; ++flip)
+    {
+        due = Poll(c, 2, false, t, t + 2000, 30000);
+        t += 2500;
+        due = due || Poll(c, 3, false, t, t + 2000, 30000);
+        t += 2500;
+    }
+    EXPECT_TRUE(due);
+}
+
+TEST(DungeonClearRoomClearClockTest, NewLowIsProgressWithoutAFight)
+{
+    RoomClearClock c;
+    EXPECT_FALSE(Poll(c, 3, false, 1000, 20000, 30000));
+    // A straggler despawns or is killed by a pet out of the busy window: 2 is a new low.
+    EXPECT_FALSE(RoomClearGiveUpDue(c, 2, true, false, 20500, 30000));
     EXPECT_EQ(c.idleMs, 0u);
 }
 

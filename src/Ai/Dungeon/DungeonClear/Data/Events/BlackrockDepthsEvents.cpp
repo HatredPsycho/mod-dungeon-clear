@@ -1591,7 +1591,8 @@ void RegisterBlackrockDepthsWings(std::unordered_map<uint32, DungeonWingLayout>&
             9041,    // Warder Stilgiss
             9056,    // Fineous Darkvire
             9016,    // Bael'Gar
-        }, "brd-db", /*lfgDungeonId*/ 30, /*terminalBossEntry*/ 9016, /*encounterMask*/ 0x001FFu},
+        }, "brd-db", /*lfgDungeonId*/ 30, /*terminalBossEntry*/ 9016, /*encounterMask*/ 0x001FFu,
+           /*continueTo*/ "brd-uc"},
         {"Blackrock Depths (Upper City)", {
             OBJ(2),  // The Shadowforge Lock (event 2)
             9033,    // General Angerforge

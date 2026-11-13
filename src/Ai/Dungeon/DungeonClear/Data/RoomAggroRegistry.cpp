@@ -301,6 +301,20 @@ namespace
           /*pullOutRadius*/ 12.0f, /*skirtRadius*/ 32.0f,
           /*hasCampBox*/ true, /*campMinX*/ -11013.0f, /*campMaxX*/ -10900.0f,
           /*campMinY*/ -1940.0f, /*campMaxY*/ -1800.0f },
+
+        // Molten Core — Shazzrah. His packs stand around him:
+        // Flameguard x3 at 28yd, Lava Reaver 35, Firewalker x3 at 42, Lava
+        // Elemental x4 at 48 (acore_world.creature). With no row the raid fought
+        // the Firewalkers walk-in 20yd off him (tr-20261109-082745-1: Ifibi woke
+        // him at 18.8yd mid-trash) or rested on his edge waiting for mana
+        // (tr-20261109-082800-2: Olum at 22.3yd), and every Blink left a
+        // Reflection (11504) exploding among the trash fight: 19 deaths, one
+        // wipe. Radius 50 takes all four packs as room trash; pullOutRadius 20
+        // keeps the 28yd Flameguards clearable (forced advanced pull) and
+        // skirtRadius 40 keeps the approach, the standoff, the rest and the
+        // pull camp off his aggro edge with room for a 20-man spread.
+        { 409, 12264, 50.0f, { 11667, 12100, 11666, 12076 }, false, 0.0f, 0.0f,
+          /*pullOutRadius*/ 20.0f, /*skirtRadius*/ 40.0f },
     };
 }
 

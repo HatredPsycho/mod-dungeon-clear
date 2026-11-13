@@ -301,6 +301,13 @@ constexpr uint32 DC_REZ_RAID_STALL_MAX_MS = 240000;
 // where it will never lift and every second of holding is spent under fire.
 constexpr uint32 DC_REZ_BLOCKED_HOLD_MAX_MS = 20000;
 
+// Raid only: the run's owner is dead and the instance has refused every resurrect
+// for this long -> entrance regroup (DcRezDecision, owner branch). Long enough for
+// the survivors to finish a boss that is still winnable (the block lifts with it),
+// short of the 600 s no-progress watchdog. In an MC bench run, the
+// Reflections of Shazzrah kept the encounter IN_PROGRESS for ten minutes.
+constexpr uint32 DC_REZ_RAID_OWNER_BLOCKED_MAX_MS = 120000;
+
 // How close an idle hostile has to stand to a corpse for the body to count as
 // unsafe to walk a rezzer to (DcRezDecision::Member::corpseUnsafe). 3D, so a pack
 // one floor below a corpse on the route does not count. Aggro reach for an elite

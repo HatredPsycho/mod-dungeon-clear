@@ -117,6 +117,19 @@ namespace DcRunWing
     // wing takes effect this tick. Returns whether the latch now names `wing`.
     bool Set(Player* bot, DungeonWing const& wing, Source source);
 
+    // Whether a run whose latch is `latch` may move on to a wing's continueTo:
+    // held in this instance and not chosen explicitly (an Explicit choice — `dc on
+    // <wing>`, a test row — means "this wing only").
+    inline bool MayContinue(Latch const& latch, uint32 instanceId)
+    {
+        return Holds(latch, instanceId) && latch.source != Source::Explicit;
+    }
+
+    // `from`'s terminal boss is down: if from.continueTo names another wing and
+    // MayContinue allows, latch it (same source), refresh the party's boss lists
+    // and announce it. Returns whether the run moved on.
+    bool ContinueTo(Player* bot, DungeonWing const& from);
+
     // Drop a Fallback latch (never an Explicit/Lfg one) so the next Resolve
     // re-reads where the party stands. `dc on` calls it before latching afresh.
     void ClearFallback(Player* bot);

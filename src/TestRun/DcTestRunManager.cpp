@@ -686,6 +686,22 @@ void DcTestRunManager::WriteLiveStatus()
     f << json << '\n';
 }
 
+bool DcTestRunManager::IsRunMember(ObjectGuid guid) const
+{
+    if (guid.IsEmpty())
+        return false;
+    std::lock_guard<std::mutex> lock(_runsMutex);
+    for (auto const& job : _runs)
+    {
+        if (job->TankGuid() == guid)
+            return true;
+        for (ObjectGuid const& g : job->BotGuids())
+            if (g == guid)
+                return true;
+    }
+    return false;
+}
+
 void DcTestRunManager::OnRunDisabled(Player* leader, std::string const& reason)
 {
     if (!leader)

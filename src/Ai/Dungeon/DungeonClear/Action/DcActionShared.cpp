@@ -7,6 +7,7 @@
 #include "Ai/Dungeon/DungeonClear/Data/HealLeashRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcHazard.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcRealRunTracker.h"
 #include "TestRun/DcTestRunManager.h"
 
 #include <algorithm>
@@ -269,6 +270,9 @@ namespace DcActionShared
     {
         AiObjectContext* ctx = botAI->GetAiObjectContext();
         Player* bot = botAI->GetBot();
+        // Real-run log: close the player's run (runs.jsonl) before anything
+        // below resets the state it reads. No-op for a run it never followed.
+        DcRealRunTracker::End(botAI, reason);
         // One reset clears the whole run-level state — enabled flag, the pause
         // cluster (paused / reason / auto-paused door), the selected-boss override,
         // and the two leader-fight latches (leader-combat-since / party-engaged) —

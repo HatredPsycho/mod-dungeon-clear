@@ -114,7 +114,7 @@ bool DungeonClearPullModeCurrentValue::Calculate()
     // and passive at the one already standing.
     if (DungeonEventExecutor::IsPullOwningEventDriving(bot, context) ||
         DcNoStopZone::IsInNoStopZone(bot, context) ||
-        DcBossStandDown::IsActive(bot))
+        DcBossStandDown::IsRaidStandDown(bot))
     {
         pull.ClearDynamicVerdict();
         // LOWER THE LATCHED BOOL TOO, not just the effective value. Returning

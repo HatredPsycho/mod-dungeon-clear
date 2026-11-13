@@ -5,6 +5,7 @@
 
 #include "DungeonClearTriggers.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcBossStandDown.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
 
 #include <algorithm>
@@ -874,6 +875,11 @@ bool DungeonClearPartyDiedTrigger::IsActive()
     // Disable runs the classic funnel; Regroup is the raid wipe verdict — the
     // same action routes it to the entrance regroup instead (the run continues).
     DcRezDecision::Outcome const outcome = DcRezRecovery::Evaluate(bot).verdict.outcome;
+    // The combat strategy carries this trigger too, for the raid regroup only (see
+    // DungeonClearCombatStrategy::InitTriggers): a survivor still fighting must not
+    // run the classic disable funnel mid-fight.
+    if (bot->IsInCombat())
+        return outcome == DcRezDecision::Outcome::Regroup;
     return outcome == DcRezDecision::Outcome::Disable ||
            outcome == DcRezDecision::Outcome::Regroup;
 }
@@ -964,7 +970,7 @@ bool DungeonClearStalledTrigger::IsActive()
     // Raid boss stand-down: a stale stall reason must never drive fallback
     // maneuvers into a live encounter (the fight is the raid strategy's; DC
     // resumes at loot). Cheap for dungeons — IsActive is raid-gated.
-    if (DcBossStandDown::IsActive(bot))
+    if (DcBossStandDown::IsRaidStandDown(bot))
         return false;
 
     // ...nor into Karazhan's chess game, which owns the whole raid for its length.
@@ -1607,6 +1613,7 @@ namespace
         return false;
     }
 
+#if !DC_MODULE_OWNS_TANK_FIGHT_ASSIST
     // Gate for the COMBAT-side fight assist: this follower's leader is mid
     // fight AND the bot currently has NO line-of-sight target of its own. The
     // empty-attackers test is what makes the combat assist self-limiting: the
@@ -1698,6 +1705,7 @@ namespace
         }
         return true;  // nothing engageable from here — reposition to the fight
     }
+#endif
 }
 
 bool DungeonClearAssistCampTrigger::IsActive()
@@ -1733,6 +1741,12 @@ bool DungeonClearAssistCampTrigger::IsActive()
     // target, not the pack); keep assist for DPS that must be driven into the fight.
     if (PlayerbotAI::IsHeal(bot))
         return false;
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The module's CoA Combat A8 assists every ordinary fight of the tank; DC
+    // keeps only the scripted camp fight's seed below.
+    if (!DcLeaderSignal::IsLeaderScriptedCampFight(bot))
+        return false;
+#endif
     // A scripted camp fight owns its followers — but only the WALK, which is the
     // one thing the plan forbids. This half of the action does not walk: it seeds
     // `current target`, SetInCombatWith()s the bot and flips it to the combat
@@ -1770,9 +1784,15 @@ bool DungeonClearAssistCampCombatTrigger::IsActive()
     // Combat side: a follower dragged into combat (group combat / stray hit) but
     // with the pack around a corner has an empty LOS attacker list and so idles
     // in the combat engine. Drive it into sight so stock combat can engage.
+#if DC_MODULE_OWNS_TANK_FIGHT_ASSIST
+    // The module's CoA Combat A8 owns it: this side never runs in a scripted camp
+    // fight (ShouldAssistCampFight), so nothing of it stays in DC.
+    return false;
+#else
     if (!bot || bot->isDead() || !bot->IsInCombat())
         return false;
     return ShouldAssistCampFight(botAI, bot);
+#endif
 }
 
 bool DungeonClearLeaderAssistTrigger::IsActive()
@@ -1937,7 +1957,7 @@ bool DungeonClearBreakStuckCombatTrigger::IsActive()
     // Karazhan's chess game holds its controllers combat-flagged by their pieces'
     // fight with nothing a bot could or should attack: exactly the phantom shape,
     // and not one. Same stand-down as a boss encounter, clocks and all.
-    if (!map || DcBossStandDown::IsActive(bot) || DcKarazhan::ChessIsOn(bot))
+    if (!map || DcBossStandDown::IsRaidStandDown(bot) || DcKarazhan::ChessIsOn(bot))
     {
         stuckCombatSinceMs = 0;
         holderCloseWatch.Reset();

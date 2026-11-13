@@ -123,6 +123,10 @@ namespace DcRezDecision
         bool          rezBlocked = false;
         std::uint32_t blockedSinceMs = 0;    // getMSTime() the block was first seen
         std::uint32_t blockedHoldMaxMs = 0;  // hold this long for it to lift; 0 = don't
+        // Raid runs only (0 = off): the run's OWNER (drivesRun) is dead and the block
+        // has lasted this long -> Regroup, even with survivors still fighting. See the
+        // owner branch inside the block below.
+        std::uint32_t ownerBlockedRegroupMs = 0;
     };
 
     enum class Outcome
@@ -346,6 +350,31 @@ namespace DcRezDecision
         // recovery (or the classic disable) resumes.
         if (in.rezBlocked)
         {
+            // RAID, OWNER DOWN. The stand-down below assumes the survivors can clear
+            // short-handed, and they cannot without the tank that drives the run: the
+            // glue holds the run on a dead owner, and nobody can raise him while the
+            // instance refuses the spell. In a raid that block can outlive any fight:
+            // tr-20261109-082745-1 (MC, 20): the tank died in the Shazzrah trash, his
+            // Reflections (11504) kept pulling the 7 survivors around the cavern, so
+            // the encounter never left IN_PROGRESS, the 90 % wipe verdict never came
+            // (survivors engaged) and the raid sat for 600 s until no_progress. Treat
+            // it as the wipe it is: the entrance regroup revives everyone and the run
+            // continues. Owner-only and raid-only: a five-man keeps the short-handed
+            // carry-on, and a dead DPS never ends a raid fight.
+            if (in.regroupOnWipe && in.ownerBlockedRegroupMs != 0 && in.blockedSinceMs != 0 &&
+                in.nowMs >= in.blockedSinceMs &&
+                (in.nowMs - in.blockedSinceMs) >= in.ownerBlockedRegroupMs)
+            {
+                for (Member const& m : members)
+                {
+                    if (m.isDead && m.drivesRun)
+                    {
+                        r.outcome = Outcome::Regroup;
+                        r.reason = Reason::Wipe;
+                        return r;
+                    }
+                }
+            }
             bool const blockOutlivedTheWait =
                 in.blockedHoldMaxMs == 0 ||
                 (in.blockedSinceMs != 0 && in.nowMs >= in.blockedSinceMs &&
