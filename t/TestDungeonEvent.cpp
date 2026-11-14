@@ -721,7 +721,7 @@ TEST(DungeonEventRegistryTest, BlackrockRingOfLawEventShape)
 }
 
 // Blackrock Depths Shadowforge Lock (map 230 event 2): walk to the lever in the
-// East Garrison, pull it, then confirm the Giant Doors it drives actually closed.
+// East Garrison, pull it, then confirm the lever moved.
 // ANCHORED because the lever is 113yd from — and a floor above — the doors it
 // moves, so only boss-nav can deliver the tank to it.
 TEST(DungeonEventRegistryTest, BlackrockShadowforgeLockEventShape)
@@ -745,13 +745,12 @@ TEST(DungeonEventRegistryTest, BlackrockShadowforgeLockEventShape)
     EXPECT_EQ(e->steps[1].kind, EventStepKind::UseGameObject);
     EXPECT_EQ(e->steps[1].goEntry, 161460u);  // The Shadowforge Lock
 
-    // 3. gate on the DOORS, not on the lever: the lever flipping only proves the
-    //    click landed, GO_STATE_READY (1) on 157923 proves its SmartAI chain ran.
+    // 3. gate on the LEVER leaving GO_STATE_READY: since CoA 3.1 the Giant Doors
+    //    open on Lord Incendius' death, not off the lever, so a wait on the
+    //    doors never ends once Incendius is down.
     EXPECT_EQ(e->steps[2].kind, EventStepKind::WaitForGameObjectState);
-    EXPECT_EQ(e->steps[2].goEntry, 157923u);  // Giant Doors
-    EXPECT_EQ(e->steps[2].wantState, 1u);     // GO_STATE_READY == shut
-    EXPECT_GT(e->steps[2].radius, 113.0f)
-        << "the doors are 113yd from the lever — the scan must reach them";
+    EXPECT_EQ(e->steps[2].goEntry, 161460u);  // The Shadowforge Lock
+    EXPECT_EQ(e->steps[2].wantState, 0u);     // GO_STATE_ACTIVE == pulled
 }
 
 // Blackrock Depths Hurley's Kegs (map 230 event 3): walk between the kegs, then

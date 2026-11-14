@@ -121,12 +121,11 @@ namespace
     constexpr uint32 BRD_ENSURE_RING_STARTED_HOOK = 1;
 
     // --- Shadowforge Lock (event 2) ---------------------------------------
-    // The lever in the East Garrison, and the Giant Doors it drives. GOState
+    // The lever in the East Garrison. GOState
     // values are spelled out locally so this TU needn't pull SharedDefines:
     // GO_STATE_ACTIVE = 0, GO_STATE_READY = 1.
     constexpr uint32 BRD_GO_SHADOWFORGE_LOCK = 161460;
-    constexpr uint32 BRD_GO_GIANT_DOORS = 157923;
-    constexpr uint32 BRD_GO_STATE_READY = 1;
+    constexpr uint32 BRD_GO_STATE_ACTIVE = 0;
 
     // The lever's own spawn point, dropped onto the garrison floor (the mmaps
     // surface under it is z -59.82; the GO sits at -60.06 on the wall). The
@@ -137,12 +136,8 @@ namespace
     constexpr float BRD_LOCK_Z = -59.82f;
     constexpr float BRD_LOCK_RADIUS = 4.0f;
 
-    // Search radius for the Giant Doors from the lever. They are 113yd away at
-    // (723.1,-105.9,-71.5) but in the SAME map grid as the lever (both fall in
-    // grid 30/32), so the cell visit always has them loaded — this is a state
-    // read, not a proximity gate.
-    constexpr float BRD_GIANT_DOOR_SCAN = 200.0f;
-    constexpr uint32 BRD_GIANT_DOOR_TIMEOUT_MS = 30000;
+    // How long the lever gets to leave GO_STATE_READY after the click.
+    constexpr uint32 BRD_LOCK_TIMEOUT_MS = 30000;
 
     using namespace DcBlackrockDepths;
 
@@ -1161,8 +1156,9 @@ void RegisterBlackrockDepthsEvents(std::vector<DungeonEvent>& out)
     // at all (locks are adjudicated client-side and, for bots, by
     // BotCanOpenDoorLikePlayer — which the exemption covers for the walk-in
     // case). Use() -> UseDoorOrButton -> SetLootState(GO_ACTIVATED) fires the
-    // lever's SmartAI chain SYNCHRONOUSLY, which activates the mechanism, the
-    // Giant Doors, and the two collision hulls in one go.
+    // lever's SmartAI chain SYNCHRONOUSLY, which activates the mechanism (and,
+    // on world DBs before CoA 3.1, the Giant Doors and the two collision hulls;
+    // from 3.1 the doors spawn shut and open on Lord Incendius' death instead).
     //
     // NOT persistent, and it does not need to be: every step is idempotent under
     // a rewind. MoveTo re-arrives, UseGO early-returns Done on a lever that is no
@@ -1175,14 +1171,16 @@ void RegisterBlackrockDepthsEvents(std::vector<DungeonEvent>& out)
             .MoveTo(BRD_LOCK_X, BRD_LOCK_Y, BRD_LOCK_Z, BRD_LOCK_RADIUS).NoEncounterStart()
             // 2. Pull it.
             .UseGO(BRD_GO_SHADOWFORGE_LOCK, /*searchRadius*/ 15.0f).NoEncounterStart()
-            // 3. Confirm the machine actually moved. Gating on the DOORS rather
-            //    than on the lever is the point: the lever flipping only proves
-            //    the click landed, while GO_STATE_READY on 157923 proves the
-            //    SmartAI chain ran and the path is open. If the world DB is
-            //    missing that chain this step burns its timeout and stalls
-            //    visibly instead of latching the objective on a no-op.
-            .WaitForGOState(BRD_GO_GIANT_DOORS, BRD_GO_STATE_READY,
-                            BRD_GIANT_DOOR_TIMEOUT_MS, BRD_GIANT_DOOR_SCAN)
+            // 3. Confirm the click landed: the lever leaves GO_STATE_READY.
+            //    Gate on the LEVER, not on the Giant Doors. Since CoA 3.1 the
+            //    doors spawn shut and open when Lord Incendius dies, and the
+            //    lever no longer drives them; Incendius falls before this
+            //    objective, so the doors sit ACTIVE and a wait for READY on
+            //    them never ends. The doors are navigation-invisible either
+            //    way (see DcEventDoorRegistry), so the lever is the only state
+            //    the run depends on, and it reads the same on both world DBs.
+            .WaitForGOState(BRD_GO_SHADOWFORGE_LOCK, BRD_GO_STATE_ACTIVE,
+                            BRD_LOCK_TIMEOUT_MS, /*searchRadius*/ 15.0f)
             .Build());
 
     // --- HURLEY'S KEGS, ANCHORED ahead of Hurley (shares his index 11) ---

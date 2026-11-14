@@ -204,4 +204,5 @@ handed to testers without shell access.
 
 ## License
 
-AGPL-3.0-or-later (inherited from mod-playerbots). See `LICENSE`.
+AGPL-3.0-or-later. `LICENSE` holds the full license text; `NOTICE` holds the
+copyright line and the note on mod-playerbots' license change.
