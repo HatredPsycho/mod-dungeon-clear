@@ -10,6 +10,7 @@
 #include "Ai/Dungeon/DungeonClear/Data/DcCombatPurgeRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Data/DcNeverTargetRegistry.h"
 #include "Ai/Dungeon/DungeonClear/Data/DcTargetExclusionRegistry.h"
+#include "Ai/Dungeon/DungeonClear/Util/DcModuleCombat.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRunProgress.h"
 
 namespace
@@ -87,7 +88,12 @@ TEST(DcCombatPurgeRegistryTest, TheRowIsScopedToItsOwnMapAndEntry)
 // non-attackable Dire Maul Crystal Totem, 4/18 at the watchdog.
 TEST(DcCombatPurgeRegistryTest, DireMaulCrystalTotemMayBePurgedAndIsNeverATarget)
 {
+#if DC_MODULE_OWNS_COMBAT_PURGE
+    // The module's CoA Combat purges it; DC must not purge it a second time.
+    EXPECT_FALSE(DcCombatPurgeRegistry::IsPurgeable(429, 13916, FIGHTING));
+#else
     EXPECT_TRUE(DcCombatPurgeRegistry::IsPurgeable(429, 13916, FIGHTING));
+#endif
     EXPECT_TRUE(DcNeverTargetRegistry::IsNeverTarget(429, 13916));
 }
 
