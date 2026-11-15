@@ -513,6 +513,7 @@ TEST(DcRezDecisionTest, RaidOwnerDownUnderALongBlockRegroups)
     party[0].isDead = true;
     party[0].drivesRun = true;
     Inputs in = BaseInputs();
+    in.nowMs = 1000000;  // a block older than BaseInputs' 100 s clock (uint32: no underflow)
     in.regroupOnWipe = true;
     in.partyEngaged = true;  // survivors still swinging at the adds
     in.rezBlocked = true;
@@ -530,6 +531,7 @@ TEST(DcRezDecisionTest, RaidOwnerDownStandsDownBeforeTheOwnerWindow)
     party[0].isDead = true;
     party[0].drivesRun = true;
     Inputs in = BaseInputs();
+    in.nowMs = 1000000;  // a block older than BaseInputs' 100 s clock (uint32: no underflow)
     in.regroupOnWipe = true;
     in.rezBlocked = true;
     in.blockedSinceMs = in.nowMs - 60000;
@@ -546,6 +548,7 @@ TEST(DcRezDecisionTest, RaidDeadNonOwnerUnderALongBlockNeverRegroups)
     party[2].isDead = true;  // a DPS, not the owner
     party[0].drivesRun = true;
     Inputs in = BaseInputs();
+    in.nowMs = 1000000;  // a block older than BaseInputs' 100 s clock (uint32: no underflow)
     in.regroupOnWipe = true;
     in.rezBlocked = true;
     in.blockedSinceMs = in.nowMs - 300000;
