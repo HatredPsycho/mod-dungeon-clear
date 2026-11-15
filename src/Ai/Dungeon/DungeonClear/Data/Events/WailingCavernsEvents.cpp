@@ -214,20 +214,39 @@ void RegisterWailingCavernsRoster(std::vector<BossRosterPatch>& t)
                      151.27f, 252.26f, -102.82f, /*completionFrom*/ 0);
         mutanus.encounterIndex = 7;
 
+        // Return-fall off Verdan's shelf (key 7, BEFORE the escort by insertion
+        // order; see the (3) note above). Backed by event 3.
+        DungeonBossInfo fall = MakeObjective(OBJ(3), /*encounterIndex*/ 7, 43,
+                                             "Drop down to the lower caverns",
+                                             -55.89f, 44.32f, -29.01f, /*arriveRadius*/ 6.0f,
+                                             /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 3);
+        DungeonBossInfo escort = MakeObjective(OBJ(2), /*encounterIndex*/ 7, 43,
+                                               "Escort the Disciple of Naralex",
+                                               -134.97f, 125.40f, -78.09f, /*arriveRadius*/ 18.0f,
+                                               /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 2);
+
+        // A dungeon-finder group queued for a Wailing Caverns WING that ends before
+        // Mutanus (Winding Chasm, Crag of the Everliving) cannot start the escort:
+        // the core's instance script answers GetData(TYPE_NARALEX_EVENT_BLOCKED = 5)
+        // with 1 for those LFG dungeons, and two conditions on gossip menu 201 hide
+        // both start options of the Disciple. The escort step then refused its
+        // gossip until its dead-air watchdog stalled the run with "can't keep up
+        // with Disciple of Naralex" right next to an idle Disciple. In that
+        // instance the return-fall, the escort and Mutanus are not part of the
+        // run: read them as done, so the wing ends after its last boss.
+        constexpr int32 WC_DATA_NARALEX_EVENT_BLOCKED = 5;
+        for (DungeonBossInfo* tail : {&fall, &escort, &mutanus})
+        {
+            tail->doneInstanceDataId = WC_DATA_NARALEX_EVENT_BLOCKED;
+            tail->doneInstanceDataValue = 1;
+        }
+
         p.add = {
             MakeObjective(OBJ(1), /*encounterIndex*/ 5, 43, "Drop to Lord Serpentis",
                           -290.65567f, -3.8297224f, -58.30473f, /*arriveRadius*/ 6.0f,
                           /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 1),
-            // Return-fall off Verdan's shelf (key 7, BEFORE the escort by
-            // insertion order; see the (3) note above). Backed by event 3.
-            MakeObjective(OBJ(3), /*encounterIndex*/ 7, 43,
-                          "Drop down to the lower caverns",
-                          -55.89f, 44.32f, -29.01f, /*arriveRadius*/ 6.0f,
-                          /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 3),
-            MakeObjective(OBJ(2), /*encounterIndex*/ 7, 43,
-                          "Escort the Disciple of Naralex",
-                          -134.97f, 125.40f, -78.09f, /*arriveRadius*/ 18.0f,
-                          /*gateEntry*/ 0, /*hook*/ 0, /*eventId*/ 2),
+            fall,
+            escort,
             mutanus,
         };
         t.push_back(std::move(p));

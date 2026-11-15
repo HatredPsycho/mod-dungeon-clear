@@ -1064,6 +1064,18 @@ TEST(BossRosterRegistryTest, WailingCavernsEscortObjectiveSortsBeforeMutanus)
     EXPECT_LT(verdanIdx, dropIdx);
     EXPECT_LT(dropIdx, escortIdx);
     EXPECT_LT(escortIdx, mutanusIdx);
+
+    // In a dungeon-finder wing that ends before Mutanus the core blocks the
+    // escort (GetData(TYPE_NARALEX_EVENT_BLOCKED = 5) == 1, gossip hidden): the
+    // return-fall, the escort and Mutanus then read done, and only then.
+    for (DungeonBossInfo const* tail : {drop, escort, mutanus})
+    {
+        EXPECT_EQ(tail->doneInstanceDataId, 5);
+        EXPECT_EQ(tail->doneInstanceDataValue, 1u);
+        EXPECT_EQ(AnchorDoneByInstanceValues(*tail, 0u, 1u), DcAnchorDoneVia::InstanceData);
+        EXPECT_EQ(AnchorDoneByInstanceValues(*tail, 0u, 0u), DcAnchorDoneVia::None);
+    }
+    EXPECT_EQ(Find(out, 5775)->doneInstanceDataId, -1);
 }
 
 // Sethekk Halls (556): the forced-Anzu objective and its room pre-clear.
