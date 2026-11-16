@@ -110,6 +110,15 @@ namespace DcSettings
     // OnAfterConfigLoad) so an edited conf takes effect without restart. Cheap:
     // bumps an atomic generation counter that each thread compares lazily.
     void InvalidateConfCache();
+
+    // Server-wide reads that the registry's numeric rows cannot hold. Both pass
+    // showLogs=false, so a missing line is silent. Called rarely (startup, a
+    // `.dc` command), never per tick, so they are not cached.
+    //   GetServerString: a DungeonClear.<key> text value.
+    //   GetForeignBool:  a key another module owns (full name, e.g.
+    //                    "AiPlayerbot.Enabled"), read with the given default.
+    std::string GetServerString(char const* key, std::string const& def);
+    bool GetForeignBool(char const* fullKey, bool def);
 }
 
 #endif
