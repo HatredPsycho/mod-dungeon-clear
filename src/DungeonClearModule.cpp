@@ -92,6 +92,18 @@
 // The combat guards that move from Dungeon Clear to the playerbots module (07/11:
 // "DC is the autorun in the dungeon, the strategies are in playerbots"). On a
 // module without them DC simply keeps every guard itself.
+// The playerbots module reports at startup, and to the addon, which Dungeon Clear
+// version is built into the server. Without its header DC simply says nothing.
+#if __has_include("CoaDungeonClearLink.h")
+#include "CoaDungeonClearLink.h"
+#define DC_HAS_COA_LINK 1
+#else
+#define DC_HAS_COA_LINK 0
+#endif
+
+// The release this tree ships as (the tag is v<version>).
+constexpr char const* kDungeonClearVersion = "3.1.4";
+
 #if __has_include("CoaGroupTank.h") && __has_include("CoaHealEscort.h")
 #include "CoaGroupTank.h"
 #include "CoaHealEscort.h"
@@ -1423,6 +1435,9 @@ namespace
 
 void AddSC_dungeon_clear_module()
 {
+#if DC_HAS_COA_LINK
+    CoaDungeonClearLink::Announce(kDungeonClearVersion);
+#endif
     // Before any map updates: the providers and the guard list are read from the
     // map threads afterwards and never change again.
     WireModuleCombatGuards();
