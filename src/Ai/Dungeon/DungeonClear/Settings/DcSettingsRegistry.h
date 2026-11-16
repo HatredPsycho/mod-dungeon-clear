@@ -106,6 +106,12 @@ inline constexpr DcSettingDef kDcSettings[] =
     // addon override may reach.
     { "Enable",                DcType::Bool,   1,   0,   1,  false },
 
+    // Startup-check mode: the module loads and stays inert, like Enable = 0,
+    // so a server can qualify a binary without a bot population. The bot
+    // module's AiPlayerbot.StartupCheckOnly and a pack's CoA.ValidationMode
+    // have the same effect (DcModule::Decide). Latched with Enable.
+    { "StartupCheck",          DcType::Bool,   0,   0,   1,  false },
+
     { "LootMinQuality",        DcType::UInt,   0,   0,   6,  true  },
 
     // Better Loot Rolling. Master toggle for a set of fixes to mod-playerbots'

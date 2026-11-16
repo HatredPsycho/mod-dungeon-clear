@@ -2,7 +2,7 @@
  * mod-dungeon-clear — DcModuleEnable.h
  *
  * The module's master switch: `DungeonClear.Enable` in
- * mod_dungeon_clear.conf (1 by default).
+ * mod_dungeon_clear.conf (1 by default), plus the startup-check mode below.
  *
  * With it set to 0 the module is compiled and linked but completely inert:
  *
@@ -31,6 +31,16 @@
  * changed value logs a warning saying a restart is required, and changes
  * nothing.
  *
+ * STARTUP-CHECK MODE: the module loads, logs its verdict and does nothing, exactly
+ * as with `DungeonClear.Enable = 0`. It is on when any of these holds, so a
+ * server that qualifies a binary without a bot population needs no patch:
+ *   * `DungeonClear.StartupCheck = 1` (this module, default 0);
+ *   * `AiPlayerbot.StartupCheckOnly = 1` (the bot module's own startup check);
+ *   * `CoA.ValidationMode = 1` (the validation key some server packs set).
+ * The module is also inert when `AiPlayerbot.Enabled = 0`: dungeon clear drives
+ * bots and has nothing to do without them. None of these keys is set on a
+ * regular server, where nothing changes.
+ *
  * The switch is server-only in the registry: a master switch is an admin
  * decision, never something the companion addon's per-run override layer may
  * reach.
@@ -46,6 +56,28 @@ namespace DcModule
     // value is resolved from conf on the spot and latched, so the answer is
     // still stable for the rest of the process.
     bool IsEnabled();
+
+    // Why the module is (in)active. Kept apart from the conf reads so the rule
+    // can be tested headless.
+    enum class Verdict
+    {
+        Enabled,
+        SwitchedOff,     // DungeonClear.Enable = 0
+        StartupCheck,    // DungeonClear.StartupCheck, AiPlayerbot.StartupCheckOnly or CoA.ValidationMode
+        BotsDisabled     // AiPlayerbot.Enabled = 0
+    };
+
+    struct ConfInputs
+    {
+        bool enable = true;              // DungeonClear.Enable
+        bool startupCheck = false;       // DungeonClear.StartupCheck
+        bool botsEnabled = true;         // AiPlayerbot.Enabled
+        bool botsStartupCheck = false;   // AiPlayerbot.StartupCheckOnly
+        bool validationMode = false;     // CoA.ValidationMode
+    };
+
+    Verdict Decide(ConfInputs const& in);
+    char const* Describe(Verdict v);
 
     // Resolve `DungeonClear.Enable` from conf and latch it, logging the verdict.
     // Called once from the registrar's first world tick, BEFORE anything is

@@ -60,3 +60,46 @@ TEST_F(DcModuleEnableTest, RepeatedReadsAreStable)
     for (int i = 0; i < 5; ++i)
         EXPECT_FALSE(DcModule::IsEnabled());
 }
+
+// ---- startup-check mode and the bot-module guard ---------------------------------
+// A regular server sets none of the extra keys, so the module stays exactly as
+// DungeonClear.Enable says.
+
+TEST(DcModuleDecideTest, RegularServerIsEnabled)
+{
+    EXPECT_EQ(DcModule::Decide({}), DcModule::Verdict::Enabled);
+}
+
+TEST(DcModuleDecideTest, EnableZeroSwitchesOff)
+{
+    DcModule::ConfInputs in;
+    in.enable = false;
+    EXPECT_EQ(DcModule::Decide(in), DcModule::Verdict::SwitchedOff);
+}
+
+TEST(DcModuleDecideTest, EachStartupCheckKeyMakesTheModuleInert)
+{
+    DcModule::ConfInputs own;
+    own.startupCheck = true;
+    DcModule::ConfInputs bots;
+    bots.botsStartupCheck = true;
+    DcModule::ConfInputs pack;
+    pack.validationMode = true;
+    EXPECT_EQ(DcModule::Decide(own), DcModule::Verdict::StartupCheck);
+    EXPECT_EQ(DcModule::Decide(bots), DcModule::Verdict::StartupCheck);
+    EXPECT_EQ(DcModule::Decide(pack), DcModule::Verdict::StartupCheck);
+}
+
+TEST(DcModuleDecideTest, DisabledBotsMakeTheModuleInert)
+{
+    DcModule::ConfInputs in;
+    in.botsEnabled = false;
+    EXPECT_EQ(DcModule::Decide(in), DcModule::Verdict::BotsDisabled);
+}
+
+TEST(DcModuleDecideTest, EveryInactiveVerdictIsDescribed)
+{
+    for (auto v : {DcModule::Verdict::SwitchedOff, DcModule::Verdict::StartupCheck,
+                   DcModule::Verdict::BotsDisabled})
+        EXPECT_STRNE(DcModule::Describe(v), "enabled");
+}
