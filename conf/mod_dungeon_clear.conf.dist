@@ -77,6 +77,25 @@
 
 DungeonClear.Enable = 1
 
+#
+#    DungeonClear.StartupCheck
+#        0 (default): normal operation.
+#        1: startup-check mode. The module loads, logs that it is disabled and
+#        does nothing, exactly as with DungeonClear.Enable = 0. Use it to check
+#        that a worldserver starts, without any bot activity.
+#
+#        The module is put in the same state, without this line, when
+#        AiPlayerbot.StartupCheckOnly = 1 (playerbots.conf) or
+#        CoA.ValidationMode = 1 is set, and it is also inert when
+#        AiPlayerbot.Enabled = 0, since it only drives bots.
+#
+#        READ ONCE AT STARTUP, like DungeonClear.Enable.
+#
+#        Default: 0
+#
+
+DungeonClear.StartupCheck = 0
+
 ########################################
 # GENERAL SETTINGS  (per-player overridable — see note above)
 ########################################

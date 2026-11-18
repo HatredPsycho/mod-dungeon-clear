@@ -411,6 +411,16 @@ namespace DcSettings
         return sConfigMgr->GetOption<float>(FullKey(key), 0.0f);
     }
 
+    std::string GetServerString(char const* key, std::string const& def)
+    {
+        return sConfigMgr->GetOption<std::string>(FullKey(key), def, false);
+    }
+
+    bool GetForeignBool(char const* fullKey, bool def)
+    {
+        return sConfigMgr->GetOption<bool>(fullKey, def, false);
+    }
+
     bool SetOverride(ObjectGuid runOwner, std::string const& key, double rawValue,
                      std::string* err)
     {

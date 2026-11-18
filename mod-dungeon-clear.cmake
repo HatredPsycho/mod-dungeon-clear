@@ -232,6 +232,20 @@ if (BUILD_TESTING)
         set_target_properties(dungeon_clear_tests PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
         )
+
+        # Run by ctest. On Windows the executable sits in the build root while the
+        # DLLs it links are copied to bin/: put bin/ on its PATH, or Windows shows a
+        # "DLL not found" box and ctest waits on it.
+        add_test(NAME dungeon_clear_tests COMMAND dungeon_clear_tests)
+        if (WIN32)
+            if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
+                set_tests_properties(dungeon_clear_tests PROPERTIES
+                    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
+            else()
+                set_tests_properties(dungeon_clear_tests PROPERTIES
+                    ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}/bin\;$ENV{PATH}")
+            endif()
+        endif()
     endfunction()
 
     # Defer execution to the root directory's configuration end, after googletest has been fetched by the core

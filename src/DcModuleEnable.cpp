@@ -20,14 +20,53 @@ namespace
     // though map-update worker threads read it.
     std::atomic<int> g_state{-1};
 
+    DcModule::ConfInputs ReadInputs()
+    {
+        DcModule::ConfInputs in;
+        in.enable = DcSettings::GetBool(ObjectGuid::Empty, "Enable");
+        in.startupCheck = DcSettings::GetBool(ObjectGuid::Empty, "StartupCheck");
+        // Keys owned by the bot module or by a server pack. Their defaults are
+        // the regular-server values, so a missing line never turns DC off.
+        in.botsEnabled = DcSettings::GetForeignBool("AiPlayerbot.Enabled", true);
+        in.botsStartupCheck = DcSettings::GetForeignBool("AiPlayerbot.StartupCheckOnly", false);
+        in.validationMode = DcSettings::GetForeignBool("CoA.ValidationMode", false);
+        return in;
+    }
+
     bool ReadConf()
     {
-        return DcSettings::GetBool(ObjectGuid::Empty, "Enable");
+        return DcModule::Decide(ReadInputs()) == DcModule::Verdict::Enabled;
     }
 }
 
 namespace DcModule
 {
+    Verdict Decide(ConfInputs const& in)
+    {
+        if (!in.enable)
+            return Verdict::SwitchedOff;
+        if (in.startupCheck || in.botsStartupCheck || in.validationMode)
+            return Verdict::StartupCheck;
+        if (!in.botsEnabled)
+            return Verdict::BotsDisabled;
+        return Verdict::Enabled;
+    }
+
+    char const* Describe(Verdict v)
+    {
+        switch (v)
+        {
+            case Verdict::SwitchedOff:
+                return "DungeonClear.Enable = 0";
+            case Verdict::StartupCheck:
+                return "startup check: DungeonClear.StartupCheck, AiPlayerbot.StartupCheckOnly or CoA.ValidationMode is 1";
+            case Verdict::BotsDisabled:
+                return "AiPlayerbot.Enabled = 0";
+            default:
+                return "enabled";
+        }
+    }
+
     void LatchValue(bool enabled)
     {
         // First writer wins — a second call (a `.reload config`, a stray early
@@ -54,18 +93,19 @@ namespace DcModule
 
     void LatchFromConf()
     {
-        LatchValue(ReadConf());
+        Verdict const verdict = Decide(ReadInputs());
+        LatchValue(verdict == Verdict::Enabled);
 
         if (IsEnabled())
             return;
 
         LOG_INFO("module",
-                 "mod-dungeon-clear: DISABLED (DungeonClear.Enable = 0). No "
+                 "mod-dungeon-clear: DISABLED ({}). No "
                  "strategies, actions, triggers or values are registered with "
                  "mod-playerbots, no bot is given the dungeon-clear strategies, "
-                 "and every `.dc` command, addon message and hook is inert. Set "
-                 "DungeonClear.Enable = 1 and restart the worldserver to enable "
-                 "it.");
+                 "and every `.dc` command, addon message and hook is inert. Clear "
+                 "that setting and restart the worldserver to enable it.",
+                 Describe(verdict));
     }
 
     void WarnIfConfDiffersFromLatch()
@@ -74,17 +114,19 @@ namespace DcModule
         if (state < 0)
             return;  // nothing latched yet — the first world tick will read it
 
-        bool const conf = ReadConf();
+        Verdict const verdict = Decide(ReadInputs());
+        bool const conf = verdict == Verdict::Enabled;
         if (conf == (state != 0))
             return;
 
         LOG_WARN("module",
-                 "mod-dungeon-clear: DungeonClear.Enable is now {} in the config, "
+                 "mod-dungeon-clear: the config now resolves to {} ({}), "
                  "but this worldserver started with the module {}. Registration "
                  "into mod-playerbots' shared contexts happens once at startup "
                  "and cannot be undone or added live, so nothing changed — "
                  "restart the worldserver for the new value to take effect.",
-                 conf ? 1 : 0, state != 0 ? "ENABLED" : "DISABLED");
+                 conf ? "ENABLED" : "DISABLED", Describe(verdict),
+                 state != 0 ? "ENABLED" : "DISABLED");
     }
 
     void ResetLatchForTests()

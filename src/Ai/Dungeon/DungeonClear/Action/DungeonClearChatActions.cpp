@@ -5,6 +5,7 @@
 
 #include "DungeonClearChatActions.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcRun.h"
+#include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLed.h"
 #include "Ai/Dungeon/DungeonClear/Util/DcPlayerLedEvents.h"
 
@@ -88,7 +89,7 @@ namespace
         char const* key = difficulty == 0 ? "normal" : difficulty == 1 ? "heroic" : "mythic";
         char const* shown = difficulty == 0 ? "Normal" : difficulty == 1 ? "Heroic" : "Mythic";
 
-        std::string allowed = sConfigMgr->GetOption<std::string>("DungeonClear.AllowedDifficulties", "normal,heroic,mythic", false);
+        std::string allowed = DcSettings::GetServerString("AllowedDifficulties", "normal,heroic,mythic");
         std::transform(allowed.begin(), allowed.end(), allowed.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         std::istringstream list(allowed);

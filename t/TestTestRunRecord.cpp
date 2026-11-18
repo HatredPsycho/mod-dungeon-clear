@@ -139,14 +139,14 @@ TEST(DcTestRunRecordTest, DeathsSerializeWhoDiedAndToWhat)
     r.deaths.push_back({413, "Olanne", "Anzu", 23035, true});
 
     std::string const line = ToJsonl(r);
-    // role / manaPct / healerManaPct / healerAlive / hpPct / harm follow onBoss;
-    // left at their defaults here ("", -1 = unknown, no harm).
+    // role / manaPct / healerManaPct / healerAlive / hpPct / harm / hits follow
+    // onBoss; left at their defaults here ("", -1 = unknown, no harm, no hits).
     EXPECT_NE(line.find("\"deaths\":[{\"t\":410,\"name\":\"Bero\",\"opponent\":\"Anzu\","
                         "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[]},"
+                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[],\"hits\":[]},"
                         "{\"t\":413,\"name\":\"Olanne\",\"opponent\":\"Anzu\","
                         "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[]}]"),
+                        "\"healerManaPct\":-1,\"healerAlive\":false,\"hpPct\":-1,\"harm\":[],\"hits\":[]}]"),
               std::string::npos);
     EXPECT_EQ(Count(line, "\"name\":\"Olanne\""), 1u);
 }
@@ -182,7 +182,7 @@ TEST(DcTestRunRecordTest, BossRosterSerializesInProgressionOrder)
               std::string::npos);
 }
 
-TEST(DcTestRunRecordTest, SchemaIsNineteen)
+TEST(DcTestRunRecordTest, SchemaIsTwenty)
 {
     // 12: added combatHolders[].trigger, and with it a change of meaning in the
     // sibling `legitimate` field — a trigger creature now sinks the verdict.
@@ -195,7 +195,8 @@ TEST(DcTestRunRecordTest, SchemaIsNineteen)
     // 17: added dispels (per dispellable debuff the party carried).
     // 18: added dispels[].expiredWhy (expiries by the carrier's dispel reach).
     // 19: added deaths[].hpPct and deaths[].harm (the victim's last sample).
-    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":19"), std::string::npos);
+    // 20: added deaths[].hits (the last creature hits, the killing blow last).
+    EXPECT_NE(ToJsonl(SampleRecord()).find("\"schema\":20"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"size\":"), std::string::npos);
     EXPECT_NE(ToJsonl(SampleRecord()).find("\"difficulty\":"), std::string::npos);
 }
