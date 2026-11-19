@@ -2,207 +2,170 @@
   <img src="squidbots-logo.png" alt="SquidBots" width="260">
 </p>
 
-# mod-dungeon-clear
+# Dungeon Clear (SquidBots)
 
-> **⚠️ SquidBots / Conquest of Azeroth build.** This branch is a customised
-> version of [jrad7/mod-dungeon-clear](https://github.com/jrad7/mod-dungeon-clear)
-> for the Conquest of Azeroth AzerothCore core and the SquidBots fork of
-> mod-playerbots (CoA classes, CoA dungeons and raids, SquidBots Lite addon). It
-> is **not recommended on a classic WotLK AzerothCore server**: use the original
-> module there.
+**Dungeon Clear for Conquest of Azeroth.** A tank bot runs the dungeon for your
+party: it routes from boss to boss, pulls the trash on the way, loots, rests,
+opens the doors and plays the scripted events. You deal damage, heal, or tank
+yourself and let the bots follow your lead.
 
-Autonomous dungeon-clearing mode for **mod-playerbots** tank bots, packaged as a
-drop-in AzerothCore module. A tank bot drives the party from boss to boss,
-clearing trash, pathing the layout, pausing for loot, resting between fights, and
-handling doors and scripted events along the way. You deal damage and let the
-tank run the dungeon.
+This module is built for the Conquest of Azeroth core and
+[SquidBots](https://github.com/Zyth45/mod-playerbots) (CoA classes, CoA
+dungeons and raids). It is not meant for a classic WotLK AzerothCore server.
 
-Routes are generated on the fly from the live navigation mesh, with no waypoints
-or hardcoded paths, so the clear works in any instance — the hand-built data the
-module does carry is for scripted events and known navmesh breaks, not for
-routing. On this branch it needs the **SquidBots fork of mod-playerbots** (CoA
-classes and raid strategies); the original module targets stock mod-playerbots.
+**Latest version: [v3.1.4](https://github.com/Zyth45/mod-dungeon-clear/tree/v3.1.4)**,
+shipped with SquidBots 3.1.4.
 
-> ## Use the companion addon
->
-> [**mod-dungeon-clear-addon**](https://github.com/jrad7/mod-dungeon-clear-addon)
-> is the recommended way to drive a clear: a movable in-game panel with On, Off,
-> Skip, and Pause buttons, a live status readout, a per-boss list, and a settings
-> panel for live tuning. The `dc` chat keywords and `.dc` commands still work, but
-> the addon is easier to use.
+**Discord (support, news, new versions): https://discord.gg/DTJceaG9Ky**
+
+## Get it
+
+The easy way is the **[SquidBots Server launcher](https://github.com/Zyth45/squidbots-launcher)**:
+it installs and updates a Conquest of Azeroth server with SquidBots and Dungeon
+Clear on your own PC, from your own game client.
+[squidbots-updates](https://github.com/Zyth45/squidbots-updates) keeps an
+existing CoA Bots repack, the addon and the dashboard up to date.
+
+To build it yourself:
+
+1. Clone this repository into `modules/mod-dungeon-clear/`, next to
+   [SquidBots](https://github.com/Zyth45/mod-playerbots) in `modules/mod-playerbots/`.
+2. Re-run CMake and rebuild the worldserver.
+3. Copy `conf/mod_dungeon_clear.conf.dist` to `mod_dungeon_clear.conf` if you
+   want to change a setting.
+
+Dungeon Clear extends the SquidBots AI engine (strategies, actions, triggers and
+values): it does not run without it.
+
+## The addon
+
+The **[SquidBots Lite addon](https://github.com/Zyth45/squidbots-addon)** is the
+easiest way to drive a clear. Its Dungeon button opens the Dungeon clear panel:
+On, Off, Pause and Skip, the boss list with Go buttons, the pull mode, a live
+status line, and settings you can change for the current run. The panel opens
+by itself once when you enter a dungeon or a raid. The `dc` chat keywords and
+the `.dc` commands below do the same things.
 
 ## What it does
 
-While enabled, the tank bot handles a run end to end:
+While a clear runs, the tank bot handles the dungeon end to end:
 
-- **Routing** from boss to boss over the live navmesh, including long corridors,
-  doors, and multi-wing maps.
-- **Pulling trash** on the way to each boss, with selectable pull styles (see
-  [Pull modes](#pull-modes)).
-- **Scripted events** that gate progress in many classic and Burning Crusade
-  dungeons: levers, altars, gongs, freed prisoners, escorts, wave set-pieces,
-  and off-mesh drops (see [Scripted dungeon events](#scripted-dungeon-events)).
-- **Looting** finished corpses, with a quality floor and skip logic so the party
-  does not camp on corpses with nothing worth taking.
-- **Resting** between fights, tracking playerbots' own eat and drink thresholds.
-- **Party support**: followers stay with the tank, healers reposition to keep the
-  tank in line of sight, and the group regroups after a fight pulls it apart.
-- **Death recovery**: when a member dies and a living Priest, Paladin, Shaman, or
-  Druid remains, the run holds while they resurrect the fallen and resumes once
-  everyone is back up, instead of ending on the first death (`DungeonClear.PostCombatRez`).
-  The run still ends on a full wipe, with no living resurrector, or on timeout.
+- **Routing** from boss to boss over the live navigation mesh, with no
+  hand-made waypoints: long corridors, doors, and dungeons with several wings.
+- **Pulling trash** on the way to each boss, in the pull mode you choose
+  (see [Pull modes](#pull-modes)).
+- **Scripted events** that gate progress: levers, gongs, altars, freed
+  prisoners, escorts, wave fights and drops between levels
+  (see [Scripted events](#scripted-events)).
+- **Looting** with a quality floor, so the party does not wait on corpses with
+  nothing worth taking.
+- **Resting** between fights, on the bots' own eat and drink thresholds.
+- **Party support**: followers stay with the tank, healers keep it in line of
+  sight, and the group regroups after a fight pulls it apart.
+- **Death recovery**: when someone dies and a living member can resurrect
+  (Priest, Paladin, Shaman, Druid, or any CoA class that knows a resurrection
+  spell), the run waits for the rez and goes on. It ends on a full wipe, with
+  nobody able to rez, or on timeout.
+- **Heroic and Mythic dungeons**: the tank pulls more carefully, and several
+  settings have their own heroic value. A realm chooses which difficulties
+  players may clear (`DungeonClear.AllowedDifficulties`).
 
-**Heroic difficulty** is supported: the tank pulls more carefully, several
-settings carry their own heroic values, and a few events fire only on heroic.
-See [Configuration](#configuration).
+## You tank, the bots follow
 
-## Requirements
+You can tank yourself. Open the **Main Tank** bar of the SquidBots Lite addon
+(or type `tank main on`): you lead, and Dungeon Clear stops driving. The bots
+keep its party side: healers place on you, DPS wait for your threat, and
+followers left behind regroup on you. `dc on` is refused while a member of the
+group is the main tank, so the two modes never fight over the party.
 
-- **mod-playerbots** installed and enabled. This module is an extension of the
-  playerbots AI engine. It subclasses playerbots' strategy, action, trigger, and
-  value classes and links against them. It is not standalone.
+A clear driven by Dungeon Clear always needs a **bot** as tank. You can also
+turn your own character into a bot (`.playerbots bot self`) and let it drive.
 
-## Install
+## Commands
 
-1. Clone into `modules/mod-dungeon-clear/`.
-2. Re-run CMake and rebuild the worldserver (`-DMODULES=static`).
-3. Optionally copy `conf/mod_dungeon_clear.conf.dist` to
-   `mod_dungeon_clear.conf`.
+The commands act on the group's tank bot. They must come from a real player in
+the group, and `.dc on` works inside a dungeon only.
 
-## Usage
-
-Both input methods control the same behaviour and act on the group's **tank**
-bot. They must come from a real player in the bot's group, and `.dc on` requires
-being inside a dungeon. (`.dc spectate` is the exception — it acts on your own
-session, so it needs no group.)
-
-| Slash command | In-party chat keyword | What it does |
+| Command | Party chat | What it does |
 |---|---|---|
-| `.dc on` | `dc on` / `dungeon clear on` | Start the clear. |
-| `.dc off` | `dc off` / `dungeon clear off` | Stop and return bots to the player. |
-| `.dc pause` | `dc pause` / `dungeon clear pause` | Soft-stop in place; resume with the same command. |
-| `.dc skip` | `dc skip` | Skip the current objective if the tank is stalled. |
-| `.dc pull` | `dc pull` / `dungeon clear pull` | Cycle the pull mode. |
-| `.dc status` | `dc status` | Print the current run status. |
-| `.dc bosses` | `dc bosses` | List the dungeon's bosses and kill state. |
-| `.dc go <boss>` | | Route directly to a named boss. |
-| `.dc config` | | Print the effective `DungeonClear.*` values for the current run, marking addon overrides and heroic defaults. |
-| `.dc spectate` | | Toggle the free-fly spectator camera. `.dc spectate follow [name]` rides a bot instead. |
+| `.dc on` | `dc on` | Start the clear. |
+| `.dc off` | `dc off` | Stop, and give the bots back to you. |
+| `.dc pause` | `dc pause` | Hold in place; the same command resumes. |
+| `.dc skip` | `dc skip` | Skip the current objective when the tank is stuck. |
+| `.dc pull` | `dc pull` | Change the pull mode. |
+| `.dc status` | `dc status` | Show the run status. |
+| `.dc bosses` | `dc bosses` | List the bosses and which are dead. |
+| `.dc go <boss>` | | Go straight to a boss. |
+| `.dc wing [wing]` | `dc wing` | Show or choose the wing (Blackrock Spire: `lbrs` or `ubrs`). |
+| `.dc config` | | Show the settings in effect for this run. |
+| `.dc spectate` | | Free camera; `.dc spectate follow [name]` rides a bot. |
 
-There is also `.dc test`, a GM-only automated test harness — see
-[Automated test runs](#automated-test-runs), below.
-
-Non-tank party bots follow the tank only while it has dungeon clear enabled, then
-revert to the player automatically.
+Game masters also have `.dc test`, an automated test harness (see
+[Test runs](#test-runs)).
 
 ## Pull modes
 
-How the tank takes trash packs on the way to each boss. Choose from the addon's
-pull control or the `dc pull` toggle.
-
 | Mode | Behaviour | Speed | Risk |
 |---|---|---|---|
-| **Dynamic** *(recommended)* | Decide per pack: Leeroy a lone pack, camp-pull a clustered or oversized one. | Middle | Middle |
-| **Leeroy** | Walk straight into each pack and fight in place. | Fastest | Highest |
-| **Advanced** | Pull every pack back to a held camp before fighting. | Slowest | Lowest |
+| **Dynamic** *(recommended)* | Chooses per pack: runs into a small pack, pulls a big or clustered one back to a safe spot. | Middle | Middle |
+| **Leeroy** | Runs into every pack and fights where it stands. | Fastest | Highest |
+| **Advanced** | Pulls every pack back to a safe spot first. | Slowest | Lowest |
 
-**Dynamic suits most content.** It Leeroys easy packs at full speed and only pays
-the careful camp-pull cost on dangerous ones, estimating how many mobs would
-actually aggro and comparing that to a tunable ceiling
-(`DungeonClear.PullDynamicMaxLeeroyMobs`). Use **Leeroy** in content you can
-out-gear, or **Advanced** in harder content where every pull matters.
+Dynamic counts how many mobs would join the fight and compares that with
+`DungeonClear.PullDynamicMaxLeeroyMobs`. Use Leeroy when you outgear the
+dungeon, Advanced when every pull matters.
 
-See the [Pull modes](https://github.com/jrad7/mod-dungeon-clear/wiki/Pull-Modes)
-wiki page for how each mode works in detail and how to tune Dynamic.
+## Scripted events
 
-## Scripted dungeon events
+Dungeon Clear plays the scripted steps of the classic dungeons as part of the
+route, with no input from you: Deadmines, Wailing Caverns, Shadowfang Keep,
+Blackfathom Deeps, Razorfen Downs, Scarlet Monastery, Uldaman, Zul'Farrak,
+Maraudon, Sunken Temple, Blackrock Depths, Blackrock Spire, Dire Maul,
+Scholomance and Stratholme. In raids it handles the encounter steps of Molten
+Core, Zul'Gurub and Blackwing Lair, while the bots' raid strategies fight the
+bosses.
 
-Many instances gate progress behind a scripted step the party must perform: pull
-a lever, click a panel, ring a gong, free a prisoner, escort an NPC, survive a
-wave set-piece, or cross a break in the navmesh. mod-dungeon-clear performs
-these automatically as part of the normal boss route, with no player input.
-
-Event support currently covers, in classic: Deadmines, Shadowfang Keep, Wailing
-Caverns, Uldaman, Sunken Temple, Razorfen Downs, Scarlet Monastery, Zul'Farrak,
-Blackrock Depths, Upper Blackrock Spire, Scholomance, Stratholme, and Dire
-Maul; and in Burning
-Crusade: Hellfire Ramparts, Blood Furnace, Shattered Halls, Slave Pens,
-Underbog, Steamvault, Sethekk Halls, Mechanar, Arcatraz, Black Morass, Old
-Hillsbrad, and Magisters' Terrace; and in Wrath of the Lich King: Utgarde Keep,
-the Nexus, Azjol-Nerub, Ahn'kahet, Drak'Tharon Keep, the Violet Hold, Gundrak,
-Halls of Stone, Halls of Lightning, Utgarde Pinnacle, the Culling of Stratholme,
-Trial of the Champion, Pit of Saron, and Halls of Reflection. Coverage continues
-to expand. (Trial of the Champion's joust itself is fought by mod-playerbots'
-`wotlk-toc` strategy; mod-dungeon-clear musters the mounted party and starts
-each phase.)
-
-Faction-specific events run only for the relevant side, and heroic-only events
-never fire on a normal run. If an event cannot complete (for example, a scripted
-NPC the party let die), the run either stalls for the player or skips the step,
-depending on whether the step is required.
-
-The full per-dungeon list is on the
-[Scripted Dungeon Events](https://github.com/jrad7/mod-dungeon-clear/wiki/Scripted-Dungeon-Events)
-wiki page.
-
-## You cannot play *as* the tank with dungeon clear on
-
-Dungeon clear drives the **tank bot's** AI, so the tank must be a bot. If you
-personally control the tank, the AI and you fight over the same character. The
-exception is **self-bot mode**: turn your own character into a self-bot
-(`.playerbots bot self`) and let the AI drive. If you want hands on the keyboard,
-play a follower instead.
+Faction events run only for the right side, and heroic-only events never fire
+on a normal run. When a step cannot be completed (an escorted NPC died, for
+example), the run either waits for you or skips the step, depending on whether
+the step is required.
 
 ## Configuration
 
-All `DungeonClear.*` options live in `conf/mod_dungeon_clear.conf.dist`, and most
-are overridable live, per run, from the companion addon's Settings panel. Common
-ones: loot quality floor, rest health and mana targets, and the Dynamic pull
-tuning. See the
-[Configuration reference](https://github.com/jrad7/mod-dungeon-clear/wiki/Configuration)
-wiki page.
+Every `DungeonClear.*` setting is in `conf/mod_dungeon_clear.conf.dist`, with
+its description and default. Most can be changed for the current run from the
+addon's settings. Common ones: loot quality floor, rest health and mana, pull
+tuning, allowed difficulties.
 
-Any setting can be given a **heroic-difficulty value** by appending `.Heroic` to
-its name (`DungeonClear.PullDynamicMaxLeeroyMobs.Heroic = 2`), which applies
-while the run is inside a dungeon at heroic difficulty. Several options ship
-with a heroic default that differs from the normal one; the conf lists them, and
-`.dc config` marks them with an `H`. Resolution order is per-run override →
-`<key>.Heroic` → `<key>` → built-in default.
+- Append `.Heroic` to a setting to give it a heroic value
+  (`DungeonClear.PullDynamicMaxLeeroyMobs.Heroic = 2`). Order: run override,
+  then `<key>.Heroic`, then `<key>`, then the built-in default. `.dc config`
+  marks heroic defaults with an `H`.
+- `DungeonClear.Enable = 0` keeps the module built in but completely inert.
+  It is read once at startup.
+- **Startup check**: with `DungeonClear.StartupCheck = 1`,
+  `AiPlayerbot.StartupCheckOnly = 1` or `CoA.ValidationMode = 1`, the module
+  loads and does nothing, so a server can check that a worldserver starts
+  without any bot activity. It is also inert when `AiPlayerbot.Enabled = 0`.
+  All of these are off by default.
 
-A few mod-playerbots ranges also affect runs (`LootDistance`, `ReactDistance`,
-`SightDistance`, `FollowDistance`). The rest gate tracks playerbots' own eat and
-drink thresholds automatically, so no playerbots config change is required.
+At startup the module tells SquidBots its version, so the server log and the
+addon show which Dungeon Clear is built in.
 
-## How it integrates
+## Test runs
 
-mod-playerbots exposes no extension API, so this module appends its context
-factories into the engine's shared registries on the first world tick, and
-registers a `.dc` command plus a login hook for the `dungeon clear` strategy. It
-touches **no** playerbots file. Details:
-[How it integrates](https://github.com/jrad7/mod-dungeon-clear/wiki/How-It-Integrates).
+`.dc test` is a **game master** tool, not part of normal play. One command
+builds a random 5-bot party (tank, healer, three DPS), levels and gears it,
+sends it to a dungeon and lets it clear on its own while you watch
+(`.dc test watch`). Each run keeps its seed, so a run that hits a bug can be
+replayed with the same party, and `.dc test plan` runs a dungeon several times
+to give a success rate. The `testdeck/` folder holds a web page to start and
+watch these runs.
 
-## Automated test runs
-
-`.dc test` is a **GM-only** harness, not part of normal play. One command rolls
-a random 5-bot party (tank, healer, three DPS on five different classes), levels
-and gears it, sends it to a dungeon entrance and lets it clear the place on its
-own. You stay out of the party and watch, or `.dc test watch` the camera along.
-Every run records its seed, so a run that hits a bug can be replayed with the
-exact same party, and `.dc test plan` runs the same dungeon N times to give you
-a success *rate* rather than an anecdote. `.dc test plan start pool=a,b:heroic,…
-total=0` runs a whole pool of dungeons until stopped — the Test Deck's
-Continuous mode, which keeps every failure and its logs across restarts.
-
-**[Test Runs](https://github.com/jrad7/mod-dungeon-clear/wiki/Test-Runs)** —
-the full command reference, gear and party options, plans, watching, the
-headless test-driver character, and where the results are written.
-
-**[Test Deck](https://github.com/jrad7/mod-dungeon-clear/wiki/Test-Deck)** — the
-web frontend for those runs, shipped in `testdeck/`. Log in with a game GM
-account, pick a dungeon from a grid, and watch the party live; built to be
-handed to testers without shell access.
+The module's unit tests build with `-DBUILD_TESTING=ON` and run with ctest
+(`dungeon_clear_tests`).
 
 ## License
 
-AGPL-3.0-or-later. `LICENSE` holds the full license text; `NOTICE` holds the
-copyright line and the note on mod-playerbots' license change.
+AGPL-3.0-or-later. `LICENSE` holds the full text; `NOTICE` holds the copyright
+line (Jared Wright and contributors) and the note on the playerbots license.
